@@ -1,0 +1,10 @@
+node_modules/
+dist/
+dist-electron/
+release/
+release-locator/
+coverage/
+*.log
+*.tsbuildinfo
+.env
+*.zip

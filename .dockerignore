@@ -1,0 +1,12 @@
+node_modules
+dist
+dist-electron
+release
+release-locator
+coverage
+.git
+.idea
+.env
+*.log
+*.zip
+*.tsbuildinfo

@@ -1,0 +1,34 @@
+{
+  "mqttSettings": {
+    "host": "192.168.1.111",
+    "port": 1883,
+    "transport": "tcp",
+    "websocketPath": "/mqtt",
+    "username": "",
+    "tls": false,
+    "rejectUnauthorized": true,
+    "keepalive": 30,
+    "connectTimeoutMs": 10000,
+    "qos": 1,
+    "subscriptionQos": 1,
+    "topics": {
+      "order": "uagv/v2/bosch/0001/order",
+      "instantActions": "uagv/v2/bosch/0001/instantActions",
+      "state": "uagv/v2/bosch/0001/state",
+      "visualization": "uagv/v2/bosch/0001/visualization",
+      "connection": "uagv/v2/bosch/0001/connection"
+    }
+  },
+  "orderSettings": {
+    "manufacturer": "bosch",
+    "serialNumber": "0001",
+    "version": "2.0.0",
+    "missionMaximumSpeedMps": 0.05,
+    "allowedDeviationXy": 0.2,
+    "allowedDeviationTheta": 0.35,
+    "rotationAllowed": true,
+    "startTolerance": 0.5,
+    "commandTimeoutMs": 5000,
+    "stateStaleTimeoutMs": 10000
+  }
+}

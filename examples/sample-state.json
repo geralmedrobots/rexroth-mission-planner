@@ -1,0 +1,30 @@
+{
+  "headerId": 864,
+  "timestamp": "2026-07-22T11:37:17.00Z",
+  "version": "2.0.0",
+  "manufacturer": "bosch",
+  "serialNumber": "0001",
+  "orderId": "",
+  "orderUpdateId": 0,
+  "lastNodeId": "",
+  "lastNodeSequenceId": 0,
+  "driving": false,
+  "paused": false,
+  "operatingMode": "AUTOMATIC",
+  "agvPosition": {
+    "mapId": "SendBox_2026-07-23_11-35-45_built_001",
+    "positionInitialized": true,
+    "theta": -0.5065,
+    "x": -0.238,
+    "y": -0.499
+  },
+  "velocity": {"vx": 0, "vy": 0, "omega": 0},
+  "batteryState": {"batteryCharge": 0, "charging": false},
+  "safetyState": {"eStop": "NONE", "fieldViolation": false},
+  "nodeStates": [],
+  "edgeStates": [],
+  "actionStates": [],
+  "errors": [],
+  "information": [],
+  "newBaseRequest": false
+}

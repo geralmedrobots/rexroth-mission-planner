@@ -1,0 +1,50 @@
+:root {
+  --mr-bg-primary: #f4f5f7;
+  --mr-bg-secondary: #ffffff;
+  --mr-panel: rgba(255, 255, 255, 0.94);
+  --mr-panel-strong: #ffffff;
+  --mr-red: #c8102e;
+  --mr-red-dark: #8f0b22;
+  --mr-text-primary: #24282d;
+  --mr-text-secondary: #687078;
+  --mr-success: #16875f;
+  --mr-warning: #b56a00;
+  --mr-danger: #c8102e;
+  --mr-border: rgba(143, 11, 34, 0.16);
+  --mr-shadow: 0 18px 45px rgba(72, 18, 29, 0.10);
+}
+
+html, body, #root { width: 100%; height: 100%; margin: 0; }
+body {
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 12% -12%, rgba(200, 16, 46, .10), transparent 36%),
+    linear-gradient(145deg, #ffffff, var(--mr-bg-primary));
+}
+.mr-glass {
+  background: linear-gradient(145deg, rgba(255,255,255,.98), rgba(250,246,247,.94)) !important;
+  border: 1px solid var(--mr-border);
+  box-shadow: var(--mr-shadow);
+  backdrop-filter: blur(18px);
+}
+.mr-status-pulse::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 0 currentColor;
+  animation: mr-pulse 2s ease-out infinite;
+}
+.mr-route-ready { animation: mr-route-in .45s ease-out both; }
+.mr-map-loading {
+  background: linear-gradient(90deg, transparent, rgba(200,16,46,.08), transparent);
+  background-size: 220% 100%;
+  animation: mr-shimmer 1.6s linear infinite;
+}
+@keyframes mr-pulse { 65% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+@keyframes mr-route-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes mr-shimmer { to { background-position: -220% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+}

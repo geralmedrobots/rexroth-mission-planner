@@ -1,0 +1,16 @@
+{
+  "headerId": 1,
+  "timestamp": "2026-07-23T12:00:00.000Z",
+  "version": "2.0.0",
+  "manufacturer": "bosch",
+  "serialNumber": "0001",
+  "orderId": "auto-order-example",
+  "orderUpdateId": 0,
+  "nodes": [
+    {"nodeId":"node-0","sequenceId":0,"released":true,"nodePosition":{"x":-0.5,"y":-0.2,"theta":0,"allowedDeviationXy":0.2,"allowedDeviationTheta":0.35,"mapId":"sample-map"},"actions":[]},
+    {"nodeId":"node-1","sequenceId":2,"released":true,"nodePosition":{"x":0.5,"y":-0.2,"theta":0.7,"allowedDeviationXy":0.2,"allowedDeviationTheta":0.35,"mapId":"sample-map"},"actions":[]}
+  ],
+  "edges": [
+    {"edgeId":"edge-0","sequenceId":1,"released":true,"startNodeId":"node-0","endNodeId":"node-1","maxSpeed":0.05,"rotationAllowed":true,"actions":[]}
+  ]
+}

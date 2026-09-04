@@ -1,0 +1,19 @@
+services:
+  rokit-path-planner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: rokit-automatic-path-planner:local
+    container_name: rokit-automatic-path-planner
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    environment:
+      ROKIT_BRIDGE_HOST: 0.0.0.0
+      ROKIT_BRIDGE_PORT: 8787
+      ROKIT_LOCATOR_HOST: ${ROKIT_LOCATOR_HOST:-192.168.1.104}
+      ROKIT_LOCATOR_RPC_PORT: ${ROKIT_LOCATOR_RPC_PORT:-18082}
+      ROKIT_LOCATOR_RPC_ENDPOINT: ${ROKIT_LOCATOR_RPC_ENDPOINT:-/}
+      ROKIT_LOCATOR_USERNAME: ${ROKIT_LOCATOR_USERNAME:-admin}
+      ROKIT_LOCATOR_PASSWORD: ${ROKIT_LOCATOR_PASSWORD:-change_me}
+      ROKIT_LOCATOR_AUTO_LOGIN: ${ROKIT_LOCATOR_AUTO_LOGIN:-false}
