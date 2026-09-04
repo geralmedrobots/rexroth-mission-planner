@@ -22,7 +22,6 @@ import {
 import { imageFileToPixels, metadataFromRosYaml, parseOccupancyJson, pixelsToOccupancy } from './domain/map/MapImporter';
 import { ObstacleInflation } from './domain/planner/ObstacleInflation';
 import { PathCollisionValidator } from './domain/planner/PathCollisionValidator';
-import { PlannerService } from './domain/planner/PlannerService';
 import { MissionMonitor } from './domain/order/MissionMonitor';
 import { selectCurrentRobotPose } from './domain/robot/RobotPoseSelector';
 import { parseBoschVehicleConfiguration } from './domain/robot/BoschVehicleConfiguration';
@@ -71,7 +70,9 @@ import { LogService } from './services/LogService';
 import { OperationalLogDiagnosticSink } from './features/diagnostics/DiagnosticEvent';
 import { mqttService } from './services/MqttService';
 import { useAppStore } from './stores/appStore';
-import { createPlanningConfigurationSnapshot } from './domain/planning/PlanningConfigurationSnapshot';
+import { PlanningCoordinator } from './features/planning/PlanningCoordinator';
+import type { PlanningConfigurationSnapshot } from './domain/planning/PlanningConfigurationSnapshot';
+import { MissionController } from './features/mission/MissionController';
 
 const navExpandedWidth=224; const navCollapsedWidth=76; const rightWidth=360;
 const safety='This application is not a safety function. Vehicle safety must be provided by certified safety hardware and the machine safety system.';
@@ -79,6 +80,8 @@ const publishWarning='Test only in a controlled area. Use a low maximum speed. E
 const operationalDiagnosticSink = new OperationalLogDiagnosticSink((category, level, message) =>
   LogService.write(category, level, message));
 const appSessionId = crypto.randomUUID();
+const planningCoordinator = new PlanningCoordinator({ diagnostics: operationalDiagnosticSink });
+const missionController = new MissionController(operationalDiagnosticSink);
 interface ConfirmationState {
   title:string;
   message:string;
@@ -124,6 +127,7 @@ export default function App(){
   const [diagnosticSeverity,setDiagnosticSeverity]=useState<'all'|'info'|'warning'|'error'>('all');
   const [pauseLogScroll,setPauseLogScroll]=useState(false);
   const [toast,setToast]=useState<{severity:'success'|'warning'|'error'|'info';message:string}>();
+  const planningConfigurationRef=useRef<PlanningConfigurationSnapshot|undefined>(undefined);
   const [confirmation,setConfirmation]=useState<ConfirmationState>();
   const confirmationResolver=useRef<((confirmed:boolean)=>void)|null>(null);
   const [routePhase,setRoutePhase]=useState('Selecting destination');
@@ -257,10 +261,6 @@ export default function App(){
     const routeStart=startOverride??store.start;
     const routeGoal=goalOverride??store.goal;
     if(!store.grid||!routeStart||!routeGoal){LogService.write('planner','error','Load a map and set start and goal first.');return;}
-    const transform=new CoordinateTransformer(store.grid.metadata);
-    const anchors:RobotPose[]=store.plannerMode==='hybrid'
-      ? [routeStart,...store.waypoints.map((w)=>({...w,mapId:store.grid!.metadata.mapId,positionInitialized:true})),routeGoal]
-      : [routeStart,routeGoal];
     if(store.plannerMode==='manual'){
       const finalPath:PathPoint[]=[routeStart,...store.waypoints,routeGoal];
       const valid=new PathCollisionValidator().pathIsFree(store.grid,finalPath,store.footprint,store.plannerOptions.collisionSampleInterval);
@@ -269,91 +269,26 @@ export default function App(){
           simplifiedPointCount:finalPath.length,finalPointCount:finalPath.length}}});
       return valid?finalPath:undefined;
     }
-    store.set({planning:true,rawPath:[],finalPath:[]}); const planner=new PlannerService();
-    const planningConfiguration=createPlanningConfigurationSnapshot({
-      plannerOptions:store.plannerOptions,footprint:store.footprint,orderSettings:store.orderSettings,
-    });
+    store.set({planning:true,rawPath:[],finalPath:[]});
     try{
-      const raw:PathPoint[]=[];const simplified:PathPoint[]=[];const final:PathPoint[]=[];let visited=0;let duration=0;
-      const baseline:PathPoint[]=[];const rejectedEnhancement:PathPoint[]=[];
-      const plannerDiagnostics:NonNullable<PlannerResult['diagnostics']>={
-        detectedPassages:[],routePassageCount:0,insertedNodeCount:0,
-        rejectedTurnLocations:[],relocatedTurnNodes:0,
-        minimumRouteClearanceM:Number.POSITIVE_INFINITY,largestHeadingChangeDeg:0,
-        stages:[],warnings:[],finalPathSource:'baseline',
-        rawPathStatus:'RAW_PATH_FAILED',baselineStatus:'BASELINE_PATH_FAILED',
-        doorAlignmentStatus:'NOT_RUN',turnValidationStatus:'NOT_RUN',
-      };
-      const mergeDiagnostics=(result:PlannerResult):void=>{
-        if(!result.diagnostics)return;
-        plannerDiagnostics.detectedPassages.push(...result.diagnostics.detectedPassages);
-        plannerDiagnostics.routePassageCount+=result.diagnostics.routePassageCount;
-        plannerDiagnostics.insertedNodeCount+=result.diagnostics.insertedNodeCount;
-        plannerDiagnostics.rejectedTurnLocations.push(
-          ...result.diagnostics.rejectedTurnLocations);
-        plannerDiagnostics.relocatedTurnNodes+=result.diagnostics.relocatedTurnNodes;
-        plannerDiagnostics.minimumRouteClearanceM=Math.min(
-          plannerDiagnostics.minimumRouteClearanceM,
-          result.diagnostics.minimumRouteClearanceM);
-        plannerDiagnostics.largestHeadingChangeDeg=Math.max(
-          plannerDiagnostics.largestHeadingChangeDeg,
-          result.diagnostics.largestHeadingChangeDeg);
-        plannerDiagnostics.stages.push(...result.diagnostics.stages);
-        plannerDiagnostics.warnings.push(...result.diagnostics.warnings);
-        plannerDiagnostics.finalPathSource=result.diagnostics.finalPathSource;
-        plannerDiagnostics.rawPathStatus=result.diagnostics.rawPathStatus;
-        plannerDiagnostics.baselineStatus=result.diagnostics.baselineStatus;
-        plannerDiagnostics.doorAlignmentStatus=result.diagnostics.doorAlignmentStatus;
-        plannerDiagnostics.turnValidationStatus=result.diagnostics.turnValidationStatus;
-        plannerDiagnostics.physicalFailureCode=result.diagnostics.physicalFailureCode;
-        plannerDiagnostics.recommendedOperatorAction=
-          result.diagnostics.recommendedOperatorAction;
-        plannerDiagnostics.freeSpace=result.diagnostics.freeSpace;
-      };
-      for(let i=0;i<anchors.length-1;i+=1){
-        const start=transform.worldToGrid(anchors[i]!.x,anchors[i]!.y);const goal=transform.worldToGrid(anchors[i+1]!.x,anchors[i+1]!.y);
-        if(!start||!goal)throw new Error(`Anchor ${i} is outside the map.`);
-        const result=await planner.plan({grid:store.grid,collisionGrid:store.grid,start,goal,
-          options:store.plannerOptions,footprint:store.footprint,planningConfiguration,
-          diagnosticContext:{sessionId:appSessionId,planningRequestId:`${appSessionId}:planning:${Date.now()}`},
-          startTheta:anchors[i]!.theta,exactStartPose:anchors[i],
-          goalTheta:i===anchors.length-2&&!store.goalThetaExplicit
-            ?undefined:anchors[i+1]!.theta});
-        result.diagnosticEvents?.forEach((event)=>operationalDiagnosticSink.emit(event));
-        raw.push(...result.rawPath.slice(i?1:0));simplified.push(...result.simplifiedPath.slice(i?1:0));
-        baseline.push(...(result.baselinePath??[]).slice(i?1:0));
-        rejectedEnhancement.push(...(result.rejectedEnhancementPath??[]).slice(i?1:0));
-        mergeDiagnostics(result);
-        if(!result.success){
-          const fallback=baseline.length?baseline:result.finalPath;
-          store.set({
-            start:routeStart,rawPath:raw,finalPath:fallback,planning:false,
-            plannerResult:{
-              ...result,rawPath:raw,simplifiedPath:simplified,
-              baselinePath:baseline,finalPath:fallback,
-              rejectedEnhancementPath:rejectedEnhancement,
-              diagnostics:{...plannerDiagnostics,
-                minimumRouteClearanceM:Number.isFinite(
-                  plannerDiagnostics.minimumRouteClearanceM)
-                  ?plannerDiagnostics.minimumRouteClearanceM:0},
-            },
-          });
-          const failedStage=[...(result.diagnostics?.stages??[])]
-            .reverse().find((item)=>!item.success);
-          LogService.write('planner','error',
-            failedStage?.reason??result.error??'RAW_PATH_FAILED');
-          return undefined;
-        }
-        final.push(...result.finalPath.slice(i?1:0));visited+=result.statistics.visitedCells;duration+=result.statistics.durationMs;
+      const result=await planningCoordinator.plan({
+        grid:structuredClone(store.grid), start:structuredClone(routeStart), goal:structuredClone(routeGoal),
+        waypoints:structuredClone(store.waypoints), plannerMode:store.plannerMode,
+        plannerOptions:structuredClone(store.plannerOptions), footprint:structuredClone(store.footprint),
+        orderSettings:structuredClone(store.orderSettings), goalThetaExplicit:store.goalThetaExplicit,
+        sessionId:appSessionId, missionId:missionController.snapshot.missionId,
+      });
+      if(!result){ store.set({planning:false}); return undefined; }
+      planningConfigurationRef.current=result.planningConfiguration;
+      const fallback=result.success ? result.finalPath : (result.baselinePath?.length ? result.baselinePath : result.finalPath);
+      store.set({start:routeStart,rawPath:result.rawPath,finalPath:fallback,planning:false,plannerResult:{...result,finalPath:fallback}});
+      if(!result.success){
+        const failedStage=[...(result.diagnostics?.stages??[])].reverse().find((item)=>!item.success);
+        LogService.write('planner','error',failedStage?.reason??result.error??'RAW_PATH_FAILED');
+        return undefined;
       }
-      store.set({start:routeStart,rawPath:raw,finalPath:final,planning:false,plannerResult:{success:true,rawPath:raw,simplifiedPath:simplified,
-        baselinePath:baseline,rejectedEnhancementPath:rejectedEnhancement,finalPath:final,
-        diagnostics:{...plannerDiagnostics,
-          minimumRouteClearanceM:Number.isFinite(plannerDiagnostics.minimumRouteClearanceM)
-            ?plannerDiagnostics.minimumRouteClearanceM:0},
-        statistics:{visitedCells:visited,durationMs:duration,rawPointCount:raw.length,simplifiedPointCount:simplified.length,finalPointCount:final.length}}});
-      LogService.write('planner','info',`Path planned: ${raw.length} raw cells → ${simplified.length} geometry points → ${final.length} final points in ${duration.toFixed(1)} ms`);
-      return final;
+      LogService.write('planner','info',`Path planned: ${result.rawPath.length} raw cells → ${result.simplifiedPath.length} geometry points → ${result.finalPath.length} final points in ${result.statistics.durationMs.toFixed(1)} ms`);
+      return result.finalPath;
     }catch(error){store.set({planning:false});LogService.write('planner','error',String(error));return undefined;}
   };
   const plan=async():Promise<void>=>{await calculatePath();};
@@ -396,6 +331,7 @@ export default function App(){
       const order=new VdaOrderBuilder().build(path,{
         robotPose:poseSnapshot.pose,activeMapId:navigatorMapId!,
         finalGoalTheta:finalGoalTheta??(store.goalThetaExplicit?store.goal?.theta:undefined),
+        planningConfiguration:planningConfigurationRef.current,
         corridorPlanning:{
           grid:store.grid,footprint:store.footprint,plannerOptions:store.plannerOptions,
           onDiagnostic:(diagnostic)=>corridorDiagnostics.push(diagnostic),
@@ -431,6 +367,8 @@ export default function App(){
       // Building a preview must never forget an Order that may still be active
       // in Navigator. sentOrder is changed only after a successful publish.
       store.set({generatedOrder:order,validation,corridorDiagnostics});
+      missionController.prepareOrder(appSessionId,order);
+      missionController.markValidated(appSessionId,validation.valid,order.orderId);
       LogService.write('planner','info',
         `Corridor planning: ${order.edges.filter((edge)=>edge.corridor).length}/${order.edges.length} edges allow local bypass.`);
       LogService.write('validation',validation.valid?'info':'error',validation.valid?'Order is valid.':`${validation.errors.length} validation errors.`);
@@ -542,6 +480,7 @@ export default function App(){
     setRoutePhase('Dispatching');live.set({publishingOrder:true});
     try{await mqttService.publish(live.mqttSettings.topics.order,JSON.stringify(order),live.mqttSettings.qos,false);
       live.set({sentOrder:order,sentOrderPublishedAtMs:Date.now(),publishingOrder:false});
+      missionController.markPublished(appSessionId);
       setRoutePhase('Dispatching');setToast({severity:'success',message:'Order sent. Waiting for Navigator acceptance.'});
       LogService.write('mqtt','info',`Published Order ${order.orderId}; awaiting Navigator acceptance.`);
     }catch(error){live.set({publishingOrder:false});
@@ -573,6 +512,7 @@ export default function App(){
     const cell=destination.cell;
     live.set({goal,goalThetaExplicit:explicitTheta,selectedCell:cell,rawPath:[],finalPath:[],
       generatedOrder:undefined,validation:undefined});
+    missionController.createMission(appSessionId,crypto.randomUUID());
     setRoutePhase('Validating destination');
     setRoutePhase('Calculating route');
     const path=await calculatePath(poseSnapshot.pose,goal);
@@ -632,12 +572,14 @@ export default function App(){
     if(!store.mqttConnected||stale){dispatchToken.current+=1;setDispatchCountdown(null);}
   },[store.mqttConnected,stale]);
   useEffect(()=>{
+    const navigatorLifecycle = mission.status==='Accepted'?'accepted':mission.status==='Rejected'||mission.status==='Timed out'?'rejected':mission.status==='Driving'?'driving':mission.status==='Completed'?'completed':mission.status==='Cancelled'?'cancelled':undefined;
+    if(navigatorLifecycle) missionController.observeNavigator(appSessionId,navigatorLifecycle,{progressPercent:mission.progressPercent});
     if(mission.status==='Accepted')setRoutePhase('Accepted by Navigator');
     else if(mission.status==='Driving')setRoutePhase('Driving');
     else if(mission.status==='Completed')setRoutePhase('Arrived');
     else if(mission.status==='Rejected'||mission.status==='Timed out')setRoutePhase('Failed');
     else if(mission.status==='Cancelled')setRoutePhase('Cancelled');
-  },[mission.status]);
+  },[mission.status,mission.progressPercent]);
   const instant=async(action:VdaInstantAction):Promise<void>=>{
     if(!isInstantActionSupported(action)){LogService.write('mqtt','warning',`${action} is disabled because the current ROKIT configuration rejected its blocking type.`);return;}
     if(!store.mqttConnected)return;
@@ -751,7 +693,8 @@ export default function App(){
     try{
       await mqttService.publish(
         live.mqttSettings.topics.order,payload.rawJson,live.mqttSettings.qos,false);
-      live.set({publishingOrder:false,sentOrder:order,sentOrderPublishedAtMs:Date.now()});
+       live.set({publishingOrder:false,sentOrder:order,sentOrderPublishedAtMs:Date.now()});
+       missionController.markPublished(appSessionId);
       setToast({severity:'success',message:'Compatibility test Order sent; monitoring Navigator evidence.'});
     }catch(error){
       const message=error instanceof Error?error.message:String(error);

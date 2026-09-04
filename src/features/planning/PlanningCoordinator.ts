@@ -25,6 +25,7 @@ export interface PlanningCoordinatorDependencies {
 }
 
 export interface PreparedPlanningRequest extends PlannerRequest { readonly planningConfiguration: PlanningConfigurationSnapshot }
+export type CoordinatedPlanningResult = PlannerResult & { readonly planningConfiguration: PlanningConfigurationSnapshot };
 
 /** Application-level planning orchestration. Domain planners remain unchanged. */
 export class PlanningCoordinator {
@@ -66,19 +67,25 @@ export class PlanningCoordinator {
 
   public invalidate(): void { this.generation += 1; }
 
-  public async plan(inputs: PlanningInputs): Promise<PlannerResult | undefined> {
+  public async plan(inputs: PlanningInputs): Promise<CoordinatedPlanningResult | undefined> {
+    // Capture every input once. The worker may outlive the React render that
+    // initiated this operation, so no mutable store object may be consulted
+    // after this point.
+    const captured = structuredClone(inputs);
     const generation = ++this.generation;
-    const requests = this.prepareRequests(inputs);
+    const requests = this.prepareRequests(captured);
     const planner = this.dependencies.planner ?? new PlannerService();
-    let combined: PlannerResult | undefined;
+    let combined: CoordinatedPlanningResult | undefined;
     const raw: PathPoint[] = []; const simplified: PathPoint[] = []; const final: PathPoint[] = [];
     const baseline: PathPoint[] = []; const rejectedEnhancement: PathPoint[] = [];
     let visitedCells = 0; let durationMs = 0;
     let diagnostics: PlannerResult['diagnostics'];
     for (const [index, request] of requests.entries()) {
       const result = await planner.plan(request);
-      result.diagnosticEvents?.forEach((event) => this.dependencies.diagnostics?.emit(event));
       if (generation !== this.generation) return undefined;
+      // Worker-produced diagnostics cross the worker boundary as part of the
+      // PlannerResult and are forwarded through the application sink here.
+      result.diagnosticEvents?.forEach((event) => this.dependencies.diagnostics?.emit(event));
       raw.push(...result.rawPath.slice(index ? 1 : 0));
       simplified.push(...result.simplifiedPath.slice(index ? 1 : 0));
       baseline.push(...(result.baselinePath ?? []).slice(index ? 1 : 0));
@@ -99,15 +106,15 @@ export class PlanningCoordinator {
           diagnostics.largestHeadingChangeDeg = Math.max(diagnostics.largestHeadingChangeDeg, result.diagnostics.largestHeadingChangeDeg);
         }
       }
-      if (!result.success) return { ...result, diagnostics, rawPath: raw, simplifiedPath: simplified, baselinePath: baseline, rejectedEnhancementPath: rejectedEnhancement, finalPath: baseline.length ? baseline : final };
+      if (!result.success) return { ...result, diagnostics, rawPath: raw, simplifiedPath: simplified, baselinePath: baseline, rejectedEnhancementPath: rejectedEnhancement, finalPath: baseline.length ? baseline : final, planningConfiguration: requests[0]!.planningConfiguration };
       combined = { ...result, rawPath: raw, simplifiedPath: simplified, finalPath: final,
         baselinePath: baseline, rejectedEnhancementPath: rejectedEnhancement,
         diagnostics,
-        statistics: { ...result.statistics, visitedCells, durationMs, rawPointCount: raw.length, simplifiedPointCount: simplified.length, finalPointCount: final.length } };
+        statistics: { ...result.statistics, visitedCells, durationMs, rawPointCount: raw.length, simplifiedPointCount: simplified.length, finalPointCount: final.length }, planningConfiguration: requests[0]!.planningConfiguration };
     }
     if (!combined) return undefined;
     this.dependencies.diagnostics?.emit(createDiagnosticEvent({
-      sessionId: inputs.sessionId, missionId: inputs.missionId, planningRequestId: requests[0]?.diagnosticContext?.planningRequestId,
+      sessionId: captured.sessionId, missionId: captured.missionId, planningRequestId: requests[0]?.diagnosticContext?.planningRequestId,
       stage: 'motionplan', severity: 'info', eventType: 'motionplan.created', message: 'Motion plan created.',
       payload: { pointCount: final.length },
     }));

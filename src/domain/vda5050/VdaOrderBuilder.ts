@@ -6,11 +6,11 @@ import type {
 import { defaultPlannerOptions } from '../defaults';
 import { EdgeCorridorPlanner, type CorridorDiagnostic } from '../planner/EdgeCorridorPlanner';
 import { PathCollisionValidator } from '../planner/PathCollisionValidator';
-import { LogService } from '../../services/LogService';
 import { CostModel } from '../planning/CostModel';
 import { createPlanningConfigurationSnapshot, type PlanningConfigurationSnapshot } from '../planning/PlanningConfigurationSnapshot';
 import type { MotionPlan } from '../motion/planningModel';
 import { buildLegacyMotionPlan } from '../motion/LegacyMotionPlanBuilder';
+import { LogService } from '../../services/LogService';
 
 let headerId = 0;
 const uniqueId = (prefix: string): string => `${prefix}-${crypto.randomUUID()}`;
@@ -56,18 +56,6 @@ export const removeInitialDuplicatePoints = (
 /** Builds an independent VDA 5050 Order whose Node 0 is always the exact live robot pose. */
 export class VdaOrderBuilder {
   private static readonly directionSwitchPenaltyMultiplier = 0.5;
-  private static readonly maxGridSnapshotCells = 4096;
-
-  private static serializeGridData(grid: OccupancyGrid): string {
-    const source = grid.data;
-    const length = source.length;
-    if (!length) return '';
-    if (length <= VdaOrderBuilder.maxGridSnapshotCells) return source.join(',');
-    const stride = Math.max(1, Math.floor(length / VdaOrderBuilder.maxGridSnapshotCells));
-    const sampled: number[] = [];
-    for (let i = 0; i < length; i += stride) sampled.push(source[i] ?? 0);
-    return `sampled(stride=${stride};count=${sampled.length})=${sampled.join(',')}`;
-  }
 
   private evaluateSegmentOrientation(
     from: PathPoint,
@@ -196,17 +184,6 @@ export class VdaOrderBuilder {
       footprint: context.corridorPlanning?.footprint,
     });
     const plannerOptions = snapshot.planner;
-    if (context.corridorPlanning) {
-      const { grid } = context.corridorPlanning;
-      const unknownCellHandling = plannerOptions.corridor.unknownCellsBlocked
-        ? 'treated-as-occupied'
-        : 'allowed-as-free';
-      const gridSnapshot = `plannerGrid mapId=${grid.metadata.mapId} name=${grid.metadata.name} ` +
-        `resolution=${grid.metadata.resolution} origin=(${grid.metadata.origin.x},${grid.metadata.origin.y},${grid.metadata.origin.yaw}) ` +
-        `width=${grid.metadata.width} height=${grid.metadata.height} occupiedThreshold=${grid.metadata.occupiedThreshold} ` +
-        `unknownCellHandling=${unknownCellHandling} data=${VdaOrderBuilder.serializeGridData(grid)}`;
-      LogService.write('planner', 'info', gridSnapshot);
-    }
     const usefulPath = removeInitialDuplicatePoints(
       context.robotPose,
       path,
