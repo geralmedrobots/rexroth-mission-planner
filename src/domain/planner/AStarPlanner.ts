@@ -7,6 +7,7 @@ import { buildClearanceField } from './ClearanceField';
 import { PathCollisionValidator } from './PathCollisionValidator';
 import { normalizeAngle } from '../geometry/angles';
 import { LogService } from '../../services/LogService';
+import { CostModel } from '../planning/CostModel';
 
 interface HeapNode { index: number; f: number }
 class MinHeap {
@@ -152,37 +153,26 @@ export class AStarPlanner {
         if (!reverseAllowed && reverseLike) continue;
         if(footprint&&!collision.pointIsFree(
           grid,{...nextWorld,theta:moveHeading},footprint))continue;
-        const distanceCost = Math.hypot(dr, dc) * grid.metadata.resolution*
-          options.distanceWeight;
+        const distanceCost = CostModel.distance(Math.hypot(dr, dc) * grid.metadata.resolution, options.distanceWeight);
         const cellClearance=clearance[nextIndex]!;
-        const preferred=options.passageSafety.wallClearancePreferredM;
-        const clearanceDeficit=Math.max(0,preferred-cellClearance);
         const reliable=options.policy==='reliable'||options.reliableBaselineMode;
-        const proximityCost = reliable?0:
-          options.passageSafety.wallProximityWeight*
-          clearanceDeficit*clearanceDeficit/Math.max(preferred,0.01);
-        const passageWidth=cellClearance*2;
-        const requiredWidth=(footprint?.width??0)+
-          2*(footprint?.safetyMargin??options.passageSafety.wallClearanceMinimumM);
-        const narrowCost=!reliable&&
-          passageWidth<options.passageSafety.maximumPassageWidthM
-          ?options.passageSafety.narrowPassageWeight/
-            Math.max(0.05,passageWidth-requiredWidth+0.05):0;
+        const proximityCost = reliable ? 0 : CostModel.wallProximity(cellClearance, options);
+        const narrowCost = reliable ? 0 : CostModel.narrowPassage(cellClearance, footprint?.width ?? 0,
+          footprint?.safetyMargin ?? options.passageSafety.wallClearanceMinimumM, options);
         let turnCost=0;
         let reverseRiskCost=0;
         if(!reliable && previousMove !== null && previousDirection !== moveIndex){
           const previousHeading = Math.atan2(currentWorld.y - previousWorld!.y, currentWorld.x - previousWorld!.x);
           const headingChange = Math.abs(normalizeAngle(moveHeading - previousHeading));
-          turnCost = options.passageSafety.headingChangeWeight * headingChange +
-            options.passageSafety.turnLocationWeight * headingChange /
-              Math.max(cellClearance, grid.metadata.resolution);
+          turnCost = CostModel.headingChange(headingChange, options) +
+            CostModel.turnLocation(headingChange, cellClearance, options, grid.metadata.resolution);
           if (reverseLike || headingChange > Math.PI/2)
-            reverseRiskCost = options.passageSafety.reverseRiskWeight;
+            reverseRiskCost = CostModel.reverseRisk(true, options);
         } else if (!reliable && previousMove === null && startTheta !== undefined) {
           const headingChange = Math.abs(normalizeAngle(moveHeading - startTheta));
-          turnCost = options.passageSafety.headingChangeWeight * headingChange;
+          turnCost = CostModel.headingChange(headingChange, options);
           if (reverseLike || headingChange > Math.PI / 2)
-            reverseRiskCost = options.passageSafety.reverseRiskWeight;
+            reverseRiskCost = CostModel.reverseRisk(true, options);
         }
         const tentative = g[current.index]! + distanceCost + proximityCost+
           narrowCost+turnCost+reverseRiskCost;

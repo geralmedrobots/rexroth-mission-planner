@@ -11,6 +11,7 @@ import { isOccupiedValue } from './ObstacleInflation';
 import { PathCollisionValidator } from './PathCollisionValidator';
 import { PathSimplifier } from './PathSimplifier';
 import { RouteSafetyProcessor } from './RouteSafetyProcessor';
+import { createPlanningConfigurationSnapshot, type PlanningConfigurationSnapshot } from '../planning/PlanningConfigurationSnapshot';
 
 export interface PlannerRequest {
   grid: OccupancyGrid;
@@ -22,6 +23,7 @@ export interface PlannerRequest {
   goalTheta?: number;
   startTheta?:number;
   exactStartPose?:PathPoint;
+  planningConfiguration?: PlanningConfigurationSnapshot;
 }
 
 const emptyDiagnostics=():PlannerDiagnostics=>({
@@ -115,6 +117,10 @@ const addCollisionContext=(
 
 export const planSynchronously = (request: PlannerRequest): PlannerResult => {
   const started=performance.now();
+  const configuration=request.planningConfiguration ?? createPlanningConfigurationSnapshot({
+    plannerOptions: request.options, footprint: request.footprint,
+  });
+  const planningOptions=configuration.planner;
   const grid=request.collisionGrid??request.grid;
   const diagnostics=emptyDiagnostics();
   const failure=(reason:string,rawPath:PathPoint[]=[],simplifiedPath:PathPoint[]=[],
@@ -135,7 +141,7 @@ export const planSynchronously = (request: PlannerRequest): PlannerResult => {
   if(mapError)return failure(mapError);
 
   const transform=new CoordinateTransformer(grid.metadata);
-  const footprint=planningFootprint(request.footprint,request.options);
+  const footprint=planningFootprint(request.footprint,planningOptions);
   const clearance=buildClearanceField(grid);
   const startError=cellReason(grid,request.start);
   const startWorld=transform.gridToWorld(request.start.row,request.start.column);
@@ -187,7 +193,7 @@ export const planSynchronously = (request: PlannerRequest): PlannerResult => {
   }
 
   const freeSpace=new FreeSpaceAnalyzer().analyze(
-    grid,request.start,request.goal,footprint,request.options.collisionSampleInterval);
+    grid,request.start,request.goal,footprint,planningOptions.collisionSampleInterval);
   diagnostics.freeSpace=freeSpace.diagnostic;
   diagnostics.stages.push(stage(
     'free-space-model',0,freeSpace.diagnostic.visitedFootprintCells,
@@ -204,7 +210,7 @@ export const planSynchronously = (request: PlannerRequest): PlannerResult => {
   }
 
   const rawResult=new AStarPlanner().plan(
-    grid,request.start,request.goal,request.options,footprint,request.startTheta);
+    grid,request.start,request.goal,planningOptions,footprint,request.startTheta);
   diagnostics.rawPathStatus=rawResult.success?'RAW_PATH_FOUND':'RAW_PATH_FAILED';
   diagnostics.stages.push(stage('raw-a-star',0,rawResult.rawPath.length,
     rawResult.success,{
@@ -222,13 +228,13 @@ export const planSynchronously = (request: PlannerRequest): PlannerResult => {
   if(request.exactStartPose&&rawPath.length){
     const exactCandidate=[request.exactStartPose,...rawPath.slice(1)];
     const exactCollision=new PathCollisionValidator().findFirstDetailedCollision(
-      grid,exactCandidate,footprint,request.options.collisionSampleInterval);
+      grid,exactCandidate,footprint,planningOptions.collisionSampleInterval);
     if(exactCollision){
       const failed=addCollisionContext(stage(
         'start-cell-validation',rawPath.length,0,false,{
           code:'FIRST_NODE_UNREACHABLE',
           reason:'The exact current pose cannot safely reach the planned grid route.',
-        }),grid,exactCandidate,footprint,request.options.collisionSampleInterval,
+        }),grid,exactCandidate,footprint,planningOptions.collisionSampleInterval,
       clearance);
       diagnostics.stages.push(failed);
       return failure(failed.reason!,rawPath);
@@ -241,20 +247,20 @@ export const planSynchronously = (request: PlannerRequest): PlannerResult => {
   const requestedOrPathGoalTheta=request.goalTheta??Math.atan2(
     rawLast.y-rawPrevious.y,rawLast.x-rawPrevious.x);
   const simplified=new PathSimplifier().simplifyDetailed(
-    grid,rawPath,footprint,request.options,requestedOrPathGoalTheta);
+    grid,rawPath,footprint,planningOptions,requestedOrPathGoalTheta);
   diagnostics.stages.push(stage('path-simplification',rawPath.length,
     simplified.simplifiedPath.length,true,{code:'SIMPLIFIED_PATH_VALID'}));
 
   const densifier=new PathSimplifier();
-  const baselineGeometry=request.options.passageSafety.enableWaypointDensification
+  const baselineGeometry=planningOptions.passageSafety.enableWaypointDensification
     ?densifier.enforceSpacing(
       simplified.simplifiedPath,
-      request.options.passageSafety.minimumWaypointSpacingM,
-      request.options.passageSafety.maximumWaypointSpacingM)
+      planningOptions.passageSafety.minimumWaypointSpacingM,
+      planningOptions.passageSafety.maximumWaypointSpacingM)
     :[...simplified.simplifiedPath];
   diagnostics.stages.push(stage('waypoint-densification',
     simplified.simplifiedPath.length,baselineGeometry.length,true,{
-      code:request.options.passageSafety.enableWaypointDensification
+      code:planningOptions.passageSafety.enableWaypointDensification
         ?'WAYPOINTS_DENSIFIED':'DENSIFICATION_DISABLED',
     }));
   const baseline=orient(
@@ -264,22 +270,22 @@ export const planSynchronously = (request: PlannerRequest): PlannerResult => {
       code:'BASELINE_ORIENTATION_GENERATED',
     }));
   const baselineCollision=new PathCollisionValidator().findFirstDetailedCollision(
-    grid,baseline,footprint,request.options.collisionSampleInterval);
+    grid,baseline,footprint,planningOptions.collisionSampleInterval);
   if(baselineCollision){
     const rawBaseline=orient(
-      request.options.passageSafety.enableWaypointDensification
+      planningOptions.passageSafety.enableWaypointDensification
         ?densifier.enforceSpacing(
-          rawPath,request.options.passageSafety.minimumWaypointSpacingM,
-          request.options.passageSafety.maximumWaypointSpacingM)
+          rawPath,planningOptions.passageSafety.minimumWaypointSpacingM,
+          planningOptions.passageSafety.maximumWaypointSpacingM)
         :rawPath,
       request.startTheta??rawPath[0]!.theta,request.goalTheta);
     if(!new PathCollisionValidator().pathIsFree(
-      grid,rawBaseline,footprint,request.options.collisionSampleInterval)){
+      grid,rawBaseline,footprint,planningOptions.collisionSampleInterval)){
       const failed=addCollisionContext(stage(
         'footprint-collision-validation',baseline.length,0,false,{
           code:'BASELINE_FOOTPRINT_COLLISION',
           reason:'Baseline path intersects occupied, unknown, or out-of-map space.',
-        }),grid,baseline,footprint,request.options.collisionSampleInterval,clearance);
+        }),grid,baseline,footprint,planningOptions.collisionSampleInterval,clearance);
       diagnostics.stages.push(failed);
       return failure(failed.reason!,rawPath,simplified.simplifiedPath);
     }
@@ -301,8 +307,8 @@ export const planSynchronously = (request: PlannerRequest): PlannerResult => {
   let selected=[...baseline];
   const effectiveGoalTheta=request.goalTheta??baseline.at(-1)!.theta;
   let rejectedEnhancementPath:PathPoint[]|undefined;
-  const reliablePolicy=request.options.policy==='reliable'||
-    request.options.reliableBaselineMode;
+  const reliablePolicy=planningOptions.policy==='reliable'||
+    planningOptions.reliableBaselineMode;
   if(reliablePolicy){
     diagnostics.warnings.push('BASELINE_PATH_USED');
     diagnostics.stages.push(stage('doorway-detection',baseline.length,
@@ -312,14 +318,14 @@ export const planSynchronously = (request: PlannerRequest): PlannerResult => {
     diagnostics.stages.push(stage('turn-feasibility',baseline.length,
       baseline.length,true,{severity:'info',code:'BASELINE_MODE_DISABLED_ENHANCEMENTS'}));
   }else{
-    if(request.options.passageSafety.enableDoorwayDetection&&
-      request.options.passageSafety.enableDoorAlignment){
+    if(planningOptions.passageSafety.enableDoorwayDetection&&
+      planningOptions.passageSafety.enableDoorAlignment){
       const doorProcessor=new RouteSafetyProcessor();
       try{
         const doorOptions={
-          ...request.options,
+          ...planningOptions,
           passageSafety:{
-            ...request.options.passageSafety,
+            ...planningOptions.passageSafety,
             enableTurnFeasibilityChecking:false,
           },
         };
@@ -358,7 +364,7 @@ export const planSynchronously = (request: PlannerRequest): PlannerResult => {
             severity:'warning',code:'DOOR_ALIGNMENT_SKIPPED',
             reason:error instanceof Error?error.message:String(error),
           }),grid,rejectedEnhancementPath,footprint,
-        request.options.collisionSampleInterval,clearance));
+        planningOptions.collisionSampleInterval,clearance));
         selected=[...baseline];
       }
     }else{
@@ -368,13 +374,13 @@ export const planSynchronously = (request: PlannerRequest): PlannerResult => {
         baseline.length,true,{severity:'info',code:'DOOR_ALIGNMENT_DISABLED'}));
     }
 
-    if(request.options.passageSafety.enableTurnFeasibilityChecking){
+    if(planningOptions.passageSafety.enableTurnFeasibilityChecking){
       const turnProcessor=new RouteSafetyProcessor();
       try{
         const turnOptions={
-          ...request.options,
+          ...planningOptions,
           passageSafety:{
-            ...request.options.passageSafety,
+            ...planningOptions.passageSafety,
             enableDoorwayDetection:false,enableDoorAlignment:false,
           },
         };
@@ -401,7 +407,7 @@ export const planSynchronously = (request: PlannerRequest): PlannerResult => {
             severity:'warning',code:'TURN_RELOCATION_SKIPPED',
             reason:error instanceof Error?error.message:String(error),
           }),grid,rejectedEnhancementPath,footprint,
-        request.options.collisionSampleInterval,clearance));
+        planningOptions.collisionSampleInterval,clearance));
         selected=diagnostics.finalPathSource==='door-aligned'?selected:[...baseline];
       }
     }else{
@@ -411,7 +417,7 @@ export const planSynchronously = (request: PlannerRequest): PlannerResult => {
   }
 
   const selectedCollision=new PathCollisionValidator().findFirstDetailedCollision(
-    grid,selected,footprint,request.options.collisionSampleInterval);
+    grid,selected,footprint,planningOptions.collisionSampleInterval);
   if(selectedCollision){
     rejectedEnhancementPath=selected;
     selected=[...baseline];
@@ -423,7 +429,7 @@ export const planSynchronously = (request: PlannerRequest): PlannerResult => {
         severity:'warning',code:'SMOOTHING_REJECTED',
         reason:'The optional enhanced route collided; the valid baseline was restored.',
       }),grid,rejectedEnhancementPath,footprint,
-    request.options.collisionSampleInterval,clearance));
+    planningOptions.collisionSampleInterval,clearance));
   }
   diagnostics.minimumRouteClearanceM=selected.reduce((minimum,point)=>{
     const cell=transform.worldToGrid(point.x,point.y);
