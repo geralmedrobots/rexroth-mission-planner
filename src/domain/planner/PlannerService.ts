@@ -24,6 +24,7 @@ export interface PlannerRequest {
   startTheta?:number;
   exactStartPose?:PathPoint;
   planningConfiguration?: PlanningConfigurationSnapshot;
+  diagnosticContext?: { sessionId: string; missionId?: string; planningRequestId: string };
 }
 
 const emptyDiagnostics=():PlannerDiagnostics=>({

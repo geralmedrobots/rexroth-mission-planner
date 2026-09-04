@@ -187,6 +187,8 @@ export interface PlannerResult {
   baselinePath?: PathPoint[];
   rejectedEnhancementPath?: PathPoint[];
   statistics: PlannerStatistics;
+  /** Bounded operational diagnostics transported from a worker with the result. */
+  diagnosticEvents?: import('../features/diagnostics/DiagnosticEvent').DiagnosticEvent[];
 }
 export interface VdaHeader {
   headerId: number; timestamp: string; version: '2.0.0'; manufacturer: string; serialNumber: string;

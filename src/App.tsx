@@ -21,8 +21,8 @@ import {
 } from './domain/defaults';
 import { imageFileToPixels, metadataFromRosYaml, parseOccupancyJson, pixelsToOccupancy } from './domain/map/MapImporter';
 import { ObstacleInflation } from './domain/planner/ObstacleInflation';
-import { PlannerService } from './domain/planner/PlannerService';
 import { PathCollisionValidator } from './domain/planner/PathCollisionValidator';
+import { PlannerService } from './domain/planner/PlannerService';
 import { MissionMonitor } from './domain/order/MissionMonitor';
 import { selectCurrentRobotPose } from './domain/robot/RobotPoseSelector';
 import { parseBoschVehicleConfiguration } from './domain/robot/BoschVehicleConfiguration';
@@ -68,12 +68,17 @@ import { GlobalReplanningPanel } from './features/replanning/GlobalReplanningPan
 import { useGlobalReplanning } from './features/replanning/useGlobalReplanning';
 import { useGlobalReplanningStore } from './features/replanning/globalReplanningStore';
 import { LogService } from './services/LogService';
+import { OperationalLogDiagnosticSink } from './features/diagnostics/DiagnosticEvent';
 import { mqttService } from './services/MqttService';
 import { useAppStore } from './stores/appStore';
+import { createPlanningConfigurationSnapshot } from './domain/planning/PlanningConfigurationSnapshot';
 
 const navExpandedWidth=224; const navCollapsedWidth=76; const rightWidth=360;
 const safety='This application is not a safety function. Vehicle safety must be provided by certified safety hardware and the machine safety system.';
 const publishWarning='Test only in a controlled area. Use a low maximum speed. Ensure emergency stop, drive enable, safety PLC, motor timeout, and braking are operational.';
+const operationalDiagnosticSink = new OperationalLogDiagnosticSink((category, level, message) =>
+  LogService.write(category, level, message));
+const appSessionId = crypto.randomUUID();
 interface ConfirmationState {
   title:string;
   message:string;
@@ -265,6 +270,9 @@ export default function App(){
       return valid?finalPath:undefined;
     }
     store.set({planning:true,rawPath:[],finalPath:[]}); const planner=new PlannerService();
+    const planningConfiguration=createPlanningConfigurationSnapshot({
+      plannerOptions:store.plannerOptions,footprint:store.footprint,orderSettings:store.orderSettings,
+    });
     try{
       const raw:PathPoint[]=[];const simplified:PathPoint[]=[];const final:PathPoint[]=[];let visited=0;let duration=0;
       const baseline:PathPoint[]=[];const rejectedEnhancement:PathPoint[]=[];
@@ -306,10 +314,12 @@ export default function App(){
         const start=transform.worldToGrid(anchors[i]!.x,anchors[i]!.y);const goal=transform.worldToGrid(anchors[i+1]!.x,anchors[i+1]!.y);
         if(!start||!goal)throw new Error(`Anchor ${i} is outside the map.`);
         const result=await planner.plan({grid:store.grid,collisionGrid:store.grid,start,goal,
-          options:store.plannerOptions,footprint:store.footprint,
+          options:store.plannerOptions,footprint:store.footprint,planningConfiguration,
+          diagnosticContext:{sessionId:appSessionId,planningRequestId:`${appSessionId}:planning:${Date.now()}`},
           startTheta:anchors[i]!.theta,exactStartPose:anchors[i],
           goalTheta:i===anchors.length-2&&!store.goalThetaExplicit
             ?undefined:anchors[i+1]!.theta});
+        result.diagnosticEvents?.forEach((event)=>operationalDiagnosticSink.emit(event));
         raw.push(...result.rawPath.slice(i?1:0));simplified.push(...result.simplifiedPath.slice(i?1:0));
         baseline.push(...(result.baselinePath??[]).slice(i?1:0));
         rejectedEnhancement.push(...(result.rejectedEnhancementPath??[]).slice(i?1:0));
