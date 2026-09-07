@@ -305,10 +305,11 @@ export class MotionStatePlanner {
     const selectedMetrics = measureMotionPlan(plan, grid,
       motionConfiguration.sampling.translationCollisionIntervalM,
       64, clearance);
+    plan.metadata = { ...plan.metadata, cost: selectedMetrics.costs.total };
     const durationMs = performance.now() - started;
     const selectedDiagnostic = {
       plannerMode: 'motion-state', planningDurationMs: durationMs, expandedStates: expanded,
-      selectedTotalCost: totalCost,
+      selectedTotalCost: selectedMetrics.costs.total,
       translationCost: selectedMetrics.costs.distance,
       rotationCost: selectedMetrics.costs.rotation,
       reverseCost: selectedMetrics.costs.reverse,
@@ -341,7 +342,7 @@ export class MotionStatePlanner {
     };
     emit('motionplan.selected.summary', selectedDiagnostic);
     emit('motionplan.created', { stateCount: plan.states.length,
-      actionCount: plan.actions.length, totalCost });
+      actionCount: plan.actions.length, totalCost: selectedMetrics.costs.total });
     plan.diagnostics = { ...plan.diagnostics, expanded, eventCounts, selected: selectedDiagnostic, events };
     const path: PathPoint[] = plan.states.map(({ x, y, theta }) => ({ x, y, theta }));
     const passages = new PassageDetector().detect(grid, path, footprint, options);
@@ -563,13 +564,15 @@ export class MotionStatePlanner {
     const cost = zeroCost();
     cost.distance = CostModel.distance(distance,
       configuration.weights.translationCostPerM);
-    cost.reverse = CostModel.motionStateReverseRisk(reverse,
-      configuration.weights.reverseCostPerTranslation);
+    cost.reverse = CostModel.motionStateReverseRisk(reverse, distance,
+      configuration.weights.reverseCostPerM);
     cost.wallClearance = CostModel.motionStateWallProximity(cellClearance,
-      configuration.clearance.preferredM, configuration.weights.wallClearanceCost);
+      configuration.clearance.preferredM, distance,
+      configuration.weights.wallClearanceCost);
     cost.narrowPassage = CostModel.motionStateNarrowPassage(cellClearance,
       configuration.footprint.widthM, configuration.footprint.effectiveSafetyMarginM,
-      configuration.passage.maximumWidthM, configuration.weights.narrowPassageCost);
+      configuration.passage.maximumWidthM, distance,
+      configuration.weights.narrowPassageCost);
     cost.total = sumCost(cost);
     return cost;
   }

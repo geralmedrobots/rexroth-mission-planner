@@ -72,6 +72,7 @@ import { mqttService } from './services/MqttService';
 import { useAppStore } from './stores/appStore';
 import { PlanningCoordinator } from './features/planning/PlanningCoordinator';
 import { createPlanningConfigurationSnapshot, type PlanningConfigurationSnapshot } from './domain/planning/PlanningConfigurationSnapshot';
+import { createMotionPlannerScenarioArtifact } from './domain/planning/MotionPlannerScenarioArtifact';
 import { MissionController } from './features/mission/MissionController';
 
 const navExpandedWidth=224; const navCollapsedWidth=76; const rightWidth=360;
@@ -121,7 +122,7 @@ const EffectiveMotionStateConfigurationPanel=({plannerOptions,footprint}:{
       <Box mt={.5}>
         <Field label="Translation" value={`${effective.weights.translationCostPerM} cost/m`}/>
         <Field label="Rotation" value={`${effective.weights.rotationCostPerRad} cost/rad`}/>
-        <Field label="Reverse" value={`${effective.weights.reverseCostPerTranslation} cost/step`}/>
+        <Field label="Reverse" value={`${effective.weights.reverseCostPerM} cost/m`}/>
         <Field label="Direction switch" value={`${effective.weights.directionSwitchCost} cost/switch`}/>
         <Field label="Wall clearance" value={effective.weights.wallClearanceCost}/>
         <Field label="Preferred / hard clearance" value={`${effective.clearance.preferredM} / ${effective.clearance.hardMinimumM} m`}/>
@@ -1093,6 +1094,18 @@ export default function App(){
           <Button size="small" disabled={!store.generatedOrder} onClick={()=>store.generatedOrder&&downloadJson('vda-order.json',store.generatedOrder)}>Export order</Button>
           <Button size="small" disabled={store.finalPath.length<2} onClick={()=>downloadJson('planner-path.json',store.finalPath)}>Export path</Button>
         </Stack>
+        {store.plannerMode==='motion-state'&&<Button size="small" fullWidth sx={{mt:.5}}
+          disabled={!store.grid||!store.start||!store.goal||!planningConfigurationRef.current||
+            !store.plannerResult?.motionPlannerCalibration}
+          onClick={()=>{
+            if(!store.grid||!store.start||!store.goal||!planningConfigurationRef.current)return;
+            downloadJson('motion-planner-calibration-scenario.json',
+              createMotionPlannerScenarioArtifact({grid:store.grid,footprint:store.footprint,
+                startPose:store.start,goalPose:store.goal,
+                goalTheta:store.goalThetaExplicit?store.goal.theta:undefined,
+                configuration:planningConfigurationRef.current,
+                originalCalibration:store.plannerResult?.motionPlannerCalibration}));
+          }}>Export calibration scenario (includes grid)</Button>}
       </Paper>
       <Typography variant="overline">First node check</Typography>
       <Paper variant="outlined" sx={{p:1.2,mb:1}}>

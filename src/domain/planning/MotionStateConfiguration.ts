@@ -4,11 +4,11 @@ export const MOTION_STATE_HEADING_BINS = 16;
 export const MOTION_STATE_HEADING_STEP_RAD = 2 * Math.PI / MOTION_STATE_HEADING_BINS;
 
 export interface EffectiveMotionStateConfiguration {
-  readonly schemaVersion: 'stage-4b';
+  readonly schemaVersion: 'stage-5a';
   readonly weights: {
     readonly translationCostPerM: number;
     readonly rotationCostPerRad: number;
-    readonly reverseCostPerTranslation: number;
+    readonly reverseCostPerM: number;
     readonly directionSwitchCost: number;
     readonly wallClearanceCost: number;
     readonly narrowPassageCost: number;
@@ -74,14 +74,14 @@ export const MOTION_STATE_PARAMETER_SCHEMA: readonly MotionStateParameterDefinit
     ui: 'Heading change weight (legacy mapping)', normalizedField: 'weights.rotationCostPerRad',
     consumer: 'CostModel.rotation', units: 'cost/rad', classification: 'soft-preference' },
   { key: 'reverseWeight', source: 'passageSafety.reverseRiskWeight', defaultValue: 2,
-    ui: 'Reverse risk weight (legacy mapping)', normalizedField: 'weights.reverseCostPerTranslation',
-    consumer: 'CostModel.motionStateReverseRisk', units: 'cost/translation action', classification: 'soft-preference' },
+    ui: 'Reverse risk weight (legacy mapping)', normalizedField: 'weights.reverseCostPerM',
+    consumer: 'CostModel.motionStateReverseRisk', units: 'cost/m', classification: 'soft-preference' },
   { key: 'directionSwitchWeight', source: 'passageSafety.motionStateDirectionSwitchWeight', defaultValue: 1,
     ui: 'Effective configuration only', normalizedField: 'weights.directionSwitchCost',
     consumer: 'CostModel.motionStateDirectionSwitch', units: 'cost/switch', classification: 'soft-preference' },
   { key: 'wallWeight', source: 'passageSafety.wallProximityWeight', defaultValue: 2,
     ui: 'Wall proximity weight (legacy mapping)', normalizedField: 'weights.wallClearanceCost',
-    consumer: 'CostModel.motionStateWallProximity', units: 'cost', classification: 'soft-preference' },
+    consumer: 'CostModel.motionStateWallProximity', units: 'cost/m', classification: 'soft-preference' },
   { key: 'preferredClearance', source: 'passageSafety.wallClearancePreferredM', defaultValue: .3,
     ui: 'Preferred wall clearance m', normalizedField: 'clearance.preferredM',
     consumer: 'CostModel.motionStateWallProximity', units: 'm', classification: 'soft-preference' },
@@ -90,7 +90,7 @@ export const MOTION_STATE_PARAMETER_SCHEMA: readonly MotionStateParameterDefinit
     consumer: 'MotionStatePlanner / MotionPlanOptimiser', units: 'm', classification: 'hard-feasibility' },
   { key: 'narrowPassageWeight', source: 'passageSafety.narrowPassageWeight', defaultValue: 1.5,
     ui: 'Narrow passage weight', normalizedField: 'weights.narrowPassageCost',
-    consumer: 'CostModel.motionStateNarrowPassage', units: 'cost', classification: 'soft-preference' },
+    consumer: 'CostModel.motionStateNarrowPassage', units: 'cost/m', classification: 'soft-preference' },
   { key: 'turnLocationWeight', source: 'passageSafety.turnLocationWeight', defaultValue: 1,
     ui: 'Turn location weight', normalizedField: 'weights.turnLocationCost',
     consumer: 'CostModel.motionStateTurnLocation', units: 'cost*m/rad', classification: 'soft-preference' },
@@ -138,11 +138,11 @@ export const createEffectiveMotionStateConfiguration = (
 ): EffectiveMotionStateConfiguration => {
   const rotationDeg = planner.passageSafety.rotationCollisionSampleDeg;
   return {
-    schemaVersion: 'stage-4b',
+    schemaVersion: 'stage-5a',
     weights: {
       translationCostPerM: planner.distanceWeight,
       rotationCostPerRad: planner.passageSafety.headingChangeWeight,
-      reverseCostPerTranslation: planner.passageSafety.reverseRiskWeight,
+      reverseCostPerM: planner.passageSafety.reverseRiskWeight,
       directionSwitchCost: planner.passageSafety.motionStateDirectionSwitchWeight,
       wallClearanceCost: planner.passageSafety.wallProximityWeight,
       narrowPassageCost: planner.passageSafety.narrowPassageWeight,

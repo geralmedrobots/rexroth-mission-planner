@@ -9,6 +9,7 @@ import {
   type MotionPlannerReplayScenario,
 } from '../domain/planning/MotionPlannerReplay';
 import { MOTION_STATE_HEADING_BINS } from '../domain/planning/MotionStateConfiguration';
+import { CostModel } from '../domain/planning/CostModel';
 import type { OccupancyGrid, PlannerOptions, PlannerResult, RobotFootprint, RobotPose } from '../domain/types';
 import { PlanningCoordinator, type PlanningInputs } from '../features/planning/PlanningCoordinator';
 
@@ -67,7 +68,7 @@ describe('Stage 4B motion planner calibration', () => {
       footprint: robot() }).normalized.motionState;
     expect(effective).toMatchObject({
       weights: { translationCostPerM: 1.4, rotationCostPerRad: .31,
-        reverseCostPerTranslation: 4.2, directionSwitchCost: 1.7,
+        reverseCostPerM: 4.2, directionSwitchCost: 1.7,
         wallClearanceCost: 2.3, narrowPassageCost: 1.8,
         turnLocationCost: .9, terminalOrientationCostPerRad: .44 },
       clearance: { preferredM: .42, hardMinimumM: .12 },
@@ -89,7 +90,7 @@ describe('Stage 4B motion planner calibration', () => {
       footprint: robot() });
     options.passageSafety.headingChangeWeight = 777;
     expect(snapshot.normalized.motionState.weights).toMatchObject({
-      rotationCostPerRad: .4, reverseCostPerTranslation: 3,
+      rotationCostPerRad: .4, reverseCostPerM: 3,
       wallClearanceCost: 5,
     });
     expect(Object.isFrozen(snapshot.normalized.motionState)).toBe(true);
@@ -144,7 +145,7 @@ describe('Stage 4B motion planner calibration', () => {
       plannerOptions: plannerOptions({ reverseRiskWeight: 9,
         motionStateDirectionSwitchWeight: 1 }), footprint: robot() });
     expect(changed.normalized.motionState.weights).toEqual({
-      ...baseline.normalized.motionState.weights, reverseCostPerTranslation: 9,
+      ...baseline.normalized.motionState.weights, reverseCostPerM: 9,
     });
     expect(changed.normalized.motionState.weights.directionSwitchCost).toBe(1);
   });
@@ -158,7 +159,12 @@ describe('Stage 4B motion planner calibration', () => {
     }), true));
     expect(high.calibration.effectiveParameters.weights.rotationCostPerRad).toBe(.8);
     expect(high.calibration.effectiveParameters.weights.terminalOrientationCostPerRad).toBe(.15);
-    expect(high.costBreakdown.terminalOrientation).toBe(low.costBreakdown.terminalOrientation);
+    expect(CostModel.rotation(1, high.calibration.effectiveParameters.weights.rotationCostPerRad))
+      .toBe(.8);
+    expect(CostModel.rotation(1,
+      high.calibration.effectiveParameters.weights.terminalOrientationCostPerRad))
+      .toBe(CostModel.rotation(1,
+        low.calibration.effectiveParameters.weights.terminalOrientationCostPerRad));
   });
 
   it('H. applies clearance preference to transitions even under legacy reliable policy', () => {
@@ -209,7 +215,7 @@ describe('Stage 4B motion planner calibration', () => {
     const request = requests[0]!;
     const effective = request.planningConfiguration!.normalized.motionState;
     expect(effective.weights
-      .reverseCostPerTranslation).not.toBe(999);
+      .reverseCostPerM).not.toBe(999);
     expect(Object.isFrozen(effective)).toBe(true);
     resolve({ success: false, error: 'test stop', rawPath: [], simplifiedPath: [],
       finalPath: [], statistics: { visitedCells: 0, durationMs: 0,

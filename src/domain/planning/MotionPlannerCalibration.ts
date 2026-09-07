@@ -5,7 +5,7 @@ import type { OccupancyGrid, PathPoint, PlannerResult, RobotFootprint } from '..
 import type { EffectiveMotionStateConfiguration } from './MotionStateConfiguration';
 
 export interface MotionPlannerCalibrationSnapshot {
-  readonly schemaVersion: 'stage-4b';
+  readonly schemaVersion: 'stage-5a';
   readonly plannerMode: 'motion-state';
   readonly map: {
     readonly mapId: string;
@@ -83,7 +83,7 @@ const hashText = (value: string): string => {
   return (hash >>> 0).toString(16).padStart(8, '0');
 };
 
-const gridRevision = (grid: OccupancyGrid): string => {
+export const motionPlannerGridRevision = (grid: OccupancyGrid): string => {
   let hash = 0x811c9dc5;
   const metadata = JSON.stringify(grid.metadata);
   for (let index = 0; index < metadata.length; index += 1) {
@@ -97,7 +97,7 @@ const gridRevision = (grid: OccupancyGrid): string => {
   return `fnv1a32:${(hash >>> 0).toString(16).padStart(8, '0')}`;
 };
 
-const footprintHash = (footprint: RobotFootprint): string => hashText(JSON.stringify({
+export const motionPlannerFootprintHash = (footprint: RobotFootprint): string => hashText(JSON.stringify({
   length: footprint.length, width: footprint.width,
   centerOffsetX: footprint.centerOffsetX, centerOffsetY: footprint.centerOffsetY,
   safetyMargin: footprint.safetyMargin, polygon: footprint.polygon ?? null,
@@ -130,12 +130,43 @@ export interface CalibrationSnapshotInput {
   result: PlannerResult;
 }
 
+const numberTerm = (value: unknown): number => typeof value === 'number' ? value : 0;
+
+const reverseExplanation = (reverseUsed: boolean,
+  evidence: readonly Record<string, unknown>[]): string => {
+  if (!reverseUsed) return 'reverse not selected; reverse distance=0.000m and reverse cost=0.000';
+  for (const decision of evidence) {
+    const alternatives = Array.isArray(decision.feasibleAlternatives)
+      ? decision.feasibleAlternatives as Array<Record<string, unknown>> : [];
+    const selected = decision.selectedTransition as Record<string, unknown> | undefined;
+    const selectedType = selected?.type;
+    const reverse = [selected, ...alternatives].find((candidate) =>
+      candidate?.type === 'TRANSLATE_REVERSE');
+    const forward = alternatives.find((candidate) => candidate.type === 'TRANSLATE_FORWARD');
+    const rotation = alternatives.find((candidate) => candidate.type === 'ROTATE_IN_PLACE');
+    if (!reverse || (!forward && !rotation)) continue;
+    const costs = (candidate: Record<string, unknown> | undefined): Record<string, unknown> =>
+      candidate?.costComponents as Record<string, unknown> | undefined ?? {};
+    const reverseCosts = costs(reverse);
+    const alternative = forward ?? rotation;
+    const alternativeCosts = costs(alternative);
+    return `reverse selected; bounded local evidence: reverse total=${numberTerm(reverseCosts.total).toFixed(3)} ` +
+      `(translation=${numberTerm(reverseCosts.distance).toFixed(3)}, reverse=${numberTerm(reverseCosts.reverse).toFixed(3)}, ` +
+      `rotation=${numberTerm(reverseCosts.rotation).toFixed(3)}, clearance=${numberTerm(reverseCosts.wallClearance).toFixed(3)}); ` +
+      `${String(alternative?.type).toLowerCase()} alternative total=${numberTerm(alternativeCosts.total).toFixed(3)} ` +
+      `(translation=${numberTerm(alternativeCosts.distance).toFixed(3)}, reverse=${numberTerm(alternativeCosts.reverse).toFixed(3)}, ` +
+      `rotation=${numberTerm(alternativeCosts.rotation).toFixed(3)}, clearance=${numberTerm(alternativeCosts.wallClearance).toFixed(3)}); ` +
+      `selected transition=${String(selectedType)}`;
+  }
+  return 'reverse selected; bounded transition capture contains no directly comparable forward/rotation candidate; no causal claim available';
+};
+
 export const createMotionPlannerCalibrationSnapshot = (
   input: CalibrationSnapshotInput,
 ): MotionPlannerCalibrationSnapshot => {
   const metrics = metricsOrEmpty(input.result.motionPlan, input.grid,
     input.configuration.sampling.translationCollisionIntervalM);
-  const footprintGeometryHash = footprintHash(input.footprint);
+  const footprintGeometryHash = motionPlannerFootprintHash(input.footprint);
   const reverseActions = (input.result.motionPlan?.actions ?? []).flatMap((action, actionIndex) =>
     action.type === 'TRANSLATE_REVERSE' ? [{ actionIndex, x: action.from.x,
       y: action.from.y, theta: action.from.theta,
@@ -149,9 +180,11 @@ export const createMotionPlannerCalibrationSnapshot = (
     Record<string, unknown> | undefined;
   const optimisation = input.result.motionPlan?.diagnostics?.optimisation as
     Record<string, unknown> | undefined;
+  const decisionEvidence = Array.isArray(selectedDiagnostic?.selectedDecisionEvidence)
+    ? selectedDiagnostic.selectedDecisionEvidence.slice(0, 12) as Record<string, unknown>[] : [];
   return {
-    schemaVersion: 'stage-4b', plannerMode: 'motion-state',
-    map: { mapId: input.grid.metadata.mapId, revision: gridRevision(input.grid),
+    schemaVersion: 'stage-5a', plannerMode: 'motion-state',
+    map: { mapId: input.grid.metadata.mapId, revision: motionPlannerGridRevision(input.grid),
       gridResolutionM: input.grid.metadata.resolution, width: input.grid.metadata.width,
       height: input.grid.metadata.height },
     robot: { footprintId: `${input.footprint.source ?? 'configured'}:${footprintGeometryHash}`,
@@ -185,9 +218,8 @@ export const createMotionPlannerCalibrationSnapshot = (
     },
     decisionSummary: {
       reverseUsed: metrics.totalReverseDistanceM > 0,
-      reverseExplanation: metrics.totalReverseDistanceM > 0
-        ? 'Reverse belongs to the lowest-cost physically feasible plan found under the captured parameters; inspect selected-decision alternatives for local evidence.'
-        : 'The selected plan contains no reverse translation.',
+      reverseExplanation: reverseExplanation(metrics.totalReverseDistanceM > 0,
+        decisionEvidence),
       reverseActions, directionChanges,
       selectedRotationRad: metrics.totalAbsoluteRotationRad,
       selectedRotationCost: metrics.costs.rotation + metrics.costs.terminalOrientation,
@@ -195,8 +227,7 @@ export const createMotionPlannerCalibrationSnapshot = (
       selectedWallClearanceCost: metrics.costs.wallClearance,
       optimiserRotationChangeRad: typeof optimisation?.rotationChangeRad === 'number'
         ? optimisation.rotationChangeRad : 0,
-      selectedDecisionEvidence: Array.isArray(selectedDiagnostic?.selectedDecisionEvidence)
-        ? selectedDiagnostic.selectedDecisionEvidence.slice(0, 12) as Record<string, unknown>[] : [],
+      selectedDecisionEvidence: decisionEvidence,
       ...(selectedDiagnostic?.clearanceDistanceTradeoff &&
         typeof selectedDiagnostic.clearanceDistanceTradeoff === 'object'
         ? { clearanceDistanceTradeoff:

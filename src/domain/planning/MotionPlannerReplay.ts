@@ -3,6 +3,7 @@ import type { MotionPlan } from '../motion/planningModel';
 import { planSynchronously } from '../planner/PlannerService';
 import type { OccupancyGrid, PathPoint, PlannerResult, RobotFootprint } from '../types';
 import type { MotionPlannerCalibrationSnapshot } from './MotionPlannerCalibration';
+import type { MotionPlannerCalibrationProfileName } from './MotionPlannerCalibrationProfiles';
 import { createPlanningConfigurationSnapshot,
   type PlanningConfigurationSnapshot } from './PlanningConfigurationSnapshot';
 
@@ -13,9 +14,11 @@ export interface MotionPlannerReplayScenario {
   goalPose: PathPoint;
   goalTheta?: number;
   configuration: PlanningConfigurationSnapshot;
+  profileName?: MotionPlannerCalibrationProfileName | 'PRODUCTION_BASELINE' | 'CUSTOM';
 }
 
 export interface MotionPlannerReplayResult {
+  selectedProfile: MotionPlannerReplayScenario['profileName'];
   motionPlan?: MotionPlan;
   calibration: MotionPlannerCalibrationSnapshot;
   metrics: MotionPlannerCalibrationSnapshot['result'];
@@ -53,9 +56,17 @@ export const replayMotionPlannerScenario = (
   const calibration = plannerResult.motionPlannerCalibration;
   if (!calibration) throw new Error('Production motion-state replay did not produce calibration data.');
   return {
+    selectedProfile: scenario.profileName ?? 'CUSTOM',
     motionPlan: plannerResult.motionPlan, calibration, metrics: calibration.result,
     costBreakdown: calibration.result.costs,
-    boundedDiagnostics: (plannerResult.motionPlannerEvents ?? []).slice(-32),
+    boundedDiagnostics: [{
+      eventType: 'motionplanner.calibration.run',
+      selectedProfile: scenario.profileName ?? 'CUSTOM',
+      effectiveParameters: calibration.effectiveParameters,
+      selectedMetrics: calibration.result,
+      reverseEvidence: calibration.decisionSummary.reverseExplanation,
+      clearanceDistanceTradeoff: calibration.decisionSummary.clearanceDistanceTradeoff,
+    }, ...(plannerResult.motionPlannerEvents ?? []).slice(-31)],
     plannerResult,
   };
 };

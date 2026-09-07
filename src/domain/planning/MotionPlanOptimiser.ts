@@ -1,10 +1,12 @@
 import { normalizeAngle } from '../geometry/angles';
+import { CoordinateTransformer } from '../geometry/CoordinateTransformer';
 import { measureMotionPlan, type MotionPlanMetrics } from '../motion/MotionPlanMetrics';
 import type { MotionAction, MotionCostComponents, MotionPlan, MotionState } from '../motion/planningModel';
 import { MotionPlanValidator } from '../planner/MotionPlanValidator';
 import { buildMotionStateClearanceField } from '../planner/ClearanceField';
 import type { OccupancyGrid, RobotFootprint } from '../types';
 import type { EffectiveMotionStateConfiguration } from './MotionStateConfiguration';
+import { CostModel } from './CostModel';
 
 export interface MotionPlanOptimisationResult {
   plan: MotionPlan;
@@ -22,17 +24,6 @@ const angularDistance = (left: number, right: number): number =>
   Math.abs(normalizeAngle(left - right));
 const samePosition = (left: MotionState, right: MotionState): boolean =>
   Math.hypot(left.x - right.x, left.y - right.y) <= POSITION_TOLERANCE;
-const sumComponents = (actions: MotionAction[]): MotionCostComponents | undefined => {
-  if (actions.some((action) => !action.costComponents)) return undefined;
-  const result: MotionCostComponents = {
-    distance: 0, rotation: 0, reverse: 0, directionSwitch: 0,
-    wallClearance: 0, narrowPassage: 0, turnLocation: 0,
-    terminalOrientation: 0, total: 0,
-  };
-  for (const action of actions) for (const key of Object.keys(result) as Array<keyof MotionCostComponents>)
-    result[key] += action.costComponents![key];
-  return result;
-};
 
 /**
  * Conservative post-processing for an already-selected motion-state route.
@@ -98,7 +89,7 @@ export class MotionPlanOptimiser {
     }
 
     // Collapse consecutive collinear translations without changing direction,
-    // heading, endpoints, or accumulated selected-search cost components.
+    // heading, or endpoints. Costs are re-integrated over accepted geometry.
     for (let index = 0; index < plan.actions.length - 1;) {
       const first = plan.actions[index]!;
       const second = plan.actions[index + 1]!;
@@ -106,7 +97,8 @@ export class MotionPlanOptimiser {
         const replacement: MotionAction = {
           type: first.type, from: first.from, to: second.to,
           distanceM: Math.hypot(second.to.x - first.from.x, second.to.y - first.from.y),
-          costComponents: sumComponents([first, second]),
+          costComponents: this.translationComponents(first.from, second.to,
+            first.type === 'TRANSLATE_REVERSE', grid, configuration, clearanceField),
           metadata: { ...first.metadata, optimised: 'merged-compatible-translations' },
         };
         if (consider(this.replaceActions(plan, index, index + 1, replacement))) continue;
@@ -127,7 +119,8 @@ export class MotionPlanOptimiser {
         const replacement: MotionAction = {
           type, from, to,
           distanceM: Math.hypot(to.x - from.x, to.y - from.y),
-          costComponents: sumComponents(removed),
+          costComponents: this.translationComponents(from, to,
+            type === 'TRANSLATE_REVERSE', grid, configuration, clearanceField),
           metadata: { optimised: 'clearance-preserving-footprint-shortcut' },
         };
         if (consider(this.replaceActions(plan, start, end, replacement))) break;
@@ -154,6 +147,40 @@ export class MotionPlanOptimiser {
       angularDistance(first.from.theta, first.to.theta) <= ANGULAR_TOLERANCE &&
       angularDistance(first.from.theta, second.from.theta) <= ANGULAR_TOLERANCE &&
       angularDistance(first.from.theta, second.to.theta) <= ANGULAR_TOLERANCE;
+  }
+
+  /** Re-integrates physical per-metre costs after geometry changes. */
+  private translationComponents(from: MotionState, to: MotionState, reverse: boolean,
+    grid: OccupancyGrid, configuration: EffectiveMotionStateConfiguration,
+    clearanceField: Float32Array): MotionCostComponents {
+    const distance = Math.hypot(to.x - from.x, to.y - from.y);
+    const components: MotionCostComponents = {
+      distance: CostModel.distance(distance, configuration.weights.translationCostPerM),
+      rotation: 0,
+      reverse: CostModel.motionStateReverseRisk(reverse, distance,
+        configuration.weights.reverseCostPerM),
+      directionSwitch: 0, wallClearance: 0, narrowPassage: 0,
+      turnLocation: 0, terminalOrientation: 0, total: 0,
+    };
+    const transform = new CoordinateTransformer(grid.metadata);
+    const samples = Math.max(1, Math.ceil(distance / grid.metadata.resolution));
+    const sampleDistance = distance / samples;
+    for (let index = 0; index < samples; index += 1) {
+      const ratio = (index + .5) / samples;
+      const cell = transform.worldToGrid(from.x + (to.x - from.x) * ratio,
+        from.y + (to.y - from.y) * ratio);
+      const clearance = cell ? clearanceField[transform.index(cell)] ?? 0 : 0;
+      components.wallClearance += CostModel.motionStateWallProximity(clearance,
+        configuration.clearance.preferredM, sampleDistance,
+        configuration.weights.wallClearanceCost);
+      components.narrowPassage += CostModel.motionStateNarrowPassage(clearance,
+        configuration.footprint.widthM, configuration.footprint.effectiveSafetyMarginM,
+        configuration.passage.maximumWidthM, sampleDistance,
+        configuration.weights.narrowPassageCost);
+    }
+    components.total = components.distance + components.reverse +
+      components.wallClearance + components.narrowPassage;
+    return components;
   }
 
   private shortcutSemanticsMatch(actions: MotionAction[], from: MotionState,
