@@ -57,9 +57,10 @@ export class PlanningCoordinator {
         grid: inputs.grid, collisionGrid: inputs.grid, start, goal,
         options: structuredClone(configuration.planner) as PlannerOptions,
         footprint: structuredClone(configuration.footprint) as RobotFootprint,
-        startTheta: anchor.theta, exactStartPose: anchor,
+        startTheta: anchor.theta, exactStartPose: anchor, exactGoalPose: next,
         goalTheta: index === anchors.length - 2 && !inputs.goalThetaExplicit ? undefined : next.theta,
         planningConfiguration: configuration,
+        plannerStrategy: inputs.plannerMode === 'motion-state' ? 'motion-state' : 'legacy',
         diagnosticContext: { sessionId: inputs.sessionId, missionId: inputs.missionId, planningRequestId: requestId },
       };
     });

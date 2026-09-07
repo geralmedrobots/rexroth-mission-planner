@@ -37,8 +37,7 @@ class DistanceHeap {
   public get size():number{return this.items.length;}
 }
 
-/** Eight-neighbour Euclidean distance transform in metres. Unknown is occupied. */
-export const buildClearanceField=(grid:OccupancyGrid):Float32Array=>{
+const buildField=(grid:OccupancyGrid,roundingSafe:boolean):Float32Array=>{
   const {width,height,resolution,occupiedThreshold}=grid.metadata;
   const result=new Float32Array(width*height).fill(Number.POSITIVE_INFINITY);
   const heap=new DistanceHeap();
@@ -54,7 +53,11 @@ export const buildClearanceField=(grid:OccupancyGrid):Float32Array=>{
   ] as const;
   while(heap.size){
     const current=heap.pop()!;
-    if(current.distance!==result[current.index])continue;
+    if(roundingSafe){
+      // Float32Array storage rounds the queued JavaScript number. Exact equality
+      // stops propagation beyond the first neighbours on many resolutions.
+      if(current.distance>result[current.index]!+1e-6)continue;
+    }else if(current.distance!==result[current.index])continue;
     const row=Math.floor(current.index/width);
     const column=current.index%width;
     for(const [dr,dc,scale] of moves){
@@ -70,3 +73,10 @@ export const buildClearanceField=(grid:OccupancyGrid):Float32Array=>{
   }
   return result;
 };
+
+/** Existing legacy distance transform, retained byte-for-byte for compatibility. */
+export const buildClearanceField=(grid:OccupancyGrid):Float32Array=>buildField(grid,false);
+
+/** Correctly propagated field used only by the motion-state pipeline. */
+export const buildMotionStateClearanceField=(grid:OccupancyGrid):Float32Array=>
+  buildField(grid,true);

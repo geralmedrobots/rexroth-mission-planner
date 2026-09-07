@@ -2,7 +2,7 @@ import { CoordinateTransformer } from '../geometry/CoordinateTransformer';
 import type {
   BoschRokitCorridor, BoschRokitCorridorSettings, OccupancyGrid, PathPoint, RobotFootprint,
 } from '../types';
-import { PathCollisionValidator } from './PathCollisionValidator';
+import { TranslationSweepChecker } from './TranslationSweepChecker';
 
 export interface CorridorDiagnostic {
   edgeId?:string;
@@ -39,6 +39,7 @@ export class EdgeCorridorPlanner {
     grid:OccupancyGrid,
     footprint:RobotFootprint,
     settings:BoschRokitCorridorSettings,
+    bodyTheta?:number,
   ):EdgeCorridorResult{
     const edgeLengthM=Math.hypot(end.x-start.x,end.y-start.y);
     const reserve=footprint.width/2+settings.obstacleSafetyMarginM+settings.localizationMarginM;
@@ -66,9 +67,9 @@ export class EdgeCorridorPlanner {
     const collisionGrid=settings.unknownCellsBlocked?grid:{
       ...grid,data:grid.data.map((value)=>value<0?0:value),
     };
-    if(!new PathCollisionValidator().segmentIsFree(
-      collisionGrid,{...start,theta:edgeTheta},{...end,theta:edgeTheta},centerlineFootprint,
-      Math.min(settings.corridorSampleSpacingM,grid.metadata.resolution/2),
+    if(!new TranslationSweepChecker().segmentIsFreeAtHeading(
+      collisionGrid,start,end,centerlineFootprint,
+      Math.min(settings.corridorSampleSpacingM,grid.metadata.resolution/2),bodyTheta??edgeTheta,
     ))return omit('Edge or robot footprint intersects occupied/unknown space.');
 
     const sampleCount=Math.max(2,Math.ceil(edgeLengthM/settings.corridorSampleSpacingM)+1);

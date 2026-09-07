@@ -12,6 +12,7 @@ export class RouteSafetyError extends Error {
   public constructor(message:string){super(message);this.name='RouteSafetyError';}
 }
 
+/** Legacy XY-route enhancement. Motion-state plans are explicitly passed through. */
 export class RouteSafetyProcessor {
   private readonly collision=new PathCollisionValidator();
   public lastCandidatePath:PathPoint[]=[];
@@ -23,7 +24,19 @@ export class RouteSafetyProcessor {
     options:PlannerOptions,
     startTheta:number,
     goalTheta:number,
+    plannerMode:'legacy'|'motion-state'='legacy',
   ):{path:PathPoint[];diagnostics:PlannerDiagnostics}{
+    if(plannerMode==='motion-state'){
+      this.lastCandidatePath=[...path];
+      return {path:[...path],diagnostics:{
+        detectedPassages:[],routePassageCount:0,insertedNodeCount:0,
+        rejectedTurnLocations:[],relocatedTurnNodes:0,minimumRouteClearanceM:0,
+        largestHeadingChangeDeg:0,stages:[],warnings:['MOTION_STATE_ROUTE_NOT_REWRITTEN'],
+        finalPathSource:'motion-state',rawPathStatus:'RAW_PATH_FOUND',
+        baselineStatus:'BASELINE_PATH_VALID',doorAlignmentStatus:'NOT_RUN',
+        turnValidationStatus:'NOT_RUN',
+      }};
+    }
     if(path.length<2)throw new RouteSafetyError('A safe route requires at least two points.');
     this.lastCandidatePath=[...path];
     const planningFootprint=this.planningFootprint(footprint,options);

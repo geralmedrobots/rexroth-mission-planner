@@ -12,6 +12,7 @@ import { PathCollisionValidator } from './PathCollisionValidator';
 import { PathSimplifier } from './PathSimplifier';
 import { RouteSafetyProcessor } from './RouteSafetyProcessor';
 import { createPlanningConfigurationSnapshot, type PlanningConfigurationSnapshot } from '../planning/PlanningConfigurationSnapshot';
+import { MotionStatePlanner } from '../planning/MotionStatePlanner';
 
 export interface PlannerRequest {
   grid: OccupancyGrid;
@@ -23,8 +24,10 @@ export interface PlannerRequest {
   goalTheta?: number;
   startTheta?:number;
   exactStartPose?:PathPoint;
+  exactGoalPose?:PathPoint;
   planningConfiguration?: PlanningConfigurationSnapshot;
   diagnosticContext?: { sessionId: string; missionId?: string; planningRequestId: string };
+  plannerStrategy?: 'legacy' | 'motion-state';
 }
 
 const emptyDiagnostics=():PlannerDiagnostics=>({
@@ -117,6 +120,7 @@ const addCollisionContext=(
 };
 
 export const planSynchronously = (request: PlannerRequest): PlannerResult => {
+  if (request.plannerStrategy === 'motion-state') return new MotionStatePlanner().plan(request);
   const started=performance.now();
   const configuration=request.planningConfiguration ?? createPlanningConfigurationSnapshot({
     plannerOptions: request.options, footprint: request.footprint,
@@ -332,7 +336,7 @@ export const planSynchronously = (request: PlannerRequest): PlannerResult => {
         };
         const doorResult=doorProcessor.process(
           grid,selected,request.footprint,doorOptions,
-          request.startTheta??rawPath[0]!.theta,effectiveGoalTheta);
+          request.startTheta??rawPath[0]!.theta,effectiveGoalTheta,'legacy');
         diagnostics.detectedPassages=doorResult.diagnostics.detectedPassages;
         diagnostics.stages.push(stage('doorway-detection',selected.length,
           doorResult.diagnostics.detectedPassages.length,true,{
@@ -388,7 +392,7 @@ export const planSynchronously = (request: PlannerRequest): PlannerResult => {
         const beforeTurn=[...selected];
         const turnResult=turnProcessor.process(
           grid,selected,request.footprint,turnOptions,
-          request.startTheta??rawPath[0]!.theta,effectiveGoalTheta);
+          request.startTheta??rawPath[0]!.theta,effectiveGoalTheta,'legacy');
         selected=turnResult.path;
         diagnostics.rejectedTurnLocations=turnResult.diagnostics.rejectedTurnLocations;
         diagnostics.relocatedTurnNodes=turnResult.diagnostics.relocatedTurnNodes;

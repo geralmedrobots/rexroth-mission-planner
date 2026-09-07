@@ -4,10 +4,14 @@ export type MotionDirection = 'FORWARD' | 'REVERSE';
 
 export interface MotionState extends Pose2D {
   direction: MotionDirection;
+  /** Discrete heading identity used by MotionStatePlanner. */
+  thetaBin?: number;
+  row?: number;
+  column?: number;
 }
 
 export type MotionActionType =
-  | 'ROTATE'
+  | 'ROTATE' | 'ROTATE_IN_PLACE'
   | 'TRANSLATE_FORWARD'
   | 'TRANSLATE_REVERSE'
   | 'DIRECTION_CHANGE';
@@ -19,6 +23,19 @@ export interface MotionAction {
   distanceM?: number;
   rotationRad?: number;
   metadata?: Record<string, unknown>;
+  costComponents?: MotionCostComponents;
+}
+
+export interface MotionCostComponents {
+  distance: number;
+  rotation: number;
+  reverse: number;
+  directionSwitch: number;
+  wallClearance: number;
+  narrowPassage: number;
+  turnLocation: number;
+  terminalOrientation: number;
+  total: number;
 }
 
 export interface MotionPlanMetadata {
@@ -33,4 +50,5 @@ export interface MotionPlan {
   states: MotionState[];
   actions: MotionAction[];
   metadata: MotionPlanMetadata;
+  diagnostics?: Record<string, unknown>;
 }

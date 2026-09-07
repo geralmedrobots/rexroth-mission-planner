@@ -67,7 +67,7 @@ import { GlobalReplanningPanel } from './features/replanning/GlobalReplanningPan
 import { useGlobalReplanning } from './features/replanning/useGlobalReplanning';
 import { useGlobalReplanningStore } from './features/replanning/globalReplanningStore';
 import { LogService } from './services/LogService';
-import { OperationalLogDiagnosticSink } from './features/diagnostics/DiagnosticEvent';
+import { createDiagnosticEvent, OperationalLogDiagnosticSink } from './features/diagnostics/DiagnosticEvent';
 import { mqttService } from './services/MqttService';
 import { useAppStore } from './stores/appStore';
 import { PlanningCoordinator } from './features/planning/PlanningCoordinator';
@@ -332,6 +332,14 @@ export default function App(){
         robotPose:poseSnapshot.pose,activeMapId:navigatorMapId!,
         finalGoalTheta:finalGoalTheta??(store.goalThetaExplicit?store.goal?.theta:undefined),
         planningConfiguration:planningConfigurationRef.current,
+        motionPlan: store.plannerResult?.motionPlan,
+        onMotionPlanValidation:(result)=>operationalDiagnosticSink.emit(createDiagnosticEvent({
+          sessionId:appSessionId,missionId:missionController.snapshot.missionId,
+          stage:'motionplan',severity:result.valid?'info':'error',
+          eventType:result.valid?'motionplan.validation.passed':'motionplan.validation.failed',
+          message:result.valid?'MotionPlan publish validation passed.':'MotionPlan publish validation failed.',
+          payload:{issues:result.issues},
+        })),
         corridorPlanning:{
           grid:store.grid,footprint:store.footprint,plannerOptions:store.plannerOptions,
           onDiagnostic:(diagnostic)=>corridorDiagnostics.push(diagnostic),
@@ -831,7 +839,7 @@ export default function App(){
       mb:`${diagnosticsHeight}px`,flex:1,position:'relative',transition:'margin .22s ease'}}>
       <Paper className="mr-glass" square sx={{height:54,display:'flex',alignItems:'center',px:1.5,gap:1,borderRadius:0}}>
         <Select size="small" value={store.plannerMode} onChange={(e)=>store.set({plannerMode:e.target.value as typeof store.plannerMode})}>
-          <MenuItem value="automatic">Automatic</MenuItem><MenuItem value="manual">Manual</MenuItem><MenuItem value="hybrid">Hybrid</MenuItem>
+          <MenuItem value="automatic">Automatic</MenuItem><MenuItem value="manual">Manual</MenuItem><MenuItem value="hybrid">Hybrid</MenuItem><MenuItem value="motion-state">Motion state (experimental)</MenuItem>
         </Select>
         <Chip color={routePhase==='Ready to start'?'success':
           routePhase.startsWith('Failed')?'error':'primary'} label={routePhase}/>
@@ -1100,7 +1108,7 @@ export default function App(){
       </Stack>
       <Alert severity="warning" sx={{mt:1}}>Pause action disabled because the current ROKIT configuration rejected the generated stopPause blocking type.</Alert>
       <Alert severity="info" sx={{mt:1}}>State request action is not confirmed for the current ROKIT configuration.</Alert>
-      {store.plannerMode!=='automatic'&&<Box mt={1}><Typography variant="overline">Waypoint editor</Typography>
+      {(store.plannerMode==='manual'||store.plannerMode==='hybrid')&&<Box mt={1}><Typography variant="overline">Waypoint editor</Typography>
         {store.waypoints.map((w,i)=><Paper key={w.id} variant="outlined" sx={{p:.7,mb:.5}}>
           <Stack direction="row" alignItems="center" gap={.5}><Typography variant="caption">{i+1}</Typography>
             <TextField size="small" label="x" type="number" value={w.x} onChange={(e)=>{const a=[...store.waypoints];a[i]={...w,x:Number(e.target.value)};store.set({waypoints:a});}}/>

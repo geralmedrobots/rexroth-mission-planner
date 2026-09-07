@@ -29,6 +29,19 @@ export class TranslationSweepChecker {
     return true;
   }
 
+  /** Motion-state variant: translation direction is physical motion, while
+   * body orientation remains the explicit state heading. */
+  public segmentIsFreeAtHeading(grid: OccupancyGrid, a: PathPoint, b: PathPoint,
+    footprint: RobotFootprint, interval: number, bodyTheta: number): boolean {
+    const distance = Math.hypot(b.x - a.x, b.y - a.y);
+    const steps = Math.max(1, Math.ceil(distance / Math.max(interval, grid.metadata.resolution / 3)));
+    for (let i = 0; i <= steps; i += 1) {
+      const t = i / steps;
+      if (!this.pose.pointIsFree(grid, { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, theta: bodyTheta }, footprint)) return false;
+    }
+    return true;
+  }
+
   public pathIsFree(grid: OccupancyGrid, path: PathPoint[], footprint: RobotFootprint, interval: number): boolean {
     return path.length >= 2 && path.slice(1).every((point, index) =>
       this.segmentIsFree(grid, path[index]!, point, footprint, interval));

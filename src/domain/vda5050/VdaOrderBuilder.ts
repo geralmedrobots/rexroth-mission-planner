@@ -5,12 +5,11 @@ import type {
 } from '../types';
 import { defaultPlannerOptions } from '../defaults';
 import { EdgeCorridorPlanner, type CorridorDiagnostic } from '../planner/EdgeCorridorPlanner';
-import { PathCollisionValidator } from '../planner/PathCollisionValidator';
-import { CostModel } from '../planning/CostModel';
 import { createPlanningConfigurationSnapshot, type PlanningConfigurationSnapshot } from '../planning/PlanningConfigurationSnapshot';
 import type { MotionPlan } from '../motion/planningModel';
 import { buildLegacyMotionPlan } from '../motion/LegacyMotionPlanBuilder';
 import { LogService } from '../../services/LogService';
+import { MotionPlanValidator, type MotionPlanValidationResult } from '../planner/MotionPlanValidator';
 
 let headerId = 0;
 const uniqueId = (prefix: string): string => `${prefix}-${crypto.randomUUID()}`;
@@ -24,6 +23,7 @@ export interface OrderBuildContext {
   finalGoalTheta?: number;
   /** Already-decided motion states. When present, this builder only serializes them. */
   motionPlan?: MotionPlan;
+  onMotionPlanValidation?: (result: MotionPlanValidationResult) => void;
   planningConfiguration?: PlanningConfigurationSnapshot;
   corridorPlanning?:{
     grid:OccupancyGrid;
@@ -55,119 +55,6 @@ export const removeInitialDuplicatePoints = (
 
 /** Builds an independent VDA 5050 Order whose Node 0 is always the exact live robot pose. */
 export class VdaOrderBuilder {
-  private static readonly directionSwitchPenaltyMultiplier = 0.5;
-
-  private evaluateSegmentOrientation(
-    from: PathPoint,
-    to: PathPoint,
-    previousTheta: number,
-    previousDirection: 'FORWARD' | 'REVERSE' | undefined,
-    plannerOptions: PlannerOptions,
-    grid?: OccupancyGrid,
-    footprint?: RobotFootprint,
-  ): {
-    selectedDirection: 'FORWARD' | 'REVERSE';
-    selectedTheta: number;
-    forwardCandidate: {
-      theta: number;
-      rotationRequired: number;
-      travelDirection: 'FORWARD';
-      feasible: boolean;
-      cost: { travel: number; rotation: number; reversePenalty: number; obstacle: number; turn: number; total: number; };
-    };
-    reverseCandidate: {
-      theta: number;
-      rotationRequired: number;
-      travelDirection: 'REVERSE';
-      feasible: boolean;
-      cost: { travel: number; rotation: number; reversePenalty: number; obstacle: number; turn: number; total: number; };
-    };
-  } {
-    const pathBearing = normalizeAngle(Math.atan2(to.y - from.y, to.x - from.x));
-    const forwardTheta = normalizeAngle(pathBearing);
-    const reverseTheta = normalizeAngle(pathBearing + Math.PI);
-    const forwardRotation = Math.abs(normalizeAngle(forwardTheta - previousTheta));
-    const reverseRotation = Math.abs(normalizeAngle(reverseTheta - previousTheta));
-    const distance = Math.hypot(to.x - from.x, to.y - from.y);
-    const travelCost = CostModel.distance(distance, plannerOptions.distanceWeight);
-    const rotationWeight = plannerOptions.passageSafety.headingChangeWeight;
-    const reversePenalty = plannerOptions.passageSafety.reverseRiskWeight;
-    const directionSwitchPenalty = CostModel.directionSwitchPenalty(plannerOptions);
-    const collisionValidator = new PathCollisionValidator();
-    const candidateObstacleCost = (candidateTheta: number, candidateDirection: 'FORWARD' | 'REVERSE'): number => {
-      if (!grid || !footprint) return 0;
-      const pointFree = collisionValidator.pointIsFree(grid, { ...from, theta: candidateTheta }, footprint);
-      const rotationFree = collisionValidator.rotationIsFree(
-        grid,
-        { x: from.x, y: from.y },
-        previousTheta,
-        candidateTheta,
-        footprint,
-        plannerOptions.passageSafety.rotationCollisionSampleDeg * Math.PI / 180,
-      );
-      if (!pointFree || !rotationFree) return Number.POSITIVE_INFINITY;
-      const turnPenalty = previousDirection && previousDirection !== candidateDirection
-        ? (plannerOptions.turnPenalty ?? plannerOptions.passageSafety.headingChangeWeight) : 0;
-      return turnPenalty;
-    };
-    const forwardCostBase = {
-      travel: travelCost,
-      rotation: rotationWeight * forwardRotation,
-      reversePenalty: 0,
-      obstacle: 0,
-      turn: previousDirection && previousDirection !== 'FORWARD'
-        ? directionSwitchPenalty
-        : 0,
-    };
-    const reverseCostBase = {
-      travel: travelCost,
-      rotation: rotationWeight * reverseRotation,
-      reversePenalty,
-      obstacle: 0,
-      turn: previousDirection && previousDirection !== 'REVERSE'
-        ? directionSwitchPenalty
-        : 0,
-    };
-    const forwardFeasible = candidateObstacleCost(forwardTheta, 'FORWARD') !== Number.POSITIVE_INFINITY;
-    const reverseFeasible = candidateObstacleCost(reverseTheta, 'REVERSE') !== Number.POSITIVE_INFINITY;
-    const forwardObstacleCost = forwardFeasible ? candidateObstacleCost(forwardTheta, 'FORWARD') : Number.POSITIVE_INFINITY;
-    const reverseObstacleCost = reverseFeasible ? candidateObstacleCost(reverseTheta, 'REVERSE') : Number.POSITIVE_INFINITY;
-    const forwardCandidate = {
-      theta: forwardTheta,
-      rotationRequired: forwardRotation,
-      travelDirection: 'FORWARD' as const,
-      feasible: forwardFeasible,
-      cost: {
-        travel: forwardCostBase.travel,
-        rotation: forwardCostBase.rotation,
-        reversePenalty: forwardCostBase.reversePenalty,
-        obstacle: forwardObstacleCost,
-        turn: forwardCostBase.turn,
-        total: forwardCostBase.travel + forwardCostBase.rotation + forwardCostBase.turn + forwardObstacleCost,
-      },
-    };
-    const reverseCandidate = {
-      theta: reverseTheta,
-      rotationRequired: reverseRotation,
-      travelDirection: 'REVERSE' as const,
-      feasible: reverseFeasible,
-      cost: {
-        travel: reverseCostBase.travel,
-        rotation: reverseCostBase.rotation,
-        reversePenalty: reverseCostBase.reversePenalty,
-        obstacle: reverseObstacleCost,
-        turn: reverseCostBase.turn,
-        total: reverseCostBase.travel + reverseCostBase.rotation + reverseCostBase.reversePenalty + reverseCostBase.turn + reverseObstacleCost,
-      },
-    };
-    const chosen = [forwardCandidate, reverseCandidate]
-      .filter((candidate) => candidate.feasible)
-      .sort((left, right) => left.cost.total - right.cost.total)[0];
-    const selectedDirection = chosen?.travelDirection ?? 'FORWARD';
-    const selectedTheta = chosen?.theta ?? forwardTheta;
-    return { selectedDirection, selectedTheta, forwardCandidate, reverseCandidate };
-  }
-
   public build(
     path: PathPoint[],
     context: OrderBuildContext,
@@ -184,78 +71,57 @@ export class VdaOrderBuilder {
       footprint: context.corridorPlanning?.footprint,
     });
     const plannerOptions = snapshot.planner;
-    const usefulPath = removeInitialDuplicatePoints(
-      context.robotPose,
-      path,
-      settings.initialPathPointDistance,
-    );
-    const route: PathPoint[] = [
-      { x: context.robotPose.x, y: context.robotPose.y, theta: normalizeAngle(context.robotPose.theta) },
-      ...usefulPath,
-    ];
-    if (route.length < 2) throw new Error('A VDA route requires the real start and at least one useful waypoint.');
-    const motionPlan = context.motionPlan ?? buildLegacyMotionPlan(
-      route, context.robotPose.theta, plannerOptions, context.corridorPlanning?.grid,
-      context.corridorPlanning?.footprint, context.finalGoalTheta,
-    );
+    let route: PathPoint[];
+    let motionPlan: MotionPlan;
+    if (context.motionPlan) {
+      motionPlan = context.motionPlan;
+      route = motionPlan.states.map((state) => ({ x: state.x, y: state.y, theta: state.theta }));
+      if (motionPlan.metadata.source === 'motion-state-planner' && !context.corridorPlanning)
+        throw new Error('Motion-state MotionPlan validation requires the planning grid and footprint.');
+      if (motionPlan.metadata.source === 'motion-state-planner') {
+        const first = motionPlan.states[0];
+        if (!first || Math.hypot(first.x - context.robotPose.x, first.y - context.robotPose.y) > settings.firstNodePositionConsistency ||
+          Math.abs(normalizeAngle(first.theta - context.robotPose.theta)) > settings.firstNodeAngularConsistency)
+          throw new Error('The live robot pose no longer matches the validated MotionPlan start state. Replan before order generation.');
+      }
+    } else {
+      const usefulPath = removeInitialDuplicatePoints(context.robotPose, path,
+        settings.initialPathPointDistance);
+      route = [
+        { x: context.robotPose.x, y: context.robotPose.y,
+          theta: normalizeAngle(context.robotPose.theta) },
+        ...usefulPath,
+      ];
+      motionPlan = buildLegacyMotionPlan(
+        route, context.robotPose.theta, plannerOptions, context.corridorPlanning?.grid,
+        context.corridorPlanning?.footprint, context.finalGoalTheta,
+      );
+    }
+    if (route.length < 2) throw new Error('A VDA route requires the real start and at least one motion transition.');
+    const outputRoute = route;
+    if (context.motionPlan && context.corridorPlanning) {
+      const validationFootprint = structuredClone(context.corridorPlanning.footprint);
+      validationFootprint.safetyMargin = Math.max(validationFootprint.safetyMargin,
+        snapshot.normalized.footprint.planningSafetyMarginM +
+        snapshot.normalized.footprint.localizationMarginM);
+      const checked = new MotionPlanValidator().validate(
+        motionPlan, context.corridorPlanning.grid, validationFootprint,
+        plannerOptions.collisionSampleInterval,
+        plannerOptions.passageSafety.rotationCollisionSampleDeg * Math.PI / 180,
+        snapshot.normalized.permissions.reverseAllowed,
+        context.finalGoalTheta,
+      );
+      context.onMotionPlanValidation?.(checked);
+      if (!checked.valid) throw new Error(`MotionPlan validation failed: ${checked.errors.join(' ')}`);
+    }
 
-    let previousTheta = normalizeAngle(context.robotPose.theta);
-    let previousDirection: 'FORWARD' | 'REVERSE' | undefined;
-
-    const nodes: VdaNode[] = route.map((point, index) => {
+    const nodes: VdaNode[] = outputRoute.map((point, index) => {
       const waypoint = point as Partial<Waypoint>;
-      const next = route[index + 1];
-      const previous = route[index - 1];
-      let theta: number;
-      let chosenDirection: 'FORWARD' | 'REVERSE' | undefined;
-      if (index === 0) {
-        theta = normalizeAngle(context.robotPose.theta);
-      } else if (motionPlan.states[index]) {
-        // MotionPlan is authoritative: orientation and direction were decided upstream.
-        const decided = motionPlan.states[index]!;
-        theta = normalizeAngle(decided.theta);
-        chosenDirection = decided.direction;
-      } else if (point.orientationLocked || point.passageId) {
-        theta = normalizeAngle(point.theta);
-      } else if (next) {
-        const segment = this.evaluateSegmentOrientation(
-          point,
-          next,
-          previousTheta,
-          previousDirection,
-          plannerOptions,
-          context.corridorPlanning?.grid,
-          context.corridorPlanning?.footprint,
-        );
-        chosenDirection = segment.selectedDirection;
-        theta = segment.selectedTheta;
-        const pathBearing = normalizeAngle(Math.atan2(next.y - point.y, next.x - point.x));
-        const formatCost = (value: number): string => Number.isFinite(value) ? value.toFixed(6) : 'inf';
-        const orderDebugMessage = `orderDebug segmentIndex=${index} pathBearing=${pathBearing.toFixed(6)} previousTheta=${previousTheta.toFixed(6)} ` +
-          `weights={distanceWeight:${plannerOptions.distanceWeight.toFixed(6)},headingChangeWeight:${plannerOptions.passageSafety.headingChangeWeight.toFixed(6)},` +
-          `reverseRiskWeight:${plannerOptions.passageSafety.reverseRiskWeight.toFixed(6)},turnPenalty:${(plannerOptions.turnPenalty ?? plannerOptions.passageSafety.headingChangeWeight).toFixed(6)},` +
-          `directionSwitchPenaltyMultiplier:${VdaOrderBuilder.directionSwitchPenaltyMultiplier.toFixed(6)},directionSwitchPenalty:${(VdaOrderBuilder.directionSwitchPenaltyMultiplier * plannerOptions.passageSafety.reverseRiskWeight).toFixed(6)}} ` +
-          `selectedDirection=${segment.selectedDirection} selectedTheta=${segment.selectedTheta.toFixed(6)} ` +
-          `forwardCostTerms={travel:${formatCost(segment.forwardCandidate.cost.travel)},rotation:${formatCost(segment.forwardCandidate.cost.rotation)},` +
-          `reversePenalty:${formatCost(segment.forwardCandidate.cost.reversePenalty)},obstacle:${formatCost(segment.forwardCandidate.cost.obstacle)},` +
-          `turn:${formatCost(segment.forwardCandidate.cost.turn)},total:${formatCost(segment.forwardCandidate.cost.total)}} ` +
-          `reverseCostTerms={travel:${formatCost(segment.reverseCandidate.cost.travel)},rotation:${formatCost(segment.reverseCandidate.cost.rotation)},` +
-          `reversePenalty:${formatCost(segment.reverseCandidate.cost.reversePenalty)},obstacle:${formatCost(segment.reverseCandidate.cost.obstacle)},` +
-          `turn:${formatCost(segment.reverseCandidate.cost.turn)},total:${formatCost(segment.reverseCandidate.cost.total)}} ` +
-          `forwardTheta=${segment.forwardCandidate.theta.toFixed(6)} reverseTheta=${segment.reverseCandidate.theta.toFixed(6)} ` +
-          `forwardFeasible=${segment.forwardCandidate.feasible} reverseFeasible=${segment.reverseCandidate.feasible}`;
-        LogService.write('planner', 'info', orderDebugMessage);
-      } else if (context.finalGoalTheta !== undefined) {
-        theta = normalizeAngle(context.finalGoalTheta);
-      } else if (previous) {
-        theta = normalizeAngle(Math.atan2(point.y - previous.y, point.x - previous.x));
-      } else {
-        throw new Error('Cannot determine final node orientation.');
-      }
-      if (index > 0 && !point.orientationLocked && !point.passageId && next) {
-        previousTheta = normalizeAngle(theta);
-        previousDirection = chosenDirection;
-      }
+      const decided = motionPlan.states[index];
+      if (!decided) throw new Error('MotionPlan state cardinality does not match its route.');
+      // Serialization only: body orientation and direction were decided by the
+      // motion-state planner or the isolated legacy compatibility builder.
+      const theta = normalizeAngle(decided.theta);
       return {
         nodeId: uniqueId(`node-${index}`),
         sequenceId: index * 2,
@@ -276,11 +142,15 @@ export class VdaOrderBuilder {
     const corridorPlanner=new EdgeCorridorPlanner();
     const edges: VdaEdge[] = nodes.slice(0, -1).map((node, index) => {
       const edgeId=uniqueId(`edge-${index}`);
-      const corridorResult=context.corridorPlanning
+      const motionAction=context.motionPlan?.actions[index];
+      const corridorResult=context.corridorPlanning&&
+        motionAction?.type!=='ROTATE_IN_PLACE'&&motionAction?.type!=='ROTATE'&&
+        motionAction?.type!=='DIRECTION_CHANGE'
         ?corridorPlanner.calculate(
           node.nodePosition,nodes[index+1]!.nodePosition,
           context.corridorPlanning.grid,context.corridorPlanning.footprint,
           context.corridorPlanning.plannerOptions.corridor,
+          motionAction?.from.theta,
         ):undefined;
       if(corridorResult)context.corridorPlanning?.onDiagnostic?.({
         ...corridorResult.diagnostic,edgeId,
@@ -292,8 +162,9 @@ export class VdaOrderBuilder {
         startNodeId: node.nodeId,
         endNodeId: nodes[index + 1]!.nodeId,
         maxSpeed: settings.missionMaximumSpeedMps,
-        rotationAllowed: index === 0 ? true :
-          (route[index]?.passageId||route[index+1]?.passageId)
+        rotationAllowed: motionAction?.type==='ROTATE_IN_PLACE'||motionAction?.type==='ROTATE'
+          ?true:index === 0 ? true :
+            (outputRoute[index]?.passageId||outputRoute[index+1]?.passageId)
             ?false:settings.rotationAllowed,
         ...(corridorResult?.corridor?{corridor:corridorResult.corridor}:{}),
         actions: [],

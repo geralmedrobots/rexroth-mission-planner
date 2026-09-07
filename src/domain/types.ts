@@ -119,10 +119,12 @@ export interface PlannerDiagnostics {
   rejectedTurnLocations: Pose2D[];
   relocatedTurnNodes: number;
   minimumRouteClearanceM: number;
+  /** Sampled from the collision-checking OccupancyGrid for motion-state plans. */
+  averageRouteClearanceM?: number;
   largestHeadingChangeDeg: number;
   stages: PlannerStageDiagnostic[];
   warnings: string[];
-  finalPathSource: 'baseline' | 'door-aligned' | 'turn-enhanced';
+  finalPathSource: 'baseline' | 'door-aligned' | 'turn-enhanced' | 'motion-state';
   rawPathStatus: 'RAW_PATH_FOUND' | 'RAW_PATH_FAILED';
   baselineStatus: 'BASELINE_PATH_VALID' | 'BASELINE_PATH_FAILED';
   doorAlignmentStatus: 'NOT_RUN' | 'APPLIED' | 'ADVANCED_ALIGNMENT_SKIPPED';
@@ -156,7 +158,8 @@ export type PlannerStageName =
   | 'raw-a-star' | 'path-simplification' | 'waypoint-densification'
   | 'doorway-detection' | 'doorway-alignment' | 'orientation-generation'
   | 'turn-feasibility' | 'footprint-collision-validation'
-  | 'corridor-generation' | 'vda-order-validation';
+  | 'corridor-generation' | 'vda-order-validation'
+  | 'motion-state-search' | 'motionplan-optimisation' | 'motionplan-validation';
 export interface PlannerStageDiagnostic {
   stage: PlannerStageName;
   inputPointCount: number;
@@ -189,6 +192,8 @@ export interface PlannerResult {
   statistics: PlannerStatistics;
   /** Bounded operational diagnostics transported from a worker with the result. */
   diagnosticEvents?: import('../features/diagnostics/DiagnosticEvent').DiagnosticEvent[];
+  motionPlan?: import('./motion/planningModel').MotionPlan;
+  motionPlannerEvents?: Array<Record<string, unknown>>;
 }
 export interface VdaHeader {
   headerId: number; timestamp: string; version: '2.0.0'; manufacturer: string; serialNumber: string;
@@ -258,7 +263,7 @@ export interface OrderSettings {
   firstNodeAngularConsistency: number; acceptanceTimeoutMs: number;
   pauseResumeEnabled: boolean;
 }
-export type PlannerMode = 'automatic' | 'manual' | 'hybrid';
+export type PlannerMode = 'automatic' | 'manual' | 'hybrid' | 'motion-state';
 export interface AppLog { id: string; timestamp: string; category: 'mqtt' | 'planner' | 'validation' | 'system'; level: 'info' | 'warning' | 'error'; message: string }
 export type PoseSource = 'state' | 'visualization';
 export type NavigatorMapIdSource =
