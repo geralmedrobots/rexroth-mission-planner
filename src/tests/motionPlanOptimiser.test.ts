@@ -4,6 +4,7 @@ import { buildLegacyMotionPlan } from '../domain/motion/LegacyMotionPlanBuilder'
 import { measureMotionPlan } from '../domain/motion/MotionPlanMetrics';
 import type { MotionActionType, MotionDirection, MotionPlan, MotionState } from '../domain/motion/planningModel';
 import { MotionPlanOptimiser } from '../domain/planning/MotionPlanOptimiser';
+import { createPlanningConfigurationSnapshot } from '../domain/planning/PlanningConfigurationSnapshot';
 import { buildMotionStateClearanceField } from '../domain/planner/ClearanceField';
 import { MotionPlanValidator } from '../domain/planner/MotionPlanValidator';
 import { PathCollisionValidator } from '../domain/planner/PathCollisionValidator';
@@ -53,7 +54,9 @@ const occupy = (map: OccupancyGrid, x: number, y: number): void => {
   map.data[transform.index(cell)] = 100;
 };
 const optimise = (plan: MotionPlan, map = grid(), robot = footprint()) =>
-  new MotionPlanOptimiser().optimise(plan, map, robot, options(), true,
+  new MotionPlanOptimiser().optimise(plan, map, robot,
+    createPlanningConfigurationSnapshot({ plannerOptions: options(), footprint: robot })
+      .normalized.motionState,
     plan.states.at(-1)?.theta);
 
 describe('MotionPlanOptimiser feasibility-preserving architecture', () => {

@@ -35,7 +35,8 @@ const options = (reverseWeight = 2): PlannerOptions => ({
   maxPlanningTimeMs: 5_000,
   passageSafety: { ...structuredClone(defaultPlannerOptions.passageSafety),
     reverseRiskWeight: reverseWeight, wallProximityWeight: 0, narrowPassageWeight: 0,
-    turnLocationWeight: 0 },
+    turnLocationWeight: 0, motionStateDirectionSwitchWeight: reverseWeight * .5,
+    planningSafetyMarginM: 0, localizationMarginM: 0 },
 });
 const plan = (grid: OccupancyGrid, start: RobotPose, goal: RobotPose,
   footprint = rectangle(), plannerOptions = options(), goalTheta = goal.theta) => {

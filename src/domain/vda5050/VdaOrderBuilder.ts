@@ -106,9 +106,9 @@ export class VdaOrderBuilder {
         snapshot.normalized.footprint.localizationMarginM);
       const checked = new MotionPlanValidator().validate(
         motionPlan, context.corridorPlanning.grid, validationFootprint,
-        plannerOptions.collisionSampleInterval,
-        plannerOptions.passageSafety.rotationCollisionSampleDeg * Math.PI / 180,
-        snapshot.normalized.permissions.reverseAllowed,
+        snapshot.normalized.motionState.sampling.translationCollisionIntervalM,
+        snapshot.normalized.motionState.sampling.rotationCollisionIntervalRad,
+        snapshot.normalized.motionState.permissions.reverse,
         context.finalGoalTheta,
       );
       context.onMotionPlanValidation?.(checked);

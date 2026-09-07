@@ -86,6 +86,8 @@ export const defaultPlannerOptions: PlannerOptions = {
     headingChangeWeight:0.15,
     turnLocationWeight:1,
     reverseRiskWeight:2,
+    motionStateDirectionSwitchWeight:1,
+    motionStateTerminalOrientationWeight:0.15,
     planningSafetyMarginM:0.05,
     localizationMarginM:0.05,
     enableTurnFeasibilityChecking:true,

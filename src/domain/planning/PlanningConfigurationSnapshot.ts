@@ -1,5 +1,7 @@
 import { defaultFootprint, defaultOrderSettings, defaultPlannerOptions } from '../defaults';
 import type { OrderSettings, PlannerOptions, RobotFootprint } from '../types';
+import { createEffectiveMotionStateConfiguration,
+  type EffectiveMotionStateConfiguration } from './MotionStateConfiguration';
 
 type DeepReadonly<T> = T extends (...args: never[]) => unknown ? T :
   T extends readonly (infer U)[] ? readonly DeepReadonly<U>[] :
@@ -35,6 +37,8 @@ export interface PlanningConfigurationSnapshot {
     readonly weights: { readonly distance: number; readonly headingChange: number; readonly turnLocation: number; readonly reverseRisk: number; readonly directionSwitch: number };
     readonly finalOrientation: { readonly enforced: boolean };
     readonly corridor: DeepReadonly<PlannerOptions['corridor']>;
+    /** The only configuration consumed by motion-state search and post-processing. */
+    readonly motionState: DeepReadonly<EffectiveMotionStateConfiguration>;
   };
 }
 
@@ -68,6 +72,8 @@ export const createPlanningConfigurationSnapshot = (input: PlanningConfiguration
   const order: OrderSettings = { ...defaultOrderSettings, ...input.orderSettings };
   for (const [name, value] of Object.entries({
     distanceWeight: plannerOptions.distanceWeight, collisionSampleInterval: plannerOptions.collisionSampleInterval,
+    motionStateDirectionSwitchWeight: plannerOptions.passageSafety.motionStateDirectionSwitchWeight,
+    motionStateTerminalOrientationWeight: plannerOptions.passageSafety.motionStateTerminalOrientationWeight,
     safetyMargin: footprint.safetyMargin, planningSafetyMarginM: plannerOptions.passageSafety.planningSafetyMarginM,
     localizationMarginM: plannerOptions.passageSafety.localizationMarginM,
   })) finite(name, value);
@@ -82,7 +88,8 @@ export const createPlanningConfigurationSnapshot = (input: PlanningConfiguration
     waypointSpacingM: { preferred: plannerOptions.passageSafety.preferredWaypointSpacingM, minimum: plannerOptions.passageSafety.minimumWaypointSpacingM, maximum: plannerOptions.passageSafety.maximumWaypointSpacingM },
     wall: { preferredClearanceM: plannerOptions.passageSafety.wallClearancePreferredM, minimumClearanceM: plannerOptions.passageSafety.wallClearanceMinimumM, proximityWeight: plannerOptions.passageSafety.wallProximityWeight },
     passage: { minimumWidthM: plannerOptions.passageSafety.minimumPassageWidthM, maximumWidthM: plannerOptions.passageSafety.maximumPassageWidthM, narrowWeight: plannerOptions.passageSafety.narrowPassageWeight },
-    weights: { distance: plannerOptions.distanceWeight, headingChange: plannerOptions.passageSafety.headingChangeWeight, turnLocation: plannerOptions.passageSafety.turnLocationWeight, reverseRisk: plannerOptions.passageSafety.reverseRiskWeight, directionSwitch: 0.5 * plannerOptions.passageSafety.reverseRiskWeight },
+    weights: { distance: plannerOptions.distanceWeight, headingChange: plannerOptions.passageSafety.headingChangeWeight, turnLocation: plannerOptions.passageSafety.turnLocationWeight, reverseRisk: plannerOptions.passageSafety.reverseRiskWeight, directionSwitch: plannerOptions.passageSafety.motionStateDirectionSwitchWeight },
     finalOrientation: { enforced: plannerOptions.finalOrientationEnforcement }, corridor: plannerOptions.corridor,
+    motionState: createEffectiveMotionStateConfiguration(plannerOptions, footprint),
   } });
 };

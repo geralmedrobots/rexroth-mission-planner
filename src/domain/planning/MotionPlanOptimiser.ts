@@ -3,10 +3,12 @@ import { measureMotionPlan, type MotionPlanMetrics } from '../motion/MotionPlanM
 import type { MotionAction, MotionCostComponents, MotionPlan, MotionState } from '../motion/planningModel';
 import { MotionPlanValidator } from '../planner/MotionPlanValidator';
 import { buildMotionStateClearanceField } from '../planner/ClearanceField';
-import type { OccupancyGrid, PlannerOptions, RobotFootprint } from '../types';
+import type { OccupancyGrid, RobotFootprint } from '../types';
+import type { EffectiveMotionStateConfiguration } from './MotionStateConfiguration';
 
 export interface MotionPlanOptimisationResult {
   plan: MotionPlan;
+  inputMetrics: MotionPlanMetrics;
   metrics: MotionPlanMetrics;
   candidatesConsidered: number;
   candidatesAccepted: number;
@@ -43,14 +45,15 @@ export class MotionPlanOptimiser {
     source: MotionPlan,
     grid: OccupancyGrid,
     footprint: RobotFootprint,
-    options: PlannerOptions,
-    reverseAllowed: boolean,
+    configuration: EffectiveMotionStateConfiguration,
     finalTheta?: number,
   ): MotionPlanOptimisationResult {
     const clearanceField = buildMotionStateClearanceField(grid);
     let plan = structuredClone(source) as MotionPlan;
-    let metrics = measureMotionPlan(plan, grid, options.collisionSampleInterval, 64,
+    const inputMetrics = measureMotionPlan(plan, grid,
+      configuration.sampling.translationCollisionIntervalM, 64,
       clearanceField);
+    let metrics = inputMetrics;
     let candidatesConsidered = 0;
     let candidatesAccepted = 0;
     let candidatesRejectedByValidation = 0;
@@ -59,16 +62,16 @@ export class MotionPlanOptimiser {
     const consider = (candidate: MotionPlan): boolean => {
       candidatesConsidered += 1;
       const checked = new MotionPlanValidator().validate(candidate, grid, footprint,
-        options.collisionSampleInterval,
-        options.passageSafety.rotationCollisionSampleDeg * Math.PI / 180,
-        reverseAllowed, finalTheta);
+        configuration.sampling.translationCollisionIntervalM,
+        configuration.sampling.rotationCollisionIntervalRad,
+        configuration.permissions.reverse, finalTheta);
       if (!checked.valid) {
         candidatesRejectedByValidation += 1;
         return false;
       }
       const candidateMetrics = measureMotionPlan(candidate, grid,
-        options.collisionSampleInterval, 64, clearanceField);
-      const hardMinimum = options.passageSafety.wallClearanceMinimumM;
+        configuration.sampling.translationCollisionIntervalM, 64, clearanceField);
+      const hardMinimum = configuration.clearance.hardMinimumM;
       if (candidateMetrics.minimumClearanceM + 1e-6 < hardMinimum ||
         candidateMetrics.minimumClearanceM + 1e-6 < metrics.minimumClearanceM ||
         candidateMetrics.averageClearanceM + 1e-6 < metrics.averageClearanceM) {
@@ -136,8 +139,11 @@ export class MotionPlanOptimiser {
     plan.diagnostics = { ...plan.diagnostics, optimisation: {
       candidatesConsidered, candidatesAccepted, candidatesRejectedByValidation,
       candidatesRejectedByClearance,
+      rotationChangeRad: metrics.totalAbsoluteRotationRad -
+        inputMetrics.totalAbsoluteRotationRad,
+      rotationActionChange: metrics.rotationActionCount - inputMetrics.rotationActionCount,
     } };
-    return { plan, metrics, candidatesConsidered, candidatesAccepted,
+    return { plan, inputMetrics, metrics, candidatesConsidered, candidatesAccepted,
       candidatesRejectedByValidation, candidatesRejectedByClearance };
   }
 

@@ -78,6 +78,10 @@ export interface PassageSafetySettings {
   headingChangeWeight: number;
   turnLocationWeight: number;
   reverseRiskWeight: number;
+  /** Motion-state-only cost; separated from reverseRiskWeight in Stage 4B. */
+  motionStateDirectionSwitchWeight: number;
+  /** Motion-state-only terminal rotation cost; separated from headingChangeWeight. */
+  motionStateTerminalOrientationWeight: number;
   planningSafetyMarginM: number;
   localizationMarginM: number;
   enableTurnFeasibilityChecking: boolean;
@@ -194,6 +198,7 @@ export interface PlannerResult {
   diagnosticEvents?: import('../features/diagnostics/DiagnosticEvent').DiagnosticEvent[];
   motionPlan?: import('./motion/planningModel').MotionPlan;
   motionPlannerEvents?: Array<Record<string, unknown>>;
+  motionPlannerCalibration?: import('./planning/MotionPlannerCalibration').MotionPlannerCalibrationSnapshot;
 }
 export interface VdaHeader {
   headerId: number; timestamp: string; version: '2.0.0'; manufacturer: string; serialNumber: string;

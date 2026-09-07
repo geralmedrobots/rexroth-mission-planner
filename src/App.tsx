@@ -29,7 +29,7 @@ import { analyzeSpeedLimits } from './domain/robot/SpeedLimitDiagnostics';
 import { compareMapIds, resolveActiveNavigatorMap } from './domain/robot/ActiveMapResolver';
 import { getLocalMessageAgeMs, isLocalMessageFresh } from './domain/robot/TelemetryFreshness';
 import type {
-  OccupancyGrid, PathPoint, PlannerOptions, PlannerResult, RobotPose,
+  OccupancyGrid, PathPoint, PlannerOptions, PlannerResult, RobotFootprint, RobotPose,
   VdaInstantAction, VdaOrder, Waypoint,
 } from './domain/types';
 import { QuickDestinations } from './features/destinations/QuickDestinations';
@@ -71,7 +71,7 @@ import { createDiagnosticEvent, OperationalLogDiagnosticSink } from './features/
 import { mqttService } from './services/MqttService';
 import { useAppStore } from './stores/appStore';
 import { PlanningCoordinator } from './features/planning/PlanningCoordinator';
-import type { PlanningConfigurationSnapshot } from './domain/planning/PlanningConfigurationSnapshot';
+import { createPlanningConfigurationSnapshot, type PlanningConfigurationSnapshot } from './domain/planning/PlanningConfigurationSnapshot';
 import { MissionController } from './features/mission/MissionController';
 
 const navExpandedWidth=224; const navCollapsedWidth=76; const rightWidth=360;
@@ -108,6 +108,34 @@ const syncPlannerWeights=(plannerOptions: PlannerOptions): PlannerOptions=>({
 const Field=({label,value}:{label:string;value:unknown})=><Box sx={{display:'flex',justifyContent:'space-between',gap:2}}>
   <Typography color="text.secondary" variant="caption">{label}</Typography><Typography variant="caption" sx={{fontFamily:'monospace',textAlign:'right'}}>{value===undefined?'—':String(value)}</Typography>
 </Box>;
+const EffectiveMotionStateConfigurationPanel=({plannerOptions,footprint}:{
+  plannerOptions:PlannerOptions;footprint:RobotFootprint;
+})=>{
+  const effective=createPlanningConfigurationSnapshot({plannerOptions,footprint})
+    .normalized.motionState;
+  return <Paper variant="outlined" sx={{p:1,mt:1}}>
+    <Box component="details">
+      <Typography component="summary" variant="overline" sx={{cursor:'pointer'}}>
+        Effective Motion-State Configuration
+      </Typography>
+      <Box mt={.5}>
+        <Field label="Translation" value={`${effective.weights.translationCostPerM} cost/m`}/>
+        <Field label="Rotation" value={`${effective.weights.rotationCostPerRad} cost/rad`}/>
+        <Field label="Reverse" value={`${effective.weights.reverseCostPerTranslation} cost/step`}/>
+        <Field label="Direction switch" value={`${effective.weights.directionSwitchCost} cost/switch`}/>
+        <Field label="Wall clearance" value={effective.weights.wallClearanceCost}/>
+        <Field label="Preferred / hard clearance" value={`${effective.clearance.preferredM} / ${effective.clearance.hardMinimumM} m`}/>
+        <Field label="Narrow passage" value={effective.weights.narrowPassageCost}/>
+        <Field label="Turn location" value={effective.weights.turnLocationCost}/>
+        <Field label="Terminal orientation" value={`${effective.weights.terminalOrientationCostPerRad} cost/rad`}/>
+        <Field label="Translation / rotation sampling" value={`${effective.sampling.translationCollisionIntervalM} m / ${effective.sampling.rotationCollisionIntervalDeg} deg`}/>
+        <Field label="Heading lattice" value={`${effective.lattice.headingBinCount} bins (${effective.lattice.headingStepDeg} deg)`}/>
+        <Field label="Translation step" value="active grid resolution"/>
+        <Field label="Forward / reverse / rotate" value={`${effective.permissions.forward} / ${effective.permissions.reverse} / ${effective.permissions.rotateInPlace}`}/>
+      </Box>
+    </Box>
+  </Paper>;
+};
 
 export default function App(){
   useMqtt();
@@ -1028,7 +1056,10 @@ export default function App(){
           <Field label="Effective limiting component"
             value={speedLimitAnalysis.effectiveLimitingComponent}/>
         </Paper>
-        <FormControlLabel control={<Switch size="small" checked={store.plannerOptions.diagonalMovement}
+        {store.plannerMode==='motion-state'
+          ?<EffectiveMotionStateConfigurationPanel plannerOptions={store.plannerOptions}
+            footprint={store.footprint}/>
+          :<><FormControlLabel control={<Switch size="small" checked={store.plannerOptions.diagonalMovement}
           onChange={(e)=>store.set({plannerOptions:{...store.plannerOptions,diagonalMovement:e.target.checked}})}/>} label="Diagonal movement"/>
         <Stack direction="row" gap={.5}>
           <TextField size="small" label="Wall cost" type="number" value={store.plannerOptions.passageSafety.wallProximityWeight}
@@ -1043,12 +1074,12 @@ export default function App(){
               turnPenalty:Number(e.target.value),
               passageSafety:{...store.plannerOptions.passageSafety,headingChangeWeight:Number(e.target.value)},
             })})}/>
-        </Stack>
+        </Stack></>}
         <Stack direction="row" gap={.5} mt={.5}>
           <TextField size="small" label="Max plan ms" type="number" value={store.plannerOptions.maxPlanningTimeMs}
             onChange={(e)=>store.set({plannerOptions:{...store.plannerOptions,maxPlanningTimeMs:Number(e.target.value)}})}/>
-          <TextField size="small" label="Max segment m" type="number" value={store.plannerOptions.maximumWaypointDistance}
-            onChange={(e)=>store.set({plannerOptions:{...store.plannerOptions,maximumWaypointDistance:Number(e.target.value)}})}/>
+          {store.plannerMode!=='motion-state'&&<TextField size="small" label="Max segment m" type="number" value={store.plannerOptions.maximumWaypointDistance}
+            onChange={(e)=>store.set({plannerOptions:{...store.plannerOptions,maximumWaypointDistance:Number(e.target.value)}})}/>}
         </Stack>
          <Button fullWidth sx={{mt:1}} variant="outlined" onClick={generate} disabled={store.finalPath.length<2}>Generate & validate VDA order</Button>
          <Button fullWidth sx={{mt:.5}} variant="outlined" color="warning" onClick={()=>void rebuildFromCurrentPose()}>
@@ -1382,7 +1413,11 @@ function SettingsDialog({open,onClose}:{open:boolean;onClose:()=>void}){
       </Button>
       </Stack></Paper>
       <Typography variant="h2">Navigation</Typography>
+      {store.plannerMode==='motion-state'&&
+        <EffectiveMotionStateConfigurationPanel plannerOptions={store.plannerOptions}
+          footprint={store.footprint}/>}
       <Paper variant="outlined" sx={{p:1.5}}><Stack direction="row" gap={1} flexWrap="wrap">
+        {store.plannerMode!=='motion-state'&&<>
         <TextField label="Wall cost" type="number" value={store.plannerOptions.passageSafety.wallProximityWeight}
           onChange={(event)=>store.set({plannerOptions:syncPlannerWeights({
             ...store.plannerOptions,
@@ -1395,17 +1430,19 @@ function SettingsDialog({open,onClose}:{open:boolean;onClose:()=>void}){
             turnPenalty:Number(event.target.value),
             passageSafety:{...store.plannerOptions.passageSafety,headingChangeWeight:Number(event.target.value)},
           })})}/>
+        </>}
         <TextField label="Maximum planning time ms" type="number" value={store.plannerOptions.maxPlanningTimeMs}
           onChange={(event)=>store.set({plannerOptions:{...store.plannerOptions,maxPlanningTimeMs:Number(event.target.value)}})}/>
-        <TextField label="Maximum segment length m" type="number" value={store.plannerOptions.maximumWaypointDistance}
+        {store.plannerMode!=='motion-state'&&<TextField label="Maximum segment length m" type="number" value={store.plannerOptions.maximumWaypointDistance}
           onChange={(event)=>store.set({plannerOptions:{...store.plannerOptions,maximumWaypointDistance:Number(event.target.value)}})}/>
+        }
         <TextField label="Maximum VDA node count" type="number" value={operator.settings.maximumVdaNodeCount}
           onChange={(event)=>operator.update({maximumVdaNodeCount:Math.max(2,Number(event.target.value))})}/>
         <TextField label="Destination validation radius m" type="number" value={operator.settings.destinationValidationRadius}
           onChange={(event)=>operator.update({destinationValidationRadius:Number(event.target.value)})}/>
-        <FormControlLabel control={<Switch checked={store.plannerOptions.diagonalMovement}
+        {store.plannerMode!=='motion-state'&&<FormControlLabel control={<Switch checked={store.plannerOptions.diagonalMovement}
           onChange={(event)=>store.set({plannerOptions:{...store.plannerOptions,diagonalMovement:event.target.checked}})}/>}
-          label="Diagonal movement"/>
+          label="Diagonal movement"/>}
       </Stack></Paper>
       <Typography variant="h2">Passage Alignment and Turn Safety</Typography>
       <Paper variant="outlined" sx={{p:1.5}}><Stack gap={1.2}>

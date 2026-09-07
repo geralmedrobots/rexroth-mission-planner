@@ -17,6 +17,29 @@ export const CostModel = {
   reverseRisk(reverse: boolean, options: PlannerOptions): number { return reverse ? options.passageSafety.reverseRiskWeight : 0; },
   directionSwitchPenalty(options: PlannerOptions): number { return 0.5 * options.passageSafety.reverseRiskWeight; },
   directionSwitch(previous: string | undefined, next: string, options: PlannerOptions): number { return previous && previous !== next ? CostModel.directionSwitchPenalty(options) : 0; },
+  motionStateReverseRisk(reverse: boolean, costPerTranslation: number): number {
+    return reverse ? costPerTranslation : 0;
+  },
+  motionStateDirectionSwitch(previous: string | undefined, next: string,
+    costPerSwitch: number): number {
+    return previous && previous !== next ? costPerSwitch : 0;
+  },
+  motionStateWallProximity(clearanceM: number, preferredM: number,
+    weight: number): number {
+    return weight * Math.max(0, preferredM - clearanceM) ** 2 /
+      Math.max(preferredM, .01);
+  },
+  motionStateNarrowPassage(clearanceM: number, footprintWidthM: number,
+    safetyMarginM: number, maximumPassageWidthM: number, weight: number): number {
+    const width = clearanceM * 2;
+    const required = footprintWidthM + 2 * safetyMarginM;
+    return width >= maximumPassageWidthM ? 0 :
+      weight / Math.max(.05, width - required + .05);
+  },
+  motionStateTurnLocation(angleRad: number, clearanceM: number, weight: number,
+    minimumClearanceM = .000001): number {
+    return weight * angleRad / Math.max(clearanceM, minimumClearanceM);
+  },
   astarTerms(distanceM: number, clearanceM: number, headingChangeRad: number | undefined, reverse: boolean, isTurn: boolean, footprintWidthM: number, safetyMarginM: number, options: PlannerOptions): CostTerms {
     const distance = CostModel.distance(distanceM, options.distanceWeight);
     const wallProximity = CostModel.wallProximity(clearanceM, options);
