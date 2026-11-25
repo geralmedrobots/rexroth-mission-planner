@@ -49,13 +49,14 @@ export interface PlanningMapSnapshot {
   readonly effectiveOccupancyGrid: OccupancyGrid;
 }
 
-async function digestOccupancy({ metadata, data }: SourceMapSnapshot['rawOccupancyGrid']): Promise<SourceMapIdentity['occupancyDigest']> {
+function occupancyParameters(metadata: SourceMapMetadata) {
   const { width, height, resolution, origin, occupiedThreshold, freeThreshold, negate } = metadata;
+  return [width, height, resolution, origin.x, origin.y, origin.yaw, occupiedThreshold, freeThreshold, negate] as const;
+}
+
+async function digestOccupancy({ metadata, data }: SourceMapSnapshot['rawOccupancyGrid']): Promise<SourceMapIdentity['occupancyDigest']> {
   // Versioned header followed by IEEE-754 cells in row-major order, independent of host byte order.
-  const header = new TextEncoder().encode(`${JSON.stringify([
-    'med-robots-occupancy-v1', width, height, resolution, origin.x, origin.y, origin.yaw,
-    occupiedThreshold, freeThreshold, negate,
-  ])}\n`);
+  const header = new TextEncoder().encode(`${JSON.stringify(['med-robots-occupancy-v1', ...occupancyParameters(metadata)])}\n`);
   const bytes = new Uint8Array(header.length + data.length * 8);
   bytes.set(header);
   const cells = new DataView(bytes.buffer, header.length);
@@ -83,15 +84,20 @@ export async function createSourceMapSnapshot(
   });
 }
 
-export function sameSourceMap(a: SourceMapIdentity, b: SourceMapIdentity): boolean {
-  if (a.metadata.mapId !== b.metadata.mapId || a.metadata.name !== b.metadata.name ||
-      a.occupancyDigest !== b.occupancyDigest || a.source.kind !== b.source.kind) return false;
+export function sameSourceMap(a: SourceMapIdentity, candidate: unknown): boolean {
+  const b = candidate as Partial<SourceMapIdentity> | null | undefined;
+  if (!b?.metadata?.origin || !b.source || a.metadata.mapId !== b.metadata.mapId ||
+      a.metadata.name !== b.metadata.name || a.occupancyDigest !== b.occupancyDigest ||
+      a.source.kind !== b.source.kind) return false;
+  const candidateParameters = occupancyParameters(b.metadata);
+  if (!occupancyParameters(a.metadata).every((value, index) => value === candidateParameters[index])) return false;
   if (a.source.kind !== 'locator' || b.source.kind !== 'locator') return true;
+  if (a.source.fingerprint !== b.source.fingerprint) return false;
   const left = a.source.instance;
   const right = b.source.instance;
-  return a.source.fingerprint === b.source.fingerprint &&
-    left?.host === right?.host && left?.port === right?.port &&
-    left?.https === right?.https && left?.rpcEndpoint === right?.rpcEndpoint;
+  if (!left || !right) return left === right;
+  return left.host === right.host && left.port === right.port &&
+    left.https === right.https && left.rpcEndpoint === right.rpcEndpoint;
 }
 
 export function createPlanningMapSnapshot(source: SourceMapSnapshot): PlanningMapSnapshot {
