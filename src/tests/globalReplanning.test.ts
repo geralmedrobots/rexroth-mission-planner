@@ -416,7 +416,7 @@ describe('automatic MQTT Order transition',()=>{
       completedAt,10_000,Date.parse(completedAt)+10_000)).toBe(false);
   });
 
-  it('publishes cancelOrder before the replacement and waits for acceptance',async()=>{
+  it.each([false,true])('publishes cancelOrder before the replacement and waits for acceptance (map changes in flight: %s)',async(mapChanges)=>{
     const oldOrder=makeOrder();const newOrder=makeOrder();
     const now=Date.now();const state=safeState(oldOrder);
     useAppStore.setState({
@@ -442,8 +442,10 @@ describe('automatic MQTT Order transition',()=>{
             actionStates:[{actionId,actionStatus:'FINISHED'}],
           }});
         }
-        if(topic===defaultMqttSettings.topics.order)
+        if(topic===defaultMqttSettings.topics.order){
+          if(mapChanges)useAppStore.getState().set({grid:makeGrid()});
           useAppStore.setState({state:{...state,orderId:newOrder.orderId,driving:false,nodeStates:[]}});
+        }
       });
     const signal=new AbortController().signal;
     await cancelActiveOrder(oldOrder,signal);
@@ -470,6 +472,10 @@ describe('automatic MQTT Order transition',()=>{
     expect(publish.mock.calls[1]?.[0]).toBe(defaultMqttSettings.topics.order);
     expect(JSON.parse(publish.mock.calls[1]![1]).orderId).toBe(newOrder.orderId);
     expect(useAppStore.getState().sentOrder?.orderId).toBe(newOrder.orderId);
+    if(mapChanges){
+      expect(useAppStore.getState().generatedOrder).toBeUndefined();
+      expect(useAppStore.getState().finalPath).toEqual([]);
+    }else expect(useAppStore.getState().generatedOrder?.orderId).toBe(newOrder.orderId);
   });
 
   it('rejects a failed cancel action even when Navigator has cleared the old Order',async()=>{

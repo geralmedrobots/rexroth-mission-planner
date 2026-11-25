@@ -278,7 +278,7 @@ export default function App(){
     connectionReceived:Boolean(store.lastConnectionReceiveTime),connectionOnline,
     operatingMode:store.state?.operatingMode,stateAgeMs:stateAge,visualizationAgeMs:visualizationAge,
     positionInitialized:store.state?.agvPosition?.positionInitialized===true,poseSource:poseSnapshot?.source,
-    activeMapId:navigatorMapId,currentPose:poseSnapshot?.pose,grid:store.grid,footprint:store.footprint,
+    activeMapId:navigatorMapId,currentPose:poseSnapshot?.pose,grid:useAppStore.getState().grid,footprint:store.footprint,
     settings:store.orderSettings,locatorMapName:locator.loadedMap?.mapName,
     mapIdSource:activeMapResolution.source,lastStateReceiveTime:receiveMetadata.lastStateReceiveTime,
     corridorSettings:store.plannerOptions.corridor,
@@ -528,8 +528,9 @@ export default function App(){
       loadedLocatorMap:locator.loadedMap?.mapName??null,
     }}});return;}
     if(!poseSnapshot)return;
+    const revision=useAppStore.getState().routeRevision;
     const path=await calculatePath(poseSnapshot.pose);
-    if(path)buildOrder(path);
+    if(path)buildOrder(path,undefined,revision);
   };
   const publish=async(orderOverride?:VdaOrder,skipConfirmation=false,
     expectedRevision?:number):Promise<void>=>{

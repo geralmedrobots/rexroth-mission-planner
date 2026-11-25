@@ -224,6 +224,7 @@ const runReplanningCycle=async(
     activeOrderId:activeOrder.orderId,
   });
   let result:GlobalReplanResult|undefined;
+  let plannedGrid = appAtBlock.grid;
   let lastError='No alternative route found.';
   let acceptedIngestionDiagnostics:ObstacleIngestionDiagnostic[]=[];
   for(let attempt=1;attempt<=settings.maximumPlanningAttempts;attempt+=1){
@@ -282,6 +283,7 @@ const runReplanningCycle=async(
       break;
     }
     try{
+      plannedGrid = live.grid;
       result=await new GlobalReplanner().calculate({
         originalMap:live.grid,observations,robotPose:livePose,
         activeMapId:live.activeNavigatorMapId,activeOrder,
@@ -370,6 +372,13 @@ const runReplanningCycle=async(
     notify(noMeaningful?'warning':'error',noMeaningful
       ?'NO_MEANINGFUL_ALTERNATIVE: the active Order was not cancelled.'
       :'No alternative route found. The robot remains stopped.');
+    return;
+  }
+  const assertCurrentGrid = () => {
+    if (useAppStore.getState().grid !== plannedGrid) throw new Error('Planning map changed during global replanning.');
+  };
+  if (useAppStore.getState().grid !== plannedGrid) {
+    replanning.setRuntime({status:'FAILED',replacementOrder:undefined,lastError:'Planning map changed during global replanning.'});
     return;
   }
   replanning.setRuntime({
@@ -471,6 +480,7 @@ const runReplanningCycle=async(
         `Cannot safely identify active Order "${activeNavigatorOrderId}" for cancellation.`);
       let cancelled=false;let cancellationError='';
       for(let retry=1;retry<=settings.maximumRetries&&!cancelled;retry+=1){
+        assertCurrentGrid();
         try{
           replanning.setRuntime({retryCount:retry-1});
           await cancelActiveOrder(orderToCancel,signal);cancelled=true;
@@ -484,6 +494,7 @@ const runReplanningCycle=async(
       }
       if(!cancelled)throw new Error(cancellationError||'Unable to clear the active Order.');
     }
+    assertCurrentGrid();
     await publishReplacement(result,signal);
     detector.reset();
     replanning.setRuntime({
@@ -497,7 +508,7 @@ const runReplanningCycle=async(
     const message=error instanceof Error?error.message:String(error);
     replanning.setRuntime({
       status:'FAILED',retryCount:settings.maximumRetries,
-      nextRetryAtMs:undefined,lastError:message,reason:message,
+      nextRetryAtMs:undefined,lastError:message,reason:message,replacementOrder:undefined,
     });
     replanning.log('OrderPublisher','error','Automatic Order transition failed.',{
       error:message,retryCount:settings.maximumRetries,
@@ -629,12 +640,14 @@ export const publishReplacement=async(
   await mqttService.publish(app.mqttSettings.topics.order,payload,app.mqttSettings.qos,false);
   // The replacement geometry supersedes the original planned route. Give it
   // a fresh route identity so the UI cannot pair it with the old MotionPlan.
-  const replacementRevision=app.invalidateRoute();
-  app.set({
-    generatedOrder:result.order,sentOrder:result.order,sentOrderPublishedAtMs:Date.now(),
-    rawPath:result.rawPath,finalPath:result.finalPath,
-    plannedRouteRevision:replacementRevision,generatedOrderRouteRevision:replacementRevision,
-  });
+  const sent = { sentOrder:result.order,sentOrderPublishedAtMs:Date.now() };
+  if (useAppStore.getState().grid === app.grid) {
+    const replacementRevision=app.invalidateRoute();
+    app.set({
+      ...sent,generatedOrder:result.order,rawPath:result.rawPath,finalPath:result.finalPath,
+      plannedRouteRevision:replacementRevision,generatedOrderRouteRevision:replacementRevision,
+    });
+  } else app.set(sent);
   replanning.log('OrderPublisher','info','Replacement Order published.',{
     topic:app.mqttSettings.topics.order,orderId:result.order.orderId,
     headerId:result.order.headerId,payloadBytes:new TextEncoder().encode(payload).byteLength,

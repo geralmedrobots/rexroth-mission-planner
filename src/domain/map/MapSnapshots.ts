@@ -40,12 +40,14 @@ export interface SourceMapSnapshot {
   readonly originalRaster?: SourceMapRaster;
 }
 
-/** Starts at zero for each source load and advances when its planning grid is replaced. */
+/** Starts at the saved correction revision or zero, and can advance through legacy edits. */
 export type PlanningMapRevision = number;
 
 export interface PlanningMapSnapshot {
   readonly sourceIdentity: SourceMapIdentity;
   readonly revision: PlanningMapRevision;
+  /** Persisted base revision, retained across legacy single-cell edits. */
+  readonly savedRevision?: number;
   readonly effectiveOccupancyGrid: OccupancyGrid;
 }
 

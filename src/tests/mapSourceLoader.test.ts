@@ -1,11 +1,18 @@
-import { readFile } from 'node:fs/promises';
+﻿import { readFile } from 'node:fs/promises';
+import { mapCorrectionPersistence } from '../features/map/MapCorrectionPersistence';
+import { defaultFootprint, defaultPlannerOptions, defaultOrderSettings } from '../domain/defaults';
+import { planSynchronously } from '../domain/planner/PlannerService';
+import { CoordinateTransformer } from '../domain/geometry/CoordinateTransformer';
+import { VdaOrderBuilder } from '../domain/vda5050/VdaOrderBuilder';
+import { VdaOrderValidator } from '../domain/vda5050/VdaOrderValidator';
+import { LogService } from '../services/LogService';
 import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { sameSourceMap } from '../domain/map/MapSnapshots';
 import { ObstacleInflation } from '../domain/planner/ObstacleInflation';
 import { locatorMapService } from '../features/locator/services/locatorMapService';
 import { useLocatorStore } from '../features/locator/stores/locatorStore';
-import { beginMapLoad, loadImageMap, loadJsonMap, loadLocatorSource, replaceLegacyPlanningGrid } from '../features/map/mapSourceLoader';
+import { activateSavedPlanningMap, beginMapLoad, loadImageMap, loadJsonMap, loadLocatorSource, replaceLegacyPlanningGrid } from '../features/map/mapSourceLoader';
 import { useAppStore } from '../stores/appStore';
 
 function deferred<T>() {
@@ -182,5 +189,105 @@ describe('map source initialization', () => {
     expect(useAppStore.getState().sourceMap).toBeUndefined();
     expect(useLocatorStore.getState().downloading).toBe(false);
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:Startup/100');
+  });
+});
+
+describe('saved planning map activation', () => {
+  it('activates a new saved revision on startup recheck and manual Locator reload', async () => {
+    vi.stubGlobal('navigator', { locks: { request: (_key: string, run: () => unknown) => run() } });
+    vi.spyOn(locatorMapService, 'downloadSource').mockImplementation(async () => downloaded('Saved-Locator'));
+    vi.spyOn(locatorMapService, 'activateRaster').mockImplementation(() => {});
+    await loadLocatorSource('Saved-Locator', {skipUnchanged:true});
+    const source = useAppStore.getState().sourceMap!;
+    const {x,y} = new CoordinateTransformer(source.rawOccupancyGrid.metadata).gridToWorld(0,1);
+    await mapCorrectionPersistence.saveCorrections(source, {sourceIdentity:source.sourceIdentity, corrections:[{
+      id:'verified-cell',createdAt:'2026-11-25T12:00:00Z',kind:'force_free',
+      area:{kind:'circle',center:{x,y},radiusM:.01},
+    }]});
+    expect((await loadLocatorSource('Saved-Locator', {skipUnchanged:true}))?.data).toEqual([100,0]);
+    expect(useAppStore.getState().planningMap?.savedRevision).toBe(1);
+    expect(await loadLocatorSource('Saved-Locator', {skipUnchanged:true})).toBeUndefined();
+    expect((await loadLocatorSource('Saved-Locator'))?.data).toEqual([100,0]);
+    expect(useAppStore.getState().sourceMap?.rawOccupancyGrid.data).toEqual([100,-1]);
+  });
+
+  it('plans, builds and validates against saved corrections after reload, then invalidates unsent routes on reset', async () => {
+    vi.stubGlobal('navigator', { locks: { request: (_key: string, run: () => unknown) => run() } });
+    const width = 40, height = 30;
+    const cells = Array.from({length: width * height}, (_, i) => i % width === 20 ? -1 : 0);
+    const file = jsonFile(JSON.stringify({width, height, origin: {x:0,y:0,yaw:0}, resolution:.1, cellData:cells}));
+    await loadJsonMap(file);
+    const original = useAppStore.getState().sourceMap!;
+    const footprint = {...defaultFootprint, width:.05, length:.05, safetyMargin:0, inflationRadius:0};
+    const plan = () => planSynchronously({grid:useAppStore.getState().grid!, start:{row:14,column:5},
+      goal:{row:14,column:34}, options:defaultPlannerOptions, footprint, goalTheta:0});
+    expect(plan().success).toBe(false);
+    await mapCorrectionPersistence.saveCorrections(original, {sourceIdentity:original.sourceIdentity, corrections:[{
+      id:'verified-passage',createdAt:'2026-11-25T12:00:00Z',kind:'force_free',
+      area:{kind:'circle',center:{x:2.05,y:1.55},radiusM:.7},
+    }]});
+    expect(plan().success).toBe(false);
+    await loadJsonMap(file);
+    const active=useAppStore.getState();
+    expect(active.planningMap?.savedRevision).toBe(1);
+    const planned=plan();
+    expect(planned.success).toBe(true);
+    const mapId=active.grid!.metadata.mapId;
+    const robotPose={...new CoordinateTransformer(active.grid!.metadata).gridToWorld(14,5),mapId,positionInitialized:true};
+    const order=new VdaOrderBuilder().build(planned.finalPath,{robotPose,activeMapId:mapId,
+      corridorPlanning:{grid:active.grid!,footprint,plannerOptions:defaultPlannerOptions}},defaultOrderSettings);
+    const validation=new VdaOrderValidator().validate(order,{mqttConnected:true,stateReceived:true,connectionReceived:true,
+      activeMapId:mapId,currentPose:robotPose,grid:active.grid!,footprint,settings:defaultOrderSettings,connectionOnline:true,
+      operatingMode:'AUTOMATIC',stateAgeMs:0,visualizationAgeMs:0,positionInitialized:true,poseSource:'state',locatorMapName:mapId});
+    expect(validation.errors).toEqual([]);
+    expect(await activateSavedPlanningMap(active.sourceMap!)).toBe(active.grid);
+    expect(useAppStore.getState().routeRevision).toBe(active.routeRevision);
+    active.set({finalPath:planned.finalPath,plannedRouteRevision:active.routeRevision,generatedOrder:order,
+      generatedOrderRouteRevision:active.routeRevision,sentOrder:order});
+    await mapCorrectionPersistence.resetCorrections(active.sourceMap!);
+    const observed:number[]=[];
+    const unsubscribe=useAppStore.subscribe((state,old)=>{
+      if(state.grid!==old.grid){
+        expect(state.grid).toBe(state.planningMap?.effectiveOccupancyGrid);
+        expect(state.inflatedGrid).toEqual(ObstacleInflation.byRadius(state.grid!,
+          state.plannerOptions.passageSafety.planningSafetyMarginM+state.plannerOptions.passageSafety.localizationMarginM));
+        expect(state.generatedOrder).toBeUndefined();
+        expect(state.finalPath).toEqual([]);
+        observed.push(state.routeRevision);
+      }
+    });
+    try { await activateSavedPlanningMap(active.sourceMap!); } finally { unsubscribe(); }
+    expect(observed).toEqual([active.routeRevision+1]);
+    expect(plan().success).toBe(false);
+    expect(useAppStore.getState().sentOrder).toBe(order);
+    expect(original.rawOccupancyGrid.data).toEqual(cells);
+    await mapCorrectionPersistence.restoreRevision(active.sourceMap!,1);
+    await activateSavedPlanningMap(active.sourceMap!);
+    expect(plan().success).toBe(true);
+    expect(useAppStore.getState().planningMap?.savedRevision).toBe(3);
+  });
+
+  it('uses the original grid and reports unreadable saved history on Locator load',async()=>{
+    vi.spyOn(mapCorrectionPersistence,'loadCorrections').mockRejectedValue(new Error('damaged history'));
+    vi.spyOn(locatorMapService,'downloadSource').mockResolvedValue(downloaded('Map-A'));
+    vi.spyOn(locatorMapService,'activateRaster').mockImplementation(()=>{});
+    const log=vi.spyOn(LogService,'write');
+    const grid=await loadLocatorSource('Map-A');
+    expect(grid?.data).toEqual([100,-1]);
+    expect(useAppStore.getState().planningMap?.revision).toBe(0);
+    expect(log).toHaveBeenCalledWith('planner','error',expect.stringContaining('damaged history'));
+  });
+
+  it('discards a pending editor activation when a new source is selected',async()=>{
+    await loadJsonMap(jsonFile());
+    const old=useAppStore.getState().sourceMap!;
+    const pending=deferred<Awaited<ReturnType<typeof mapCorrectionPersistence.loadCorrections>>>();
+    vi.spyOn(mapCorrectionPersistence,'loadCorrections').mockReturnValueOnce(pending.promise);
+    const activation=activateSavedPlanningMap(old);
+    await loadJsonMap(jsonFile(json([5,6])));
+    pending.resolve({collection:{sourceIdentity:old.sourceIdentity,corrections:[]},revision:4,createdAt:null});
+    expect(await activation).toBeUndefined();
+    expect(await activateSavedPlanningMap(old)).toBeUndefined();
+    expect(useAppStore.getState().grid?.data).toEqual([5,6]);
   });
 });

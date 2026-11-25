@@ -1,4 +1,5 @@
 import { imageFileToPixels, metadataFromRosYaml, parseOccupancyJson, pixelsToOccupancy } from '../../domain/map/MapImporter';
+import { applyCorrections } from '../../domain/map/MapCorrectionRasterizer';
 import {
   createPlanningMapSnapshot, createSourceMapSnapshot, sameSourceMap,
   type PlanningMapSnapshot, type SourceMapRaster, type SourceMapSnapshot,
@@ -9,6 +10,7 @@ import { LogService } from '../../services/LogService';
 import { useAppStore } from '../../stores/appStore';
 import { locatorMapService } from '../locator/services/locatorMapService';
 import { useLocatorStore } from '../locator/stores/locatorStore';
+import { mapCorrectionPersistence } from './MapCorrectionPersistence';
 
 let loadVersion = 0;
 
@@ -34,6 +36,46 @@ function commitPlanningMap(planningMap: PlanningMapSnapshot, sourceMap: SourceMa
   return grid;
 }
 
+async function activateSource(
+  source: SourceMapSnapshot, isCurrent: () => boolean, mode: 'reload' | 'startup' | 'editor' = 'reload',
+  onCommit?: () => void,
+): Promise<OccupancyGrid | undefined> {
+  let planning: PlanningMapSnapshot;
+  try {
+    const { revision, collection } = await mapCorrectionPersistence.loadCorrections(source);
+    if (!isCurrent()) return;
+    const active = useAppStore.getState().planningMap;
+    if (active?.savedRevision === revision && sameSourceMap(active.sourceIdentity, source.sourceIdentity)) {
+      if (mode === 'startup') return;
+      if (mode === 'editor' && active.revision === revision) return active.effectiveOccupancyGrid;
+    }
+    planning = { sourceIdentity: source.sourceIdentity, revision, savedRevision: revision,
+      effectiveOccupancyGrid: applyCorrections(source, collection) };
+  } catch (error) {
+    if (!isCurrent()) return;
+    planning = createPlanningMapSnapshot(source);
+    LogService.write('planner', 'error',
+      'Using original map ' + source.sourceIdentity.metadata.name + '. Saved corrections could not be activated: ' + String(error));
+  }
+  if (!isCurrent()) return;
+  const grid = commitPlanningMap(planning, source);
+  onCommit?.();
+  return grid;
+}
+
+let activationVersion = 0;
+
+/** Call after saving, restoring or resetting the editor's source snapshot.
+ * Returns undefined if the source or request is obsolete. A read failure logs a diagnostic and activates the original grid.
+ */
+export async function activateSavedPlanningMap(source: SourceMapSnapshot): Promise<OccupancyGrid | undefined> {
+  if (useAppStore.getState().sourceMap !== source) return;
+  const selection = mapLoadCheckpoint();
+  const request = ++activationVersion;
+  return activateSource(source, () => isLatestMapLoad(selection) &&
+    request === activationVersion && useAppStore.getState().sourceMap === source, 'editor');
+}
+
 /** Keeps the existing single-cell click modes on the effective grid. */
 export function replaceLegacyPlanningGrid(grid: OccupancyGrid): void {
   const { sourceMap, planningMap } = useAppStore.getState();
@@ -41,6 +83,7 @@ export function replaceLegacyPlanningGrid(grid: OccupancyGrid): void {
   commitPlanningMap({
     sourceIdentity: sourceMap.sourceIdentity,
     revision: planningMap.revision + 1,
+    savedRevision: planningMap.savedRevision,
     effectiveOccupancyGrid: grid,
   }, sourceMap);
 }
@@ -74,13 +117,11 @@ export async function loadLocatorSource(name: string, {
         reportedHeightM: raster.heightMeters,
       });
     if (!isCurrent()) return;
-    const currentSource = useAppStore.getState().sourceMap;
-    if (skipUnchanged && currentSource && sameSourceMap(currentSource.sourceIdentity, sourceMap.sourceIdentity)) return;
-    const grid = commitPlanningMap(createPlanningMapSnapshot(sourceMap), sourceMap);
-    locatorMapService.activateRaster(raster);
-    pendingUrl = undefined;
-    locator.set({ loadedMap: raster, mapInfo: info, lastDownloadTime: new Date().toISOString() });
-    return grid;
+    return await activateSource(sourceMap, isCurrent, skipUnchanged ? 'startup' : 'reload', () => {
+      locatorMapService.activateRaster(raster);
+      pendingUrl = undefined;
+      locator.set({ loadedMap: raster, mapInfo: info, lastDownloadTime: new Date().toISOString() });
+    });
   } catch (error) {
     if (isCurrent()) throw error;
   } finally {
@@ -95,7 +136,7 @@ async function loadImportedSource(read: () => Promise<{ grid: OccupancyGrid; ras
     const { grid, raster } = await read();
     if (!isLatestMapLoad(version)) return;
     const sourceMap = await createSourceMapSnapshot(grid, { kind: 'import' }, raster);
-    if (isLatestMapLoad(version)) commitPlanningMap(createPlanningMapSnapshot(sourceMap), sourceMap);
+    if (isLatestMapLoad(version)) await activateSource(sourceMap, () => isLatestMapLoad(version));
   } catch (error) {
     if (isLatestMapLoad(version)) throw error;
   }
