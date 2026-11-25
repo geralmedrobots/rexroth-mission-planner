@@ -68,7 +68,7 @@ export class LocatorRpcClient {
   public async call<T>(method: string, query: Record<string, unknown>): Promise<T> {
     const id = this.nextRequestId++;
     const body = JSON.stringify({ jsonrpc: '2.0', method, params: { query }, id });
-    const envelope = await this.request(body);
+    const envelope = await this.request(body, method === 'serverMapGetInfo');
     if (envelope.id !== id || envelope.jsonrpc !== '2.0') {
       throw new LocatorRpcError('Malformed JSON-RPC response: mismatched id or version.', 'protocol');
     }
@@ -93,7 +93,7 @@ export class LocatorRpcClient {
     return response;
   }
 
-  private request(body: string): Promise<JsonRpcEnvelope> {
+  private request(body: string, preserveMapFingerprint: boolean): Promise<JsonRpcEnvelope> {
     const endpoint = this.config.endpoint.trim();
     if (!endpoint.startsWith('/')) {
       return Promise.reject(new LocatorRpcError('RPC endpoint must begin with "/".', 'protocol'));
@@ -121,7 +121,16 @@ export class LocatorRpcClient {
             return;
           }
           try {
-            const parsed = JSON.parse(Buffer.concat(chunks).toString('utf8')) as JsonRpcEnvelope;
+            const json = Buffer.concat(chunks).toString('utf8');
+            const parsed = (preserveMapFingerprint
+              ? JSON.parse(json, (key, value: unknown, context?: { source?: string }) => {
+                if (key !== 'fingerprint' || typeof value !== 'number' ||
+                    !Number.isInteger(value) || Number.isSafeInteger(value)) return value;
+                // Keep the wire token before JSON serialization by the local proxy.
+                if (context?.source === undefined) throw new Error('Exact Locator fingerprints require Node.js 22 or later.');
+                return context.source;
+              })
+              : JSON.parse(json)) as JsonRpcEnvelope;
             resolve(parsed);
           } catch (error) {
             reject(new LocatorRpcError(`Malformed JSON-RPC response: ${String(error)}`, 'protocol'));

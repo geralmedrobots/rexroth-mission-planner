@@ -12,7 +12,7 @@ export const serverMapInfoResponseSchema = z.object({
   level: z.number().int(),
   loaded: z.boolean(),
   type: z.number().int(),
-  fingerprint: z.union([z.number(), z.string()]),
+  fingerprint: z.union([z.number().refine(Number.isSafeInteger), z.string()]),
   createdAt: z.unknown().optional(),
   updatedAt: z.unknown().optional(),
   sentAt: z.unknown().optional(),

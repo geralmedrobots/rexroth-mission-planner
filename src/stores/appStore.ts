@@ -17,6 +17,7 @@ import { normalizeMapId } from '../domain/robot/ActiveMapResolver';
 import type { CorridorDiagnostic } from '../domain/planner/EdgeCorridorPlanner';
 import type { SpeedCycleDiagnostic } from '../domain/robot/SpeedLimitDiagnostics';
 import type { PlanningConfigurationSnapshot } from '../domain/planning/PlanningConfigurationSnapshot';
+import type { PlanningMapSnapshot, SourceMapSnapshot } from '../domain/map/MapSnapshots';
 
 export interface PlannedRouteCommit {
   start: RobotPose;
@@ -44,6 +45,8 @@ export interface AppState {
   confirmedMapBinding: ConfirmedMapBinding | null;
   mapBindingMismatchWarning: string | null;
   navigatorIdentityKey: string;
+  sourceMap?: SourceMapSnapshot; planningMap?: PlanningMapSnapshot;
+  /** Compatibility alias for the effective occupancy grid. */
   grid?: OccupancyGrid; inflatedGrid?: OccupancyGrid; start?: RobotPose; goal?: RobotPose;
   goalThetaExplicit: boolean;
   rawPath: PathPoint[]; finalPath: PathPoint[]; waypoints: Waypoint[]; plannerResult?: PlannerResult;

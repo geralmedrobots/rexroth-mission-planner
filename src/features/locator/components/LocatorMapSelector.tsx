@@ -8,6 +8,7 @@ import { normalizeMapId } from '../../../domain/robot/ActiveMapResolver';
 import type { OccupancyGrid } from '../../../domain/types';
 import { LogService } from '../../../services/LogService';
 import { useAppStore } from '../../../stores/appStore';
+import { beginMapLoad, isLatestMapLoad, loadLocatorSource, type LocatorLoadOptions } from '../../map/mapSourceLoader';
 import { findExactServerMap } from '../mapSelection';
 import { locatorMapService } from '../services/locatorMapService';
 import { useLocatorStore } from '../stores/locatorStore';
@@ -17,8 +18,9 @@ const mismatchText =
 const noMqttMapText =
   'No active mapId was received from MQTT. Select a Locator map and confirm it manually.';
 
-export function LocatorMapSelector({ onMapLoaded }: { onMapLoaded: (grid: OccupancyGrid) => void }) {
+export function LocatorMapSelector({ onMapLoaded }: { onMapLoaded?: (grid: OccupancyGrid) => void }) {
   const store=useLocatorStore();
+  const setLocator=store.set;
   const app=useAppStore();
   const [confirmOpen,setConfirmOpen]=useState(false);
   const attemptedActiveMap=useRef('');
@@ -29,45 +31,41 @@ export function LocatorMapSelector({ onMapLoaded }: { onMapLoaded: (grid: Occupa
   const selectedMapIsLoaded=Boolean(
     selectedMapName&&loadedMapName&&selectedMapName===loadedMapName);
 
-  const listMaps=useCallback(async()=>{
+  const listMaps=useCallback(async(version?:number)=>{
     if(store.sessionState!=='logged-in')throw new Error('Login to the Locator Server first.');
     if(!moduleReady)throw new Error('Test the RPC connection and verify the ServerMap module first.');
     const maps=await locatorMapService.listMaps();
-    store.set({maps,error:undefined});
+    if(version===undefined||isLatestMapLoad(version))store.set({maps,error:undefined});
     LogService.write('system','info',`serverMapList returned ${maps.length} map(s).`);
     return maps;
   },[moduleReady,store]);
 
-  const load=useCallback(async(name:string)=>{
-    if(!name)throw new Error('Select a Locator map first.');
-    const resolution=store.settings.imagePixelsPerMeter;
-    if(!(resolution>0))throw new Error('Image resolution must be greater than zero.');
-    store.set({downloading:true,error:undefined,selectedMapName:name});
+  const load=useCallback(async(name:string,options?:LocatorLoadOptions)=>{
     try{
-      const info=await locatorMapService.getMapInfo(name);
-      const raster=await locatorMapService.getMapImageWithResolution(name,resolution);
-      const loaded=await locatorMapService.toOccupancy(raster,store.settings);
-      store.set({loadedMap:raster,mapInfo:info,lastDownloadTime:new Date().toISOString()});
-      onMapLoaded(loaded.occupancy);
-      LogService.write('planner','info',
-        `Loaded Locator map "${name}" (${raster.pixelWidth}×${raster.pixelHeight}, origin ${raster.origin.x}/${raster.origin.y}/${raster.origin.yaw}).`);
+      const grid=await loadLocatorSource(name,options);
+      if(grid)onMapLoaded?.(grid);
     }catch(error){
-      store.set({error:String(error)});
+      setLocator({error:String(error)});
       LogService.write('system','error',`Locator map download failed: ${String(error)}`);
-    }finally{store.set({downloading:false});}
-  },[onMapLoaded,store]);
+    }
+  },[onMapLoaded,setLocator]);
 
   const loadActive=useCallback(async()=>{
     const active=normalizeMapId(useAppStore.getState().lastKnownValidNavigatorMapId);
     if(!active)throw new Error(noMqttMapText);
-    const maps=store.maps.length?store.maps:await listMaps();
+    const version=beginMapLoad();
+    const isSelectionCurrent=()=>normalizeMapId(useAppStore.getState().lastKnownValidNavigatorMapId)===active;
+    let maps=store.maps;
+    try{if(!maps.length)maps=await listMaps(version);}
+    catch(error){if(isLatestMapLoad(version)&&isSelectionCurrent())throw error;return;}
+    if(!isLatestMapLoad(version)||!isSelectionCurrent())return;
     const exact=findExactServerMap(maps,active);
     if(!exact){
       store.set({error:mismatchText});
       LogService.write('system','error',mismatchText);
       return;
     }
-    await load(exact.name);
+    await load(exact.name,{version,isSelectionCurrent});
   },[listMaps,load,store]);
 
   useEffect(()=>{
@@ -81,6 +79,7 @@ export function LocatorMapSelector({ onMapLoaded }: { onMapLoaded: (grid: Occupa
   },[loadActive,moduleReady,mqttMapId,store]);
 
   const selectMap=(name:string):void=>{
+    if(name!==store.selectedMapName)beginMapLoad();
     const binding=app.confirmedMapBinding;
     if(binding&&normalizeMapId(binding.locatorMapName)!==normalizeMapId(name)){
       app.clearConfirmedMapBinding();

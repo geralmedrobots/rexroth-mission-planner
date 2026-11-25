@@ -12,9 +12,8 @@ import { diagnosticPointCloudResponseSchema } from '../schemas/serverMapSchemas'
 
 const MAX_IMAGE_DIMENSION = 20_000;
 
-const pngToGrayscale = async (bytes: Uint8Array): Promise<{ width: number; height: number; pixels: Uint8Array }> => {
-  const blob = new Blob([new Uint8Array(bytes)], { type: 'image/png' });
-  const bitmap = await createImageBitmap(blob);
+const pngToGrayscale = async (image: Blob): Promise<{ width: number; height: number; pixels: Uint8Array }> => {
+  const bitmap = await createImageBitmap(image);
   const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
   const context = canvas.getContext('2d');
   if (!context) throw new Error('Canvas image decoder unavailable.');
@@ -62,9 +61,35 @@ export class LocatorMapService implements LocatorMapProvider {
     };
   }
   public async getMapImageWithResolution(name: string, pixelsPerMeter: number): Promise<LocatorRasterMap> {
+    const { raster } = await this.downloadRaster(name, pixelsPerMeter);
+    this.activateRaster(raster);
+    return raster;
+  }
+  private async downloadRaster(name: string, pixelsPerMeter: number) {
     if (!Number.isFinite(pixelsPerMeter) || pixelsPerMeter <= 0) throw new Error('Image resolution must be greater than zero.');
     const response = await this.maps.getImageWithResolution(name, pixelsPerMeter);
     return this.createRaster(name, response, pixelsPerMeter);
+  }
+  public async downloadSource(name: string, settings: LocatorConnectionSettings) {
+    const instance = this.sessions.configuredInstance;
+    const before = await this.getMapInfo(name);
+    const { raster, image } = await this.downloadRaster(name, settings.imagePixelsPerMeter);
+    try {
+      const loaded = await this.toOccupancy(raster, settings, image);
+      const info = await this.getMapInfo(name);
+      if (instance !== this.sessions.configuredInstance || before.fingerprint !== info.fingerprint) {
+        throw new Error('Locator source changed during map download. Reload the map.');
+      }
+      return { ...loaded, image, info, instance };
+    } catch (error) {
+      URL.revokeObjectURL(raster.imageUrl);
+      throw error;
+    }
+  }
+  /** The caller owns pending URLs until activation. */
+  public activateRaster(raster: LocatorRasterMap): void {
+    if (this.currentObjectUrl !== raster.imageUrl) this.dispose();
+    this.currentObjectUrl = raster.imageUrl;
   }
   /** Optional documented serverMapGetImage binding with server-side aspect-ratio preservation. */
   public async getMapImage(name: string, maxPixelWidth: number, maxPixelHeight: number, level: number): Promise<LocatorRasterMap> {
@@ -77,7 +102,9 @@ export class LocatorMapService implements LocatorMapProvider {
     if (!(response.width > 0) || !(response.height > 0)) throw new Error('Locator returned invalid map dimensions.');
     const decoded = decodePngContainer(response.image);
     const pixelsPerMeter = decoded.pixelWidth / response.width;
-    return this.createRaster(name, response, pixelsPerMeter);
+    const { raster } = this.createRaster(name, response, pixelsPerMeter);
+    this.activateRaster(raster);
+    return raster;
   }
   /** Optional documented thumbnail method. Thumbnails are list previews, never planner maps. */
   public async getMapThumbnail(name: string, mapLevel: number): Promise<{ pngBytes: Uint8Array; imageUrl: string }> {
@@ -92,26 +119,28 @@ export class LocatorMapService implements LocatorMapProvider {
     name: string,
     response: Awaited<ReturnType<ServerMapApi['getImageWithResolution']>>,
     pixelsPerMeter: number,
-  ): LocatorRasterMap {
+  ): { raster: LocatorRasterMap; image: Blob } {
     const decoded = decodePngContainer(response.image);
     if (decoded.pixelWidth > MAX_IMAGE_DIMENSION || decoded.pixelHeight > MAX_IMAGE_DIMENSION) {
       throw new Error(`Locator image ${decoded.pixelWidth}×${decoded.pixelHeight} exceeds the 20000-pixel limit.`);
     }
     if (!(response.width > 0) || !(response.height > 0)) throw new Error('Locator returned invalid map dimensions.');
-    if (this.currentObjectUrl) URL.revokeObjectURL(this.currentObjectUrl);
-    const imageUrl = URL.createObjectURL(new Blob([new Uint8Array(decoded.bytes)], { type: 'image/png' }));
-    this.currentObjectUrl = imageUrl;
+    const image = new Blob([new Uint8Array(decoded.bytes)], { type: 'image/png' });
+    const imageUrl = URL.createObjectURL(image);
     return {
-      mapName: name,
-      pngBytes: decoded.bytes,
-      imageUrl,
-      pixelWidth: decoded.pixelWidth,
-      pixelHeight: decoded.pixelHeight,
-      widthMeters: response.width,
-      heightMeters: response.height,
-      pixelsPerMeter,
-      metersPerPixel: 1 / pixelsPerMeter,
-      origin: { x: response.MAPimageOrigin.x, y: response.MAPimageOrigin.y, yaw: response.MAPimageOrigin.a },
+      image,
+      raster: {
+        mapName: name,
+        pngBytes: decoded.bytes,
+        imageUrl,
+        pixelWidth: decoded.pixelWidth,
+        pixelHeight: decoded.pixelHeight,
+        widthMeters: response.width,
+        heightMeters: response.height,
+        pixelsPerMeter,
+        metersPerPixel: 1 / pixelsPerMeter,
+        origin: { x: response.MAPimageOrigin.x, y: response.MAPimageOrigin.y, yaw: response.MAPimageOrigin.a },
+      },
     };
   }
   public async getMapPointCloud(name: string, maxNonReflectorPoints?: number): Promise<LocatorPointCloudMap> {
@@ -137,8 +166,11 @@ export class LocatorMapService implements LocatorMapProvider {
     if (after.fingerprint !== before.fingerprint) throw new Error('Server map changed during diagnostic download. Reload and retry.');
     return { cloud, raw, compatibility, info: after };
   }
-  public async toOccupancy(raster: LocatorRasterMap, settings: LocatorConnectionSettings): Promise<LoadedLocatorMap> {
-    const grayscale = await pngToGrayscale(raster.pngBytes);
+  public async toOccupancy(
+    raster: LocatorRasterMap, settings: LocatorConnectionSettings,
+    image = new Blob([new Uint8Array(raster.pngBytes)], { type: 'image/png' }),
+  ): Promise<LoadedLocatorMap> {
+    const grayscale = await pngToGrayscale(image);
     if (grayscale.width !== raster.pixelWidth || grayscale.height !== raster.pixelHeight) {
       throw new Error('Decoded map image dimensions changed unexpectedly.');
     }

@@ -7,6 +7,7 @@ import { useAppStore } from '../../stores/appStore';
 import { locatorMapService } from '../locator/services/locatorMapService';
 import { locatorSessionService } from '../locator/services/locatorSessionService';
 import { useLocatorStore } from '../locator/stores/locatorStore';
+import { isLatestMapLoad, loadLocatorSource, mapLoadCheckpoint } from '../map/mapSourceLoader';
 import { startupConnectionManager } from './StartupConnectionManager';
 import { useStartupStore } from './startupStore';
 import type { StartupOperation } from './types';
@@ -22,10 +23,19 @@ const waitFor=async(
   }
 };
 
-export function useStartupConnections(onGridLoaded:(grid:OccupancyGrid)=>void):void {
+const resolveStartupMapId=()=>{
+  const app=useAppStore.getState();
+  const binding=app.confirmedMapBinding;
+  return normalizeMapId(app.activeNavigatorMapId)||
+    (binding&&binding.manufacturer===app.orderSettings.manufacturer&&
+      binding.serialNumber===app.orderSettings.serialNumber?normalizeMapId(binding.locatorMapName):null);
+};
+
+export function useStartupConnections(onGridLoaded?:(grid:OccupancyGrid)=>void):void {
   const retryToken=useStartupStore((state)=>state.retryToken);
   const callbackRef=useRef(onGridLoaded);callbackRef.current=onGridLoaded;
   useEffect(()=>{
+    const mapCheckpoint=mapLoadCheckpoint();
     const operations:StartupOperation[]=[
       {phase:'LOADING_CONFIGURATION',message:'Loading saved application configuration…',run:async()=>{}},
       {phase:'CONNECTING_MQTT',message:'Connecting to the robot message broker…',retries:2,run:async()=>{
@@ -62,35 +72,23 @@ export function useStartupConnections(onGridLoaded:(grid:OccupancyGrid)=>void):v
         LogService.write('system','info',`Locator returned ${maps.length} available map(s).`);
       }},
       {phase:'RESOLVING_MAP',message:'Resolving the active navigation map…',optional:true,run:async(signal)=>{
-        await waitFor(()=>{
-          const app=useAppStore.getState();
-          const binding=app.confirmedMapBinding;
-          return Boolean(normalizeMapId(app.activeNavigatorMapId)||
-            (binding&&binding.manufacturer===app.orderSettings.manufacturer&&
-              binding.serialNumber===app.orderSettings.serialNumber&&normalizeMapId(binding.locatorMapName)));
-        },8_000,signal,'Navigator mapId is unavailable. Confirm a Locator map binding in advanced settings.');
+        await waitFor(()=>!isLatestMapLoad(mapCheckpoint)||Boolean(resolveStartupMapId()),
+          8_000,signal,'Navigator mapId is unavailable. Confirm a Locator map binding in advanced settings.');
       }},
-      {phase:'LOADING_MAP',message:'Loading the matching hospital navigation map…',optional:true,run:async()=>{
-        const app=useAppStore.getState();const locator=useLocatorStore.getState();
-        const binding=app.confirmedMapBinding;
-        const mapId=normalizeMapId(app.activeNavigatorMapId)||
-          (binding&&binding.manufacturer===app.orderSettings.manufacturer&&
-            binding.serialNumber===app.orderSettings.serialNumber?normalizeMapId(binding.locatorMapName):null);
+      {phase:'LOADING_MAP',message:'Loading the matching hospital navigation map…',optional:true,run:async(signal)=>{
+        if(!isLatestMapLoad(mapCheckpoint))return;
+        const locator=useLocatorStore.getState();
+        const mapId=resolveStartupMapId();
         if(!mapId)throw new Error('No resolved navigation map is available.');
         const match=locator.maps.find((map)=>normalizeMapId(map.name)===mapId);
         if(!match)throw new Error(`Resolved map "${mapId}" is not available on ROKIT Locator.`);
-        if(locator.loadedMap?.mapName===match.name)return;
-        locator.set({downloading:true,selectedMapName:match.name,error:undefined});
-        try{
-          const [info,raster]=await Promise.all([
-            locatorMapService.getMapInfo(match.name),
-            locatorMapService.getMapImageWithResolution(match.name,locator.settings.imagePixelsPerMeter),
-          ]);
-          const loaded=await locatorMapService.toOccupancy(raster,locator.settings);
-          locator.set({loadedMap:raster,mapInfo:info,lastDownloadTime:new Date().toISOString()});
-          callbackRef.current(loaded.occupancy);
+        const grid=await loadLocatorSource(match.name,{
+          signal,skipUnchanged:true,isSelectionCurrent:()=>resolveStartupMapId()===mapId,
+        });
+        if(grid){
+          callbackRef.current?.(grid);
           LogService.write('planner','info','Map loaded successfully.');
-        }finally{locator.set({downloading:false});}
+        }
       }},
       {phase:'WAITING_FOR_ROBOT',message:'Waiting for fresh localization and robot state…',optional:true,run:async(signal)=>{
         await waitFor(()=>{

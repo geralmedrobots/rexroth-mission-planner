@@ -19,7 +19,6 @@ import { normalizeAngle, radiansToDegrees } from './domain/geometry/angles';
 import {
   normalizeMissionMaximumSpeed, clampStateStaleTimeoutMs,
 } from './domain/defaults';
-import { imageFileToPixels, metadataFromRosYaml, parseOccupancyJson, pixelsToOccupancy } from './domain/map/MapImporter';
 import { ObstacleInflation } from './domain/planner/ObstacleInflation';
 import { PathCollisionValidator } from './domain/planner/PathCollisionValidator';
 import { MissionMonitor } from './domain/order/MissionMonitor';
@@ -29,7 +28,7 @@ import { analyzeSpeedLimits } from './domain/robot/SpeedLimitDiagnostics';
 import { compareMapIds, resolveActiveNavigatorMap } from './domain/robot/ActiveMapResolver';
 import { getLocalMessageAgeMs, isLocalMessageFresh } from './domain/robot/TelemetryFreshness';
 import type {
-  OccupancyGrid, PathPoint, PlannerOptions, PlannerResult, RobotFootprint, RobotPose,
+  PathPoint, PlannerOptions, PlannerResult, RobotFootprint, RobotPose,
   VdaInstantAction, VdaOrder, Waypoint,
 } from './domain/types';
 import { QuickDestinations } from './features/destinations/QuickDestinations';
@@ -62,6 +61,7 @@ import { LocatorMapSelector } from './features/locator/components/LocatorMapSele
 import { LocatorMapStatus } from './features/locator/components/LocatorMapStatus';
 import { locatorSessionService } from './features/locator/services/locatorSessionService';
 import { useLocatorStore } from './features/locator/stores/locatorStore';
+import { loadImageMap, loadJsonMap, replaceLegacyPlanningGrid } from './features/map/mapSourceLoader';
 import { useMqtt } from './hooks/useMqtt';
 import { GlobalReplanningPanel } from './features/replanning/GlobalReplanningPanel';
 import { useGlobalReplanning } from './features/replanning/useGlobalReplanning';
@@ -295,14 +295,7 @@ export default function App(){
     setLocator({activeNavigatorMapId:navigatorMapId??''});
   },[setActiveMapResolution,setLocator,navigatorMapId,activeMapResolution.source]);
 
-  const loadGrid=(grid:OccupancyGrid):void=>{
-    const inflated=ObstacleInflation.byRadius(grid,
-      store.plannerOptions.passageSafety.planningSafetyMarginM+
-      store.plannerOptions.passageSafety.localizationMarginM);
-    store.set({grid,inflatedGrid:inflated,rawPath:[],finalPath:[],generatedOrder:undefined,validation:undefined});
-    LogService.write('planner','info',`Loaded ${grid.metadata.name}: ${grid.metadata.width}×${grid.metadata.height} at ${grid.metadata.resolution} m/cell`);
-  };
-  useStartupConnections(loadGrid);
+  useStartupConnections();
   const setCell=(cell:{row:number;column:number}):void=>{
     if(!store.grid)return; const transform=new CoordinateTransformer(store.grid.metadata);const pose=transform.gridToWorld(cell.row,cell.column);
     if(mode==='goal'){prepareDestinationCell(cell);return;}
@@ -313,7 +306,7 @@ export default function App(){
       store.set({waypoints:[...store.waypoints,waypoint]});
     }else if(mode==='obstacle'||mode==='erase'){
       const data=[...store.grid.data];data[cell.row*store.grid.metadata.width+cell.column]=mode==='obstacle'?100:0;
-      loadGrid({...store.grid,data});
+      replaceLegacyPlanningGrid({...store.grid,data});
     }else store.set({selectedCell:cell});
   };
   const calculatePath=async(startOverride?:RobotPose,goalOverride?:RobotPose):Promise<PathPoint[]|undefined>=>{
@@ -734,11 +727,7 @@ export default function App(){
     }catch(error){LogService.write('mqtt','error',String(error));}
   };
   const importImage=async(file:File):Promise<void>=>{
-    try{const image=await imageFileToPixels(file);const metadata=yamlText
-      ?metadataFromRosYaml(yamlText,image.width,image.height,file.name.replace(/\.[^.]+$/,''))
-      :{name:file.name,mapId:file.name.replace(/\.[^.]+$/,''),width:image.width,height:image.height,resolution:0.05,
-        origin:{x:0,y:0,yaw:0},occupiedThreshold:0.65,freeThreshold:0.196,negate:false};
-      loadGrid({metadata,data:pixelsToOccupancy(image.pixels,metadata)});
+    try{await loadImageMap(file,yamlText);
     }catch(error){LogService.write('planner','error',`Map import failed: ${String(error)}`);}
   };
   const routeDistance=store.finalPath.slice(1).reduce((distance,point,index)=>{
@@ -961,7 +950,7 @@ export default function App(){
           <Button size="small" startIcon={<Upload/>} onClick={()=>jsonInput.current?.click()}>Import grid JSON</Button>
           <input hidden ref={yamlInput} type="file" accept=".yaml,.yml" onChange={(e)=>{const f=e.target.files?.[0];if(f)void f.text().then(setYamlText);}}/>
           <input hidden ref={imageInput} type="file" accept=".pgm,.png,.jpg,.jpeg" onChange={(e)=>{const f=e.target.files?.[0];if(f)void importImage(f);}}/>
-          <input hidden ref={jsonInput} type="file" accept=".json" onChange={(e)=>{const f=e.target.files?.[0];if(f)void f.text().then((t)=>loadGrid(parseOccupancyJson(t))).catch((err)=>LogService.write('planner','error',String(err)));}}/>
+          <input hidden ref={jsonInput} type="file" accept=".json" onChange={(e)=>{const f=e.target.files?.[0];if(f)void loadJsonMap(f).catch((err)=>LogService.write('planner','error',String(err)));}}/>
         </Stack>
       </Box>}
     </Drawer>
@@ -1433,7 +1422,7 @@ export default function App(){
       <DialogTitle>ROKIT Locator Server Map</DialogTitle>
       <DialogContent><Stack gap={2} mt={1}>
         <LocatorConnectionPanel/>
-        <LocatorMapSelector onMapLoaded={loadGrid}/>
+        <LocatorMapSelector/>
         <LocatorMapStatus/>
       </Stack></DialogContent>
       <DialogActions><Button onClick={()=>setLocatorOpen(false)}>Close</Button></DialogActions>
