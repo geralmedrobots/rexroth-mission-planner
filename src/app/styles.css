@@ -21,6 +21,58 @@ body {
     radial-gradient(circle at 12% -12%, rgba(200, 16, 46, .10), transparent 36%),
     linear-gradient(145deg, #ffffff, var(--mr-bg-primary));
 }
+.mr-app-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100vh;
+  height: 100dvh;
+}
+.mr-workspace {
+  display: grid;
+  grid-template-columns: min(var(--mr-nav-width), 40vw) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+}
+.mr-workspace-mission {
+  grid-template-columns: min(var(--mr-nav-width), 40vw) minmax(0, 1fr) min(var(--mr-mission-width), 36vw);
+}
+.mr-workspace-nav { min-height: 0; }
+.mr-workspace-map {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+.mr-workspace-mission-panel {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+.mr-diagnostics-dock {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: auto;
+}
+.mr-app-shell[data-compact='true'] .mr-workspace-nav .MuiListItemButton-root { min-height: 32px; }
+.mr-app-shell[data-compact='true'] .mr-workspace-mission-panel { padding: 6px; }
+body:has(.mr-app-shell[data-reduce-motion='true']) *,
+body:has(.mr-app-shell[data-reduce-motion='true']) *::before,
+body:has(.mr-app-shell[data-reduce-motion='true']) *::after {
+  animation-duration: .001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: .001ms !important;
+  scroll-behavior: auto !important;
+}
+@media (max-width: 760px) {
+  .mr-workspace-mission {
+    grid-template-columns: min(var(--mr-nav-width), 40vw) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 32%);
+  }
+  .mr-workspace-mission .mr-workspace-nav { grid-row: 1 / 3; }
+  .mr-workspace-mission-panel { grid-column: 2; }
+}
 .mr-glass {
   background: linear-gradient(145deg, rgba(255,255,255,.98), rgba(250,246,247,.94)) !important;
   border: 1px solid var(--mr-border);

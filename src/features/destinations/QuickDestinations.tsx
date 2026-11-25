@@ -20,9 +20,11 @@ export function QuickDestinations({
     <Stack direction="row" alignItems="center" justifyContent="space-between">
       <Box><Typography variant="overline">Quick destinations</Typography>
         <Typography variant="caption" color="text.secondary" display="block">Hospital locations on this map</Typography></Box>
-      <Button size="small" startIcon={<AddLocationAlt/>} disabled={!currentGoal} onClick={onSaveGoal}>Save point</Button>
+      <Button size="small" startIcon={<AddLocationAlt/>} disabled={!currentGoal||!mapId} onClick={onSaveGoal}>Save point</Button>
     </Stack>
-    {destinations.length===0?<Alert severity="info" sx={{mt:1}}>No destinations saved for this map. Select a point and save it.</Alert>:
+    {destinations.length===0?<Alert severity="info" sx={{mt:1}}>{mapId
+      ?'No destinations saved for this map. Select a point and save it.'
+      :'Resolve the active map before saving a destination.'}</Alert>:
       <Box sx={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:1,mt:1}}>
         {destinations.map((destination)=><Button key={destination.id} variant="outlined"
           startIcon={icons[destination.category]} onClick={()=>onSelect(destination)}

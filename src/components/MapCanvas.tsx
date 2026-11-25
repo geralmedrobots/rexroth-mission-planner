@@ -1,5 +1,5 @@
 import { Box, Chip, FormControlLabel, Paper, Switch, Typography } from '@mui/material';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CoordinateTransformer } from '../domain/geometry/CoordinateTransformer';
 import type { GridCell, RobotPose } from '../domain/types';
 import { useLocatorStore } from '../features/locator/stores/locatorStore';
@@ -20,6 +20,10 @@ export const MapCanvas=({mode,onCell,liveRobotPose}:Props)=>{
   const lastPoseMapDiagnostic=useRef<string|undefined>(undefined);
   const [mouse,setMouse]=useState<{cell?:GridCell;world?:{x:number;y:number}}>({});
   const [view,setView]=useState({zoom:1,panX:0,panY:0});
+  const [size,setSize]=useState({width:0,height:0});
+  const zoomBy=useCallback((factor:number)=>setView(current=>({
+    ...current,zoom:Math.max(.35,Math.min(8,current.zoom*factor)),
+  })),[]);
   const [layers,setLayers]=useState({
     raw:true,baseline:true,rejected:true,optimized:false,nodes:false,corridors:true,
     explored:true,passages:true,footprints:false,turnSafety:true,
@@ -66,9 +70,33 @@ export const MapCanvas=({mode,onCell,liveRobotPose}:Props)=>{
     return()=>{image.onload=null;};
   },[locatorRaster?.imageUrl]);
   useEffect(()=>{
-    const element=canvas.current; const host=container.current;if(!element||!host||!grid)return;
-    const rect=host.getBoundingClientRect(); const dpr=devicePixelRatio; element.width=rect.width*dpr;element.height=rect.height*dpr;
-    element.style.width=`${rect.width}px`;element.style.height=`${rect.height}px`;
+    const element=canvas.current;
+    if(!element)return;
+    const wheel=(event:WheelEvent)=>{
+      if(!event.deltaY)return;
+      event.preventDefault();
+      zoomBy(event.deltaY<0?1.15:.87);
+    };
+    element.addEventListener('wheel',wheel,{passive:false});
+    return()=>element.removeEventListener('wheel',wheel);
+  },[zoomBy]);
+  useEffect(()=>{
+    const host=container.current;
+    if(!host)return;
+    const measure=()=>{
+      const {width,height}=host.getBoundingClientRect();
+      setSize(previous=>previous.width===width&&previous.height===height?previous:{width,height});
+    };
+    const observer=typeof ResizeObserver==='undefined'?undefined:new ResizeObserver(measure);
+    observer?.observe(host);
+    measure();
+    return()=>observer?.disconnect();
+  },[]);
+  useEffect(()=>{
+    const element=canvas.current;
+    if(!element)return;
+    if(!grid||!size.width||!size.height){element.width=0;return;}
+    const rect=size; const dpr=devicePixelRatio; element.width=rect.width*dpr;element.height=rect.height*dpr;
     const ctx=element.getContext('2d');if(!ctx)return;ctx.scale(dpr,dpr);ctx.fillStyle='#f4f5f7';ctx.fillRect(0,0,rect.width,rect.height);
     const base=Math.min(rect.width/grid.metadata.width,rect.height/grid.metadata.height)*view.zoom;
     const ox=(rect.width-grid.metadata.width*base)/2+view.panX; const oy=(rect.height-grid.metadata.height*base)/2+view.panY;
@@ -185,9 +213,10 @@ export const MapCanvas=({mode,onCell,liveRobotPose}:Props)=>{
       if(!a||!b)continue;const angle=Math.atan2(b.y-a.y,b.x-a.x);const x=(a.x+b.x)/2,y=(a.y+b.y)/2;
       ctx.save();ctx.translate(x,y);ctx.rotate(angle);ctx.fillStyle='#f4fafc';ctx.beginPath();
       ctx.moveTo(7,0);ctx.lineTo(-4,-4);ctx.lineTo(-4,4);ctx.closePath();ctx.fill();ctx.restore();}
-    if(layers.nodes)final.forEach((p,i)=>{const q=pixel(p.x,p.y);if(!q)return;ctx.fillStyle='#fff';ctx.strokeStyle='#c8102e';ctx.lineWidth=2;
+    if(layers.nodes)generatedOrder?.nodes.forEach((node,i)=>{const q=pixel(node.nodePosition.x,node.nodePosition.y);if(!q)return;ctx.fillStyle='#fff';ctx.strokeStyle='#c8102e';ctx.lineWidth=2;
       ctx.beginPath();ctx.arc(q.x,q.y,5,0,Math.PI*2);ctx.fill();ctx.stroke();
-      ctx.beginPath();ctx.moveTo(q.x,q.y);ctx.lineTo(q.x+Math.cos(p.theta)*14,q.y-Math.sin(p.theta)*14);ctx.stroke();
+      const theta=node.nodePosition.theta;
+      if(theta!==undefined){ctx.beginPath();ctx.moveTo(q.x,q.y);ctx.lineTo(q.x+Math.cos(theta)*14,q.y-Math.sin(theta)*14);ctx.stroke();}
       ctx.fillStyle='#071a2b';ctx.font='10px sans-serif';ctx.fillText(String(i),q.x+7,q.y-7);});
     if(layers.footprints)final.forEach((point)=>
       drawFootprint(point,'rgba(21,101,192,.55)'));
@@ -220,7 +249,7 @@ export const MapCanvas=({mode,onCell,liveRobotPose}:Props)=>{
     }
     if(start)drawFootprint(start,'#1565c0');
     ctx.restore();
-  },[grid,inflated,start,goal,raw,final,footprint,showInflation,showGrid,rotation,view,
+  },[grid,inflated,start,goal,raw,final,footprint,showInflation,showGrid,rotation,view,size,
     locatorImage,locatorRaster,layers,robotState,generatedOrder,replanOriginal,replanBlocked,
     replanNew,temporaryObstacleCells,inflatedTemporaryObstacleCells,
     replanExplored,startProjection,recoveryPath,plannerDiagnostics,optimizedPath,
@@ -234,34 +263,8 @@ export const MapCanvas=({mode,onCell,liveRobotPose}:Props)=>{
     const cell={column:Math.floor((sx-ox)/base),row:Math.floor((sy-oy)/base)};
     return cell.row>=0&&cell.column>=0&&cell.row<grid.metadata.height&&cell.column<grid.metadata.width?cell:null;
   };
-  return <Box ref={container} sx={{position:'relative',width:'100%',height:'100%',overflow:'hidden',bgcolor:'#f4f5f7'}}>
-    <canvas ref={canvas} onClick={(e)=>{
-      if(suppressClick.current){suppressClick.current=false;return;}
-      const cell=cellFromEvent(e);if(cell)onCell(cell);
-    }}
-      onMouseDown={(event)=>{
-        suppressClick.current=false;
-        dragging.current={x:event.clientX,y:event.clientY,panX:view.panX,panY:view.panY};
-      }}
-      onMouseUp={()=>{dragging.current=null;}}
-      onMouseLeave={()=>{dragging.current=null;}}
-      onMouseMove={(e)=>{
-        const drag=dragging.current;
-        if(drag){
-          const deltaX=e.clientX-drag.x;const deltaY=e.clientY-drag.y;
-          if(Math.hypot(deltaX,deltaY)>3)suppressClick.current=true;
-          setView((current)=>({...current,panX:drag.panX+deltaX,panY:drag.panY+deltaY}));
-          return;
-        }
-        const cell=cellFromEvent(e);if(grid&&cell){
-          const p=new CoordinateTransformer(grid.metadata).gridToWorld(cell.row,cell.column);
-          setMouse({cell,world:p});
-        }
-      }}
-      onWheel={(e)=>{e.preventDefault();setView(v=>({...v,zoom:Math.max(.35,Math.min(8,v.zoom*(e.deltaY<0?1.15:.87)))}));}}
-      onContextMenu={(event)=>{event.preventDefault();const cell=cellFromEvent(event);if(cell)setMouse((value)=>({...value,cell}));}}
-      style={{display:'block',cursor:mode==='inspect'?'crosshair':'crosshair'}}/>
-    <Paper className="mr-glass" sx={{position:'absolute',top:14,right:14,p:1}}>
+  return <Box sx={{display:'flex',flexDirection:'column',flex:'1 0 auto',minWidth:0,bgcolor:'#f4f5f7'}}>
+    <Paper role="group" aria-label="Map layers" className="mr-glass" sx={{px:1,flexShrink:0}}>
       <Typography variant="overline">Layers</Typography>
       <FormControlLabel control={<Switch size="small" checked={layers.raw}
         onChange={(event)=>setLayers((value)=>({...value,raw:event.target.checked}))}/>} label="Raw A*"/>
@@ -292,19 +295,49 @@ export const MapCanvas=({mode,onCell,liveRobotPose}:Props)=>{
         onChange={(event)=>setLayers((value)=>({...value,turnSafety:event.target.checked}))}/>}
         label="Swept / rejected turns"/>
     </Paper>
-    <Box sx={{position:'absolute',left:12,bottom:12,display:'flex',gap:1}}>
+    <Box ref={container} sx={{position:'relative',flex:'1 0 180px',minHeight:180,overflow:'hidden'}}>
+    <canvas ref={canvas} aria-label="Planning map" onClick={(e)=>{
+      if(suppressClick.current){suppressClick.current=false;return;}
+      const cell=cellFromEvent(e);if(cell)onCell(cell);
+    }}
+      onMouseDown={(event)=>{
+        suppressClick.current=false;
+        dragging.current={x:event.clientX,y:event.clientY,panX:view.panX,panY:view.panY};
+      }}
+      onMouseUp={()=>{dragging.current=null;}}
+      onMouseLeave={()=>{dragging.current=null;setMouse({});}}
+      onMouseMove={(e)=>{
+        const drag=dragging.current;
+        if(drag){
+          const deltaX=e.clientX-drag.x;const deltaY=e.clientY-drag.y;
+          if(Math.hypot(deltaX,deltaY)>3)suppressClick.current=true;
+          setView((current)=>({...current,panX:drag.panX+deltaX,panY:drag.panY+deltaY}));
+          return;
+        }
+        const cell=cellFromEvent(e);if(grid&&cell){
+          const p=new CoordinateTransformer(grid.metadata).gridToWorld(cell.row,cell.column);
+          setMouse({cell,world:p});
+        }else setMouse({});
+      }}
+      onContextMenu={(event)=>{
+        event.preventDefault();
+        const cell=cellFromEvent(event);
+        setMouse(cell&&grid?{cell,world:new CoordinateTransformer(grid.metadata).gridToWorld(cell.row,cell.column)}:{});
+      }}
+      style={{display:'block',position:'absolute',inset:0,width:'100%',height:'100%',
+        filter:'contrast(var(--mr-map-contrast, 1))',cursor:'crosshair'}}/>
+    </Box>
+    <Box role="group" aria-label="Map position and zoom" sx={{display:'flex',flexWrap:'wrap',gap:1,p:.75}}>
       <Chip size="small" label={`Mode: ${mode}`} color="primary"/>
       <Chip size="small" label={robotVisualization.label}
         color={robotVisualization.status==='visible'?'success':
           robotVisualization.status==='outside-map'?'warning':'default'}/>
       <Chip size="small" label={mouse.cell?`Grid ${mouse.cell.column}, ${mouse.cell.row}`:'Grid —'}/>
       <Chip size="small" label={mouse.world?`World ${mouse.world.x.toFixed(3)}, ${mouse.world.y.toFixed(3)} m`:'World —'}/>
-    </Box>
-    <Box sx={{position:'absolute',right:12,bottom:12,display:'flex',gap:1}}>
-      <Chip size="small" clickable label="−" onClick={()=>setView(v=>({...v,zoom:v.zoom/1.2}))}/>
+      <Chip size="small" clickable label="−" aria-label="Zoom out" onClick={()=>zoomBy(1/1.2)}/>
       <Chip size="small" label={`${Math.round(view.zoom*100)}%`}/>
-      <Chip size="small" clickable label="+" onClick={()=>setView(v=>({...v,zoom:v.zoom*1.2}))}/>
-      <Chip size="small" clickable label="Fit" onClick={()=>setView({zoom:1,panX:0,panY:0})}/>
+      <Chip size="small" clickable label="+" aria-label="Zoom in" onClick={()=>zoomBy(1.2)}/>
+      <Chip size="small" clickable label="Fit" aria-label="Fit map" onClick={()=>setView({zoom:1,panX:0,panY:0})}/>
     </Box>
   </Box>;
 };

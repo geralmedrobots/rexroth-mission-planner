@@ -4,11 +4,22 @@ import {
   Typography,
 } from '@mui/material';
 import { MedRobotsLogo } from '../../app/MedRobotsLogo';
+import { useAppStore } from '../../stores/appStore';
+import { useLocatorStore } from '../locator/stores/locatorStore';
 import { useStartupStore } from './startupStore';
 
-const labels=['Configuration','MQTT','ROKIT Locator','Map','Robot state'];
 export function StartupOverlay(){
   const startup=useStartupStore();
+  const mqtt=useAppStore(state=>state.mqttConnected);
+  const grid=useAppStore(state=>state.grid);
+  const mapId=useAppStore(state=>state.activeNavigatorMapId);
+  const robot=useAppStore(state=>state.state?.agvPosition?.positionInitialized===true&&
+    state.connection?.connectionState?.toUpperCase()==='ONLINE');
+  const locator=useLocatorStore(state=>state.sessionState==='logged-in');
+  const steps=[
+    ['Configuration',startup.phase!=='INITIALIZING'&&startup.phase!=='LOADING_CONFIGURATION'],
+    ['MQTT',mqtt],['ROKIT Locator',locator],['Map',Boolean(grid&&mapId===grid.metadata.mapId)],['Robot state',mqtt&&robot],
+  ] as const;
   const terminal=startup.phase==='READY'||startup.phase==='DEGRADED'||startup.phase==='ERROR';
   if(startup.dismissed||startup.phase==='READY')return null;
   return <Dialog open fullWidth maxWidth="sm" aria-labelledby="startup-title">
@@ -24,9 +35,9 @@ export function StartupOverlay(){
             {startup.retryAttempt?` · retry ${startup.retryAttempt}`:''}</Typography></Box>
         {startup.running&&<LinearProgress sx={{width:'100%',borderRadius:2}}/>}
         <Stack direction="row" justifyContent="space-between" width="100%">
-          {labels.map((label,index)=><Stack key={label} alignItems="center" gap={.4}>
-            <CheckCircle color={index<(startup.phase==='CONNECTING_MQTT'?1:startup.phase==='CONNECTING_LOCATOR'?2:
-              startup.phase==='LOADING_MAPS'?3:startup.phase==='WAITING_FOR_ROBOT'?4:0)?'success':'disabled'} fontSize="small"/>
+          {steps.map(([label,complete])=><Stack key={label} alignItems="center" gap={.4}
+            aria-label={`${label} ${complete?'ready':'pending'}`}>
+            <CheckCircle color={complete?'success':'disabled'} fontSize="small"/>
             <Typography variant="caption">{label}</Typography>
           </Stack>)}
         </Stack>

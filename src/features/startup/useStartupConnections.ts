@@ -33,15 +33,25 @@ export function useStartupConnections(onGridLoaded:(grid:OccupancyGrid)=>void):v
         if(!app.mqttSettings.automaticConnection)throw new Error('Automatic MQTT connection is disabled.');
         mqttService.connect(app.mqttSettings);
       }},
-      {phase:'CONNECTING_LOCATOR',message:'Connecting to ROKIT Locator…',retries:2,optional:true,run:async()=>{
+      {phase:'CONNECTING_LOCATOR',message:'Connecting to ROKIT Locator…',retries:2,optional:true,run:async(signal)=>{
         const locator=useLocatorStore.getState();
         if(!locator.settings.automaticConnection)throw new Error('Automatic Locator connection is disabled.');
         locator.set({connectionState:'testing',error:undefined});
-        await locatorSessionService.connect(locator.settings);
-        const testResult=await locatorSessionService.test();
-        if(!testResult.serverMapModule)throw new Error('ROKIT Locator ServerMap module is unavailable.');
-        locator.set({connectionState:'ready',testResult});
-        LogService.write('system','info','ROKIT Locator connected.');
+        try{
+          await locatorSessionService.connect(locator.settings);
+          if(signal.aborted)return;
+          const testResult=await locatorSessionService.test();
+          if(signal.aborted)return;
+          if(!testResult.serverMapModule)throw new Error('ROKIT Locator ServerMap module is unavailable.');
+          locator.set({connectionState:'ready',testResult});
+          LogService.write('system','info','ROKIT Locator connected.');
+        }catch(error){
+          if(!signal.aborted)locator.set({
+            connectionState:'error',testResult:undefined,
+            error:error instanceof Error?error.message:String(error),
+          });
+          throw error;
+        }
       }},
       {phase:'AUTHENTICATING_LOCATOR',message:'Authenticating the secure Locator session…',retries:2,optional:true,run:async()=>{
         const locator=useLocatorStore.getState();

@@ -1,5 +1,5 @@
 import {
-  AccountCircle, AltRoute, Autorenew, BugReport, ChevronLeft, ChevronRight, Cloud,
+  AltRoute, Autorenew, BugReport, ChevronLeft, ChevronRight, Cloud,
   Delete, Download, EditRoad, ExpandLess, ExpandMore, GridOn, Map,
   Pause, PlayArrow, Refresh, RotateRight, Save, Settings, StopCircle,
   Timeline, Upload,
@@ -10,7 +10,7 @@ import {
   ListItemText, MenuItem, Paper, Select, Snackbar, Stack, Switch, Tab, Tabs, TextField,
   Toolbar, Tooltip, Typography, useMediaQuery,
 } from '@mui/material';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import { MedRobotsLogo } from './app/MedRobotsLogo';
 import { StatusPill } from './app/StatusPill';
 import { MapCanvas, type ClickMode } from './components/MapCanvas';
@@ -30,7 +30,7 @@ import { compareMapIds, resolveActiveNavigatorMap } from './domain/robot/ActiveM
 import { getLocalMessageAgeMs, isLocalMessageFresh } from './domain/robot/TelemetryFreshness';
 import type {
   OccupancyGrid, PathPoint, PlannerOptions, PlannerResult, RobotFootprint, RobotPose,
-  VdaInstantAction, VdaOrder, Waypoint,
+  ValidationResult, VdaInstantAction, VdaOrder, Waypoint,
 } from './domain/types';
 import { QuickDestinations } from './features/destinations/QuickDestinations';
 import type { DestinationCategory, SavedDestination } from './features/destinations/destinationStore';
@@ -49,7 +49,9 @@ import {
 import type { CorridorTestVariant } from './features/corridorCompatibility/types';
 import { getActiveNavigatorOrderId, getDispatchIssues } from './features/mission/dispatchGate';
 import { validateDestination } from './features/mission/destinationValidation';
+import { getRouteStatus } from './features/mission/routeStatus';
 import { useOperatorSettingsStore } from './features/settings/operatorSettingsStore';
+import { parseSettingsFile } from './features/settings/settingsFile';
 import { StartupOverlay } from './features/startup/StartupOverlay';
 import { useStartupConnections } from './features/startup/useStartupConnections';
 import { InstantActionBuilder, isInstantActionSupported } from './domain/vda5050/InstantActionBuilder';
@@ -69,7 +71,7 @@ import { useGlobalReplanningStore } from './features/replanning/globalReplanning
 import { LogService } from './services/LogService';
 import { createDiagnosticEvent, OperationalLogDiagnosticSink } from './features/diagnostics/DiagnosticEvent';
 import { mqttService } from './services/MqttService';
-import { useAppStore } from './stores/appStore';
+import { useAppStore, type AppState } from './stores/appStore';
 import { PlanningCoordinator } from './features/planning/PlanningCoordinator';
 import { isCurrentRouteOrder, RoutePreparationGuard } from './features/planning/RouteRevisionGuard';
 import { createPlanningConfigurationSnapshot } from './domain/planning/PlanningConfigurationSnapshot';
@@ -95,6 +97,58 @@ interface ConfirmationState {
   confirmLabel:string;
   destructive?:boolean;
 }
+type Notice = {severity:'success'|'warning'|'error'|'info';message:string};
+
+function routeContext(app: AppState, loadedMapName: string | undefined, now: number) {
+  const receive = app.mqttReceiveMetadata;
+  const timeout = app.orderSettings.stateStaleTimeoutMs;
+  const stateAge = getLocalMessageAgeMs(receive.lastStateReceiveTime, now);
+  const visualizationAge = getLocalMessageAgeMs(receive.lastVisualizationReceiveTime, now);
+  const stateFresh = isLocalMessageFresh(receive.lastStateReceiveTime, timeout, now);
+  const visualizationFresh = isLocalMessageFresh(receive.lastVisualizationReceiveTime, timeout, now);
+  const connectionOnline = app.connection?.connectionState?.toUpperCase() === 'ONLINE';
+  const activeMapResolution = resolveActiveNavigatorMap({
+    stateMapId: stateFresh ? app.stateMapId : null,
+    visualizationMapId: visualizationFresh ? app.visualizationMapId : null,
+    lastKnownValidMapId: app.lastKnownValidNavigatorMapId,
+    confirmedBinding: app.confirmedMapBinding,
+    manufacturer: app.orderSettings.manufacturer, serialNumber: app.orderSettings.serialNumber,
+  });
+  const poseSnapshot = selectCurrentRobotPose({
+    state: app.state, visualization: app.visualization,
+    lastStateReceiveTime: receive.lastStateReceiveTime ?? undefined,
+    lastVisualizationReceiveTime: receive.lastVisualizationReceiveTime ?? undefined,
+    stateFresh, visualizationFresh, activeMapResolution,
+  });
+  const navigatorMapId = activeMapResolution.mapId;
+  const validation: OrderValidationContext = {
+    mqttConnected: app.mqttConnected, stateReceived: receive.lastStateReceiveTime !== null,
+    connectionReceived: Boolean(app.lastConnectionReceiveTime), connectionOnline,
+    operatingMode: app.state?.operatingMode, stateAgeMs: stateAge, visualizationAgeMs: visualizationAge,
+    positionInitialized: app.state?.agvPosition?.positionInitialized === true, poseSource: poseSnapshot?.source,
+    activeMapId: navigatorMapId, currentPose: poseSnapshot?.pose, grid: app.grid, footprint: app.footprint,
+    settings: app.orderSettings, locatorMapName: loadedMapName,
+    mapIdSource: activeMapResolution.source, lastStateReceiveTime: receive.lastStateReceiveTime,
+    corridorSettings: app.plannerOptions.corridor,
+  };
+  const prerequisites: OrderGenerationPrerequisites = {
+    mqttConnected: app.mqttConnected, connectionOnline, operatingMode: app.state?.operatingMode,
+    stateAgeMs: stateAge, maximumStateAgeMs: timeout, lastStateReceiveTime: receive.lastStateReceiveTime,
+    positionInitialized: validation.positionInitialized, pose: poseSnapshot,
+    activeMapId: navigatorMapId, activeMapSource: activeMapResolution.source,
+    stateMapId: app.stateMapId, visualizationMapId: app.visualizationMapId,
+    lastKnownValidNavigatorMapId: app.lastKnownValidNavigatorMapId,
+    confirmedMapBinding: app.confirmedMapBinding, loadedLocatorMapName: loadedMapName,
+  };
+  return {
+    activeMapResolution, navigatorMapId, poseSnapshot, stateAge, visualizationAge,
+    stateFresh, visualizationFresh, connectionOnline, validation, prerequisites,
+    mapComparison: compareMapIds(loadedMapName, navigatorMapId),
+  };
+}
+
+const getLiveRouteContext = (app: AppState) =>
+  routeContext(app, useLocatorStore.getState().loadedMap?.mapName, Date.now());
 const downloadJson=(name:string,value:unknown):void=>{
   const link=document.createElement('a');link.href=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));
   link.download=name;link.click();URL.revokeObjectURL(link.href);
@@ -161,14 +215,22 @@ export default function App(){
   const [diagnosticSearch,setDiagnosticSearch]=useState('');
   const [diagnosticSeverity,setDiagnosticSeverity]=useState<'all'|'info'|'warning'|'error'>('all');
   const [pauseLogScroll,setPauseLogScroll]=useState(false);
-  const [toast,setToast]=useState<{severity:'success'|'warning'|'error'|'info';message:string}>();
+  const [toast,setToast]=useState<Notice>();
   const [confirmation,setConfirmation]=useState<ConfirmationState>();
   const confirmationResolver=useRef<((confirmed:boolean)=>void)|null>(null);
   const lastLivePoseResolutionDiagnostic=useRef<string|undefined>(undefined);
-  const [routePhase,setRoutePhase]=useState('Selecting destination');
-  const [dispatchCountdown,setDispatchCountdown]=useState<number|null>(null);
+  const [planningFailure,setPlanningFailure]=useState<{revision:number;message:string}>();
+  const [dispatchCountdown,setDispatchCountdown]=useState<{revision:number;orderId:string;seconds:number}>();
   const dispatchToken=useRef(0);
   const routePreparationGuard=useRef(new RoutePreparationGuard());
+  const replanningConfirmation=useRef(false);
+  const [replanningPending,setReplanningPending]=useState(false);
+  const [yamlName,setYamlName]=useState<string>();
+  const [yamlLoading,setYamlLoading]=useState(false);
+  const [mapImporting,setMapImporting]=useState(false);
+  const mapImportToken=useRef(0);
+  const yamlImportToken=useRef(0);
+  const logViewport=useRef<HTMLDivElement>(null);
   const [saveDestinationOpen,setSaveDestinationOpen]=useState(false);
   const [destinationName,setDestinationName]=useState('');
   const [destinationCategory,setDestinationCategory]=useState<DestinationCategory>('other');
@@ -183,7 +245,6 @@ export default function App(){
   const imageInput=useRef<HTMLInputElement>(null); const jsonInput=useRef<HTMLInputElement>(null); const yamlInput=useRef<HTMLInputElement>(null);
   const [now,setNow]=useState(Date.now());
   const drawerWidth=navCollapsed?navCollapsedWidth:navExpandedWidth;
-  const diagnosticsHeight=diagnosticsOpen?310:48;
   useEffect(()=>{document.title='Med Robots Navigation Control';},[]);
   useEffect(()=>{
     const listener=(event:Event):void=>{
@@ -196,7 +257,7 @@ export default function App(){
     return()=>window.removeEventListener('global-replanning-notification',listener);
   },[]);
   const requestConfirmation=(options:ConfirmationState):Promise<boolean>=>{
-    confirmationResolver.current?.(false);
+    if(confirmationResolver.current)return Promise.resolve(false);
     setConfirmation(options);
     return new Promise((resolve)=>{confirmationResolver.current=resolve;});
   };
@@ -205,35 +266,41 @@ export default function App(){
     confirmationResolver.current=null;setConfirmation(undefined);resolve?.(confirmed);
   };
   useEffect(()=>()=>confirmationResolver.current?.(false),[]);
+  const changeReplanningEnabled=async(enabled:boolean):Promise<void>=>{
+    if(replanningConfirmation.current||useGlobalReplanningStore.getState().settings.enabled===enabled)return;
+    if(enabled){
+      replanningConfirmation.current=true;
+      setReplanningPending(true);
+      try{
+        if(!await requestConfirmation({
+          title:'Enable automatic global replanning?',
+          message:'When a blocked route is confirmed, the application may cancel the active Order and publish a new independently planned Order without another prompt.\n\n'+safety,
+          confirmLabel:'Enable Automatic Replanning',
+        }))return;
+      }finally{
+        replanningConfirmation.current=false;
+        setReplanningPending(false);
+      }
+    }
+    const replanning=useGlobalReplanningStore.getState();
+    replanning.updateSettings({enabled});
+    replanning.resetRuntime();
+    setToast({severity:'info',message:enabled
+      ?'Automatic replanning enabled for eligible active missions.'
+      :'Automatic replanning disabled.'});
+  };
   useEffect(()=>{if(tablet)setNavCollapsed(true);},[tablet]);
   useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(timer);},[]);
   useEffect(()=>evaluateCompatibilityTimeout(now),[evaluateCompatibilityTimeout,now]);
   const receiveMetadata=store.mqttReceiveMetadata;
-  const stateAge=getLocalMessageAgeMs(receiveMetadata.lastStateReceiveTime,now);
-  const visualizationAge=getLocalMessageAgeMs(receiveMetadata.lastVisualizationReceiveTime,now);
-  const stateFresh=isLocalMessageFresh(
-    receiveMetadata.lastStateReceiveTime,store.orderSettings.stateStaleTimeoutMs,now);
-  const visualizationFresh=isLocalMessageFresh(
-    receiveMetadata.lastVisualizationReceiveTime,store.orderSettings.stateStaleTimeoutMs,now);
+  const {
+    stateAge, visualizationAge, stateFresh, visualizationFresh, connectionOnline,
+    activeMapResolution, poseSnapshot, navigatorMapId, mapComparison:locatorComparison,
+    validation:currentValidationContext,
+  }=routeContext(store,locator.loadedMap?.mapName,now);
   const stale=!stateFresh;
-  const connectionOnline=store.connection?.connectionState?.toUpperCase()==='ONLINE';
-  const activeMapResolution=resolveActiveNavigatorMap({
-    stateMapId:stateFresh?store.stateMapId:null,
-    visualizationMapId:visualizationFresh?store.visualizationMapId:null,
-    lastKnownValidMapId:store.lastKnownValidNavigatorMapId,
-    confirmedBinding:store.confirmedMapBinding,
-    manufacturer:store.orderSettings.manufacturer,
-    serialNumber:store.orderSettings.serialNumber,
-  });
-  const poseSnapshot=selectCurrentRobotPose({
-    state:store.state,visualization:store.visualization,
-    lastStateReceiveTime:receiveMetadata.lastStateReceiveTime??undefined,
-    lastVisualizationReceiveTime:receiveMetadata.lastVisualizationReceiveTime??undefined,
-    stateFresh,visualizationFresh,activeMapResolution,
-  });
-  const navigatorMapId=activeMapResolution.mapId;
+  const displayedState=store.mqttConnected&&stateFresh?store.state:undefined;
   const activeMapId=navigatorMapId??'—';
-  const locatorComparison=compareMapIds(locator.loadedMap?.mapName,navigatorMapId);
   const locatorMismatch=Boolean(navigatorMapId&&locator.loadedMap&&!locatorComparison.matches);
   useEffect(()=>{
     const pose=poseSnapshot?.pose;
@@ -262,28 +329,7 @@ export default function App(){
     publishedAtMs:store.sentOrderPublishedAtMs,nowMs:now,acceptanceTimeoutMs:store.orderSettings.acceptanceTimeoutMs,
     publishing:store.publishingOrder,
   });
-  const generationPrerequisites=():OrderGenerationPrerequisites=>({
-    mqttConnected:store.mqttConnected,connectionOnline,operatingMode:store.state?.operatingMode,
-    stateAgeMs:stateAge,maximumStateAgeMs:store.orderSettings.stateStaleTimeoutMs,
-    lastStateReceiveTime:receiveMetadata.lastStateReceiveTime,
-    positionInitialized:store.state?.agvPosition?.positionInitialized===true,
-    pose:poseSnapshot,activeMapId:navigatorMapId,activeMapSource:activeMapResolution.source,
-    stateMapId:store.stateMapId,visualizationMapId:store.visualizationMapId,
-    lastKnownValidNavigatorMapId:store.lastKnownValidNavigatorMapId,
-    confirmedMapBinding:store.confirmedMapBinding,
-    loadedLocatorMapName:locator.loadedMap?.mapName,
-  });
-  const validationContext=():OrderValidationContext=>({
-    mqttConnected:store.mqttConnected,stateReceived:receiveMetadata.lastStateReceiveTime!==null,
-    connectionReceived:Boolean(store.lastConnectionReceiveTime),connectionOnline,
-    operatingMode:store.state?.operatingMode,stateAgeMs:stateAge,visualizationAgeMs:visualizationAge,
-    positionInitialized:store.state?.agvPosition?.positionInitialized===true,poseSource:poseSnapshot?.source,
-    activeMapId:navigatorMapId,currentPose:poseSnapshot?.pose,grid:store.grid,footprint:store.footprint,
-    settings:store.orderSettings,locatorMapName:locator.loadedMap?.mapName,
-    mapIdSource:activeMapResolution.source,lastStateReceiveTime:receiveMetadata.lastStateReceiveTime,
-    corridorSettings:store.plannerOptions.corridor,
-  });
-  const firstNodeDiagnostics=getFirstNodeDiagnostics(store.generatedOrder,validationContext());
+  const firstNodeDiagnostics=getFirstNodeDiagnostics(store.generatedOrder,currentValidationContext);
   const firstNodeStatus=stale?'Stale robot state':
     store.state?.agvPosition?.positionInitialized!==true?'Position not initialized':
       locatorMismatch?'Map mismatch':
@@ -296,6 +342,8 @@ export default function App(){
   },[setActiveMapResolution,setLocator,navigatorMapId,activeMapResolution.source]);
 
   const loadGrid=(grid:OccupancyGrid):void=>{
+    mapImportToken.current+=1;
+    setMapImporting(false);
     const inflated=ObstacleInflation.byRadius(grid,
       store.plannerOptions.passageSafety.planningSafetyMarginM+
       store.plannerOptions.passageSafety.localizationMarginM);
@@ -316,27 +364,29 @@ export default function App(){
       loadGrid({...store.grid,data});
     }else store.set({selectedCell:cell});
   };
-  const calculatePath=async(startOverride?:RobotPose,goalOverride?:RobotPose):Promise<PathPoint[]|undefined>=>{
+  const calculatePath=async(startOverride?:RobotPose,goalOverride?:RobotPose):Promise<{
+    path:PathPoint[];revision:number;
+  }|undefined>=>{
     const selected=useAppStore.getState();
-    const revision=selected.routeRevision;
     const routeStart=startOverride??selected.start;
     const routeGoal=goalOverride??selected.goal;
-    if(!selected.grid||!routeStart||!routeGoal){LogService.write('planner','error','Load a map and set start and goal first.');return;}
-    if(selected.plannerMode==='manual'){
-      const finalPath:PathPoint[]=[routeStart,...selected.waypoints,routeGoal];
-      const valid=new PathCollisionValidator().pathIsFree(selected.grid,finalPath,selected.footprint,selected.plannerOptions.collisionSampleInterval);
-      const plannerResult:PlannerResult={success:valid,error:valid?undefined:'Manual path intersects obstacles.',
-        rawPath:finalPath,simplifiedPath:finalPath,finalPath,statistics:{visitedCells:0,durationMs:0,rawPointCount:finalPath.length,
-          simplifiedPointCount:finalPath.length,finalPointCount:finalPath.length}};
-      const accepted=selected.commitPlannedRoute(revision,{start:routeStart,rawPath:finalPath,finalPath,
-        plannerResult,planningConfiguration:planningCoordinator.createSnapshot(selected)});
-      return accepted&&valid?finalPath:undefined;
-    }
-    if(!selected.beginPlanning(revision))return undefined;
-    selected.set({rawPath:[],finalPath:[],plannerResult:undefined,
-      plannedRouteRevision:undefined,generatedOrder:undefined,generatedOrderRouteRevision:undefined,
-      validation:undefined,corridorDiagnostics:[],planningConfiguration:undefined});
+    if(!selected.grid||!routeStart||!routeGoal)return;
+    const revision=selected.invalidateRoute();
+    dispatchToken.current+=1;
+    setDispatchCountdown(undefined);
+    if(!selected.beginPlanning(revision))return;
     try{
+      if(selected.plannerMode==='manual'){
+        const finalPath:PathPoint[]=[routeStart,...selected.waypoints,routeGoal];
+        const valid=new PathCollisionValidator().pathIsFree(selected.grid,finalPath,selected.footprint,selected.plannerOptions.collisionSampleInterval);
+        const plannerResult:PlannerResult={success:valid,error:valid?undefined:'Manual path intersects obstacles.',
+          rawPath:finalPath,simplifiedPath:finalPath,finalPath,statistics:{visitedCells:0,durationMs:0,rawPointCount:finalPath.length,
+            simplifiedPointCount:finalPath.length,finalPointCount:finalPath.length}};
+        const accepted=selected.commitPlannedRoute(revision,{start:routeStart,rawPath:finalPath,finalPath,
+          plannerResult,planningConfiguration:planningCoordinator.createSnapshot(selected)});
+        if(accepted&&!valid)setToast({severity:'error',message:plannerResult.error!});
+        return accepted&&valid?{path:finalPath,revision}:undefined;
+      }
       const result=await planningCoordinator.plan({
         grid:structuredClone(selected.grid), start:structuredClone(routeStart), goal:structuredClone(routeGoal),
         waypoints:structuredClone(selected.waypoints), plannerMode:selected.plannerMode,
@@ -354,18 +404,29 @@ export default function App(){
       if(!accepted)return undefined;
       if(!result.success){
         const failedStage=[...(result.diagnostics?.stages??[])].reverse().find((item)=>!item.success);
-        LogService.write('planner','error',failedStage?.reason??result.error??'RAW_PATH_FAILED');
+        const message=failedStage?.reason??result.error??'No valid route was found.';
+        LogService.write('planner','error',message);
+        setToast({severity:'error',message});
         return undefined;
       }
       LogService.write('planner','info',`Path planned: ${result.rawPath.length} raw cells → ${result.simplifiedPath.length} geometry points → ${result.finalPath.length} final points in ${result.statistics.durationMs.toFixed(1)} ms`);
-      return result.finalPath;
+      return {path:result.finalPath,revision};
     }catch(error){
-      LogService.write('planner','error',String(error));return undefined;
+      if(useAppStore.getState().routeRevision===revision){
+        const message=error instanceof Error?error.message:String(error);
+        setPlanningFailure({revision,message});
+        setToast({severity:'error',message:`Route calculation failed: ${message}`});
+        LogService.write('planner','error',message);
+      }
+      return undefined;
     }finally{
       selected.finishPlanning(revision);
     }
   };
-  const plan=async():Promise<void>=>{await calculatePath();};
+  const plan=async():Promise<void>=>{
+    routePreparationGuard.current.cancel();
+    await calculatePath();
+  };
   const appendOrderStages=(stages:NonNullable<PlannerResult['diagnostics']>['stages']):void=>{
     const live=useAppStore.getState();
     const currentDiagnostics=live.plannerResult?.diagnostics;
@@ -388,7 +449,8 @@ export default function App(){
     const revision=expectedRevision??live.routeRevision;
     if(revision!==live.routeRevision||live.plannedRouteRevision!==revision)return undefined;
     const path=pathOverride??live.finalPath;
-    const readiness=getOrderGenerationIssues(generationPrerequisites());
+    const context=getLiveRouteContext(live);
+    const readiness=getOrderGenerationIssues(context.prerequisites);
     const readinessErrors=readiness.filter((issue)=>issue.severity==='error');
     const readinessWarnings=readiness.filter((issue)=>issue.severity==='warning');
     if(readinessErrors.length){
@@ -399,17 +461,17 @@ export default function App(){
       }]);
       live.set({generatedOrder:undefined,generatedOrderRouteRevision:undefined,
         validation:{valid:false,errors:readinessErrors,warnings:readinessWarnings,context:{
-        stateAgeMs:stateAge,stateStaleTimeoutMs:live.orderSettings.stateStaleTimeoutMs,
-        activeNavigatorMapId:navigatorMapId,mapIdSource:activeMapResolution.source,
-        loadedLocatorMap:locator.loadedMap?.mapName??null,
+        stateAgeMs:context.stateAge,stateStaleTimeoutMs:live.orderSettings.stateStaleTimeoutMs,
+        activeNavigatorMapId:context.navigatorMapId,mapIdSource:context.activeMapResolution.source,
+        loadedLocatorMap:context.validation.locatorMapName??null,
       }}});
       readiness.forEach((issue)=>LogService.write('validation',issue.severity==='error'?'error':'warning',issue.message));return undefined;
     }
-    if(!live.grid||!poseSnapshot||path.length<1)return undefined;
+    if(!live.grid||!context.poseSnapshot||path.length<1)return undefined;
     try{
       const corridorDiagnostics:import('./domain/planner/EdgeCorridorPlanner').CorridorDiagnostic[]=[];
       const order=new VdaOrderBuilder().build(path,{
-        robotPose:poseSnapshot.pose,activeMapId:navigatorMapId!,
+        robotPose:context.poseSnapshot.pose,activeMapId:context.navigatorMapId!,
         finalGoalTheta:finalGoalTheta??(live.goalThetaExplicit?live.goal?.theta:undefined),
         planningConfiguration:live.planningConfiguration,
         motionPlan: live.plannerResult?.motionPlan,
@@ -425,10 +487,11 @@ export default function App(){
           onDiagnostic:(diagnostic)=>corridorDiagnostics.push(diagnostic),
         },
       },live.orderSettings);
-      const validation=new VdaOrderValidator().validate(order,validationContext());
-      if(order.nodes.length>operatorSettings.maximumVdaNodeCount){
+      const validation=new VdaOrderValidator().validate(order,context.validation);
+      const maximumNodeCount=useOperatorSettingsStore.getState().settings.maximumVdaNodeCount;
+      if(order.nodes.length>maximumNodeCount){
         validation.errors.push({code:'nodes.maximum',
-          message:`Order contains ${order.nodes.length} nodes; configured maximum is ${operatorSettings.maximumVdaNodeCount}.`,
+          message:`Order contains ${order.nodes.length} nodes; configured maximum is ${maximumNodeCount}.`,
           severity:'error'});
         validation.valid=false;
       }
@@ -477,15 +540,6 @@ export default function App(){
       return undefined;
     }
   };
-  const corridorSettingsSignature=JSON.stringify(store.plannerOptions.corridor);
-  useEffect(()=>{
-    if(!store.sentOrder&&store.finalPath.length>=1&&store.grid&&poseSnapshot&&navigatorMapId)
-      buildOrder(store.finalPath);
-    // Rebuild the unsent Order whenever geometry, corridor policy, or the
-    // single MissionMaximumSpeedMps source changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[corridorSettingsSignature,store.footprint.width,store.footprint.length,
-    store.footprint.safetyMargin,store.orderSettings.missionMaximumSpeedMps]);
   const generate=():void=>{ buildOrder(); };
   const useBaselinePath=():void=>{
     const live=useAppStore.getState();
@@ -526,17 +580,20 @@ export default function App(){
     LogService.write('planner','warning','BASELINE_PATH_USED: operator selected the last collision-free baseline path.');
   };
   const rebuildFromCurrentPose=async():Promise<void>=>{
-    const readiness=getOrderGenerationIssues(generationPrerequisites());
+    const live=useAppStore.getState();
+    const context=getLiveRouteContext(live);
+    const readiness=getOrderGenerationIssues(context.prerequisites);
     const readinessErrors=readiness.filter((issue)=>issue.severity==='error');
     const readinessWarnings=readiness.filter((issue)=>issue.severity==='warning');
-    if(readinessErrors.length){store.set({validation:{valid:false,errors:readinessErrors,warnings:readinessWarnings,context:{
-      stateAgeMs:stateAge,stateStaleTimeoutMs:store.orderSettings.stateStaleTimeoutMs,
-      activeNavigatorMapId:navigatorMapId,mapIdSource:activeMapResolution.source,
-      loadedLocatorMap:locator.loadedMap?.mapName??null,
-    }}});return;}
-    if(!poseSnapshot)return;
-    const path=await calculatePath(poseSnapshot.pose);
-    if(path)buildOrder(path);
+    if(readinessErrors.length){live.set({validation:{valid:false,errors:readinessErrors,warnings:readinessWarnings,context:{
+      stateAgeMs:context.stateAge,stateStaleTimeoutMs:live.orderSettings.stateStaleTimeoutMs,
+      activeNavigatorMapId:context.navigatorMapId,mapIdSource:context.activeMapResolution.source,
+      loadedLocatorMap:context.validation.locatorMapName??null,
+    }}});setToast({severity:'error',message:readinessErrors[0]!.message});return;}
+    if(!context.poseSnapshot||!live.goal)return;
+    routePreparationGuard.current.cancel();
+    const result=await calculatePath(context.poseSnapshot.pose);
+    if(result)buildOrder(result.path,undefined,result.revision);
   };
   const publish=async(orderOverride?:VdaOrder,skipConfirmation=false,
     expectedRevision?:number):Promise<void>=>{
@@ -564,10 +621,20 @@ export default function App(){
       return;
     }
     const activeDifferentOrder=Boolean(activeNavigatorOrderId&&activeNavigatorOrderId!==order.orderId);
-    const currentValidation=new VdaOrderValidator().validate(order,validationContext());
+    const context=getLiveRouteContext(live);
+    let currentValidation:ValidationResult;
+    try{
+      currentValidation=new VdaOrderValidator().validate(order,context.validation);
+    }catch(error){
+      const message=error instanceof Error?error.message:String(error);
+      live.set({validation:{valid:false,warnings:[],errors:[{code:'validation.exception',severity:'error',message}]}});
+      setToast({severity:'error',message:`Order validation failed: ${message}`});
+      LogService.write('validation','error',message);
+      return;
+    }
     const dispatchIssues=getDispatchIssues({
-      mqttConnected:live.mqttConnected,robotOnline:connectionOnline,stateFresh,
-      poseValid:Boolean(poseSnapshot),mapMatches:Boolean(locator.loadedMap&&locatorComparison.matches),
+      mqttConnected:live.mqttConnected,robotOnline:context.connectionOnline,stateFresh:context.stateFresh,
+      poseValid:Boolean(context.poseSnapshot),mapMatches:context.mapComparison.matches,
       validation:currentValidation,state:live.state,
       hasActiveDifferentOrder:activeDifferentOrder,
     });
@@ -580,95 +647,82 @@ export default function App(){
       setToast({severity:'error',message:dispatchIssues[0]?.message??'Order validation failed.'});
       return;
     }
-    if(!skipConfirmation&&!await requestConfirmation({
-      title:'Start mission?',
-      message:`${publishWarning}\n\nTopic: ${live.mqttSettings.topics.order}\nOrder: ${order.orderId}\nMaximum speed: ${live.orderSettings.missionMaximumSpeedMps} m/s`,
-      confirmLabel:'Send Mission',
-    }))return;
-    const current=useAppStore.getState();
-    if(!isCurrentRouteOrder(current,order,revision)){
-      setToast({severity:'warning',message:'Publication cancelled because the selected route changed.'});
+    if(!skipConfirmation){
+      const confirmed=await requestConfirmation({
+        title:'Start mission?',
+        message:`${publishWarning}\n\nTopic: ${live.mqttSettings.topics.order}\nOrder: ${order.orderId}\nMaximum speed: ${live.orderSettings.missionMaximumSpeedMps} m/s`,
+        confirmLabel:'Send Mission',
+      });
+      if(!confirmed)return;
+      if(useAppStore.getState().mqttSettings!==live.mqttSettings){
+        setToast({severity:'warning',message:'MQTT settings changed. Review the mission and confirm again.'});
+        return;
+      }
+      await publish(order,true,revision);
       return;
     }
-    setRoutePhase('Dispatching');current.set({publishingOrder:true});
+    const current=live;
+    current.set({publishingOrder:true});
     try{await mqttService.publish(current.mqttSettings.topics.order,JSON.stringify(order),current.mqttSettings.qos,false);
       current.set({sentOrder:order,sentOrderPublishedAtMs:Date.now(),publishingOrder:false});
       stage5BRecording.order(order,revision,true);
       missionController.markPublished(appSessionId);
-      setRoutePhase('Dispatching');setToast({severity:'success',message:'Order sent. Waiting for Navigator acceptance.'});
+      setToast({severity:'info',message:'Order handed to MQTT. Waiting for Navigator acceptance.'});
       LogService.write('mqtt','info',`Published Order ${order.orderId}; awaiting Navigator acceptance.`);
     }catch(error){current.set({publishingOrder:false});
       stage5BRecording.observe(order.orderId,'failed',`Order publication failed: ${String(error)}`,
-        poseSnapshot?.pose ? { agvPosition: poseSnapshot.pose } : undefined);
-      setRoutePhase('Failed');setToast({severity:'error',message:'Unable to dispatch the mission.'});LogService.write('mqtt','error',String(error));}
+        context.poseSnapshot?.pose ? { agvPosition: context.poseSnapshot.pose } : undefined);
+      setToast({severity:'error',message:`Unable to dispatch the mission: ${String(error)}`});LogService.write('mqtt','error',String(error));}
   };
   const beginDirectDispatch=async(order:VdaOrder,revision:number):Promise<void>=>{
     const token=++dispatchToken.current;
-    for(let remaining=operatorSettings.dispatchCountdownSeconds;remaining>0;remaining-=1){
-      if(token!==dispatchToken.current)return;
-      const live=useAppStore.getState();
-      if(!isCurrentRouteOrder(live,order,revision))return;
-      if(!live.mqttConnected||!isLocalMessageFresh(
-        live.mqttReceiveMetadata.lastStateReceiveTime,live.orderSettings.stateStaleTimeoutMs)){
-        setDispatchCountdown(null);setToast({severity:'warning',message:'Automatic dispatch cancelled because robot data is not ready.'});return;
+    try{
+      for(let remaining=useOperatorSettingsStore.getState().settings.dispatchCountdownSeconds;remaining>0;remaining-=1){
+        if(token!==dispatchToken.current)return;
+        const live=useAppStore.getState();
+        if(!isCurrentRouteOrder(live,order,revision)||!live.validation?.valid)return;
+        if(!live.mqttConnected||!isLocalMessageFresh(
+          live.mqttReceiveMetadata.lastStateReceiveTime,live.orderSettings.stateStaleTimeoutMs)){
+          setToast({severity:'warning',message:'Automatic dispatch cancelled because robot data is not ready.'});return;
+        }
+        setDispatchCountdown({revision,orderId:order.orderId,seconds:remaining});
+        await new Promise((resolve)=>setTimeout(resolve,1_000));
       }
-      setDispatchCountdown(remaining);
-      await new Promise((resolve)=>setTimeout(resolve,1_000));
+      if(token===dispatchToken.current&&isCurrentRouteOrder(useAppStore.getState(),order,revision)){
+        await publish(order,true,revision);
+      }
+    }finally{
+      if(token===dispatchToken.current)setDispatchCountdown(undefined);
     }
-    if(token===dispatchToken.current){setDispatchCountdown(null);await publish(order,true,revision);}
   };
   const prepareDestination=async(goal:RobotPose,explicitTheta=false):Promise<void>=>{
-    dispatchToken.current+=1;setDispatchCountdown(null);
-    const preparationToken=routePreparationGuard.current.begin();
-    const setCurrentRoutePhase=(phase:string):void=>{
-      if(routePreparationGuard.current.isCurrent(preparationToken))setRoutePhase(phase);
-    };
     const live=useAppStore.getState();const grid=live.grid;
-    if(!grid||!poseSnapshot){setCurrentRoutePhase('Failed: ROUTE_NOT_READY');setToast({severity:'error',message:'A loaded map and fresh robot pose are required.'});return;}
+    const context=getLiveRouteContext(live);
+    if(!grid||!context.poseSnapshot){setToast({severity:'error',message:'A loaded map and fresh robot pose are required.'});return;}
     const collisionGrid=live.inflatedGrid??grid;
-    const destination=validateDestination(goal,navigatorMapId,grid,collisionGrid);
+    const destination=validateDestination(goal,context.navigatorMapId,grid,collisionGrid);
     if(!destination.valid||!destination.cell){
-      setCurrentRoutePhase('Failed: INVALID_DESTINATION');
       setToast({severity:'error',message:destination.message??'Destination is not navigable.'});return;
     }
+    const preparationToken=routePreparationGuard.current.begin();
     const cell=destination.cell;
     live.set({goal,goalThetaExplicit:explicitTheta,selectedCell:cell,rawPath:[],finalPath:[],
       generatedOrder:undefined,validation:undefined});
-    const revision=useAppStore.getState().routeRevision;
     missionController.createMission(appSessionId,crypto.randomUUID());
-    setCurrentRoutePhase('Validating destination');
-    setCurrentRoutePhase('Calculating route');
-    const path=await calculatePath(poseSnapshot.pose,goal);
-    if(!routePreparationGuard.current.isCurrent(preparationToken))return;
-    if(useAppStore.getState().routeRevision!==revision){
-      setCurrentRoutePhase('Selection changed');
-      return;
-    }
-    if(!path){
-      const planner=useAppStore.getState().plannerResult;
-      const rejected=[...(planner?.diagnostics?.stages??[])].reverse()
-        .find((item)=>item.severity!=='info');
-      const code=planner?.diagnostics?.physicalFailureCode??
-        rejected?.code??'NO_PHYSICALLY_VALID_ROUTE';
-      const reason=rejected?.reason??planner?.error??
-        'No route satisfies the configured map, vehicle footprint, and margins.';
-      setCurrentRoutePhase(`Failed: ${code}`);
-      setToast({severity:'error',message:`${code}: ${reason}`});
-      return;
-    }
-    setCurrentRoutePhase('Simplifying route');
-    setCurrentRoutePhase('Generating order');
+    const planned=await calculatePath(context.poseSnapshot.pose,goal);
+    if(!planned||!routePreparationGuard.current.isCurrent(preparationToken))return;
+    const {path,revision}=planned;
+    if(useAppStore.getState().routeRevision!==revision)return;
     const order=buildOrder(path,explicitTheta?goal.theta:undefined,revision);
     const result=useAppStore.getState().validation;
     if(!order||!result?.valid){
       const reason=result?.errors[0]?.message??
         'Generated Order did not pass validation.';
-      setCurrentRoutePhase('Failed: ORDER_VALIDATION_FAILED');
-      setToast({severity:'error',message:`ORDER_VALIDATION_FAILED: ${reason}`});
+      setToast({severity:'error',message:reason});
       return;
     }
-    setCurrentRoutePhase('Ready to start');setToast({severity:'success',message:'Route calculated. Order validated and ready.'});
-    if(operatorSettings.directDispatchMode)void beginDirectDispatch(order,revision);
+    setToast({severity:'success',message:'Route calculated and order validated.'});
+    if(useOperatorSettingsStore.getState().settings.directDispatchMode)void beginDirectDispatch(order,revision);
   };
   const prepareDestinationCell=(cell:{row:number;column:number}):void=>{
     const live=useAppStore.getState();if(!live.grid)return;
@@ -676,39 +730,38 @@ export default function App(){
     void prepareDestination({...point,theta:live.goal?.theta??poseSnapshot?.pose.theta??0,
       mapId:navigatorMapId??'',positionInitialized:true},false);
   };
-  const clearDestination=async(confirm=true):Promise<void>=>{
+  const clearDestination=async():Promise<void>=>{
     const live=useAppStore.getState();
-    if(confirm&&(live.sentOrder||live.generatedOrder)&&!await requestConfirmation({
+    if((live.sentOrder||live.generatedOrder)&&!await requestConfirmation({
       title:'Clear destination?',
       message:'Clear the active destination and route preview?',
       confirmLabel:'Clear Destination',destructive:true,
     }))return;
+    if(useAppStore.getState().routeRevision!==live.routeRevision){
+      setToast({severity:'warning',message:'The route changed. Confirm Clear Destination again to clear the current route.'});
+      return;
+    }
     dispatchToken.current+=1;routePreparationGuard.current.cancel();
-    setDispatchCountdown(null);setRoutePhase('Selecting destination');
+    setDispatchCountdown(undefined);
     live.set({goal:undefined,rawPath:[],finalPath:[],generatedOrder:undefined,validation:undefined,
       plannerResult:undefined,selectedCell:undefined});
   };
+  const handleWorkspaceKey=(event:KeyboardEvent):void=>{
+    if(event.key!=='Escape'||event.defaultPrevented||event.target instanceof HTMLElement&&
+      event.target.closest('input,textarea,select,[contenteditable],[role="combobox"],[role="dialog"],[role="menu"],[role="listbox"]'))return;
+    if(confirmationResolver.current||settingsOpen||locatorOpen||corridorCompatibilityOpen||
+      globalReplanningOpen||saveDestinationOpen||!event.currentTarget.contains(event.target as Node))return;
+    if(useAppStore.getState().goal)void clearDestination();
+  };
   useEffect(()=>{
-    const onKey=(event:KeyboardEvent):void=>{
-      if(event.key!=='Escape')return;
-      dispatchToken.current+=1;routePreparationGuard.current.cancel();
-      setDispatchCountdown(null);setRoutePhase('Selecting destination');
-      useAppStore.getState().set({goal:undefined,rawPath:[],finalPath:[],generatedOrder:undefined,
-        validation:undefined,plannerResult:undefined,selectedCell:undefined});
-    };
-    window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey);
-  },[]);
-  useEffect(()=>{
-    if(!store.mqttConnected||stale){dispatchToken.current+=1;setDispatchCountdown(null);}
-  },[store.mqttConnected,stale]);
+    if(!store.mqttConnected||stale||!operatorSettings.directDispatchMode){
+      dispatchToken.current+=1;
+      setDispatchCountdown(undefined);
+    }
+  },[store.mqttConnected,stale,operatorSettings.directDispatchMode]);
   useEffect(()=>{
     const navigatorLifecycle = mission.status==='Accepted'?'accepted':mission.status==='Rejected'||mission.status==='Timed out'?'rejected':mission.status==='Driving'?'driving':mission.status==='Completed'?'completed':mission.status==='Cancelled'?'cancelled':undefined;
     if(navigatorLifecycle) missionController.observeNavigator(appSessionId,navigatorLifecycle,{progressPercent:mission.progressPercent});
-    if(mission.status==='Accepted')setRoutePhase('Accepted by Navigator');
-    else if(mission.status==='Driving')setRoutePhase('Driving');
-    else if(mission.status==='Completed')setRoutePhase('Arrived');
-    else if(mission.status==='Rejected'||mission.status==='Timed out')setRoutePhase('Failed');
-    else if(mission.status==='Cancelled')setRoutePhase('Cancelled');
   },[mission.status,mission.progressPercent]);
   useEffect(()=>{
     const outcome = mission.status==='Completed' ? 'success' : mission.status==='Cancelled' ? 'cancelled'
@@ -717,9 +770,19 @@ export default function App(){
     if(outcome) stage5BRecording.observe(store.sentOrder?.orderId,outcome,mission.status,store.state);
   },[mission.status,store.sentOrder?.orderId,store.state]);
   useEffect(()=>{ stage5BRecording.routeChanged(store.routeRevision); },[store.routeRevision]);
+  useEffect(()=>{
+    if(!operatorSettings.autoClearCompletedMission||mission.status!=='Completed'||!displayedState)return;
+    const current=useAppStore.getState();
+    if(current.goal&&current.generatedOrder&&current.sentOrder?.orderId===current.generatedOrder.orderId&&
+      isCurrentRouteOrder(current,current.generatedOrder,current.routeRevision)){
+      current.set({goal:undefined,selectedCell:undefined});
+    }
+  },[operatorSettings.autoClearCompletedMission,mission.status,displayedState,store.generatedOrder,store.sentOrder]);
   const instant=async(action:VdaInstantAction):Promise<void>=>{
     if(!isInstantActionSupported(action)){LogService.write('mqtt','warning',`${action} is disabled because the current ROKIT configuration rejected its blocking type.`);return;}
-    if(!store.mqttConnected)return;
+    if(!useAppStore.getState().mqttConnected){
+      setToast({severity:'error',message:'MQTT is disconnected. The action was not sent.'});return;
+    }
     if(!await requestConfirmation({
       title:action==='cancelOrder'?'Cancel active mission?':'Send instant action?',
       message:action==='cancelOrder'
@@ -727,19 +790,63 @@ export default function App(){
         :`Publish ${action} to ${store.mqttSettings.topics.instantActions}?`,
       confirmLabel:action==='cancelOrder'?'Cancel Mission':'Send Action',destructive:action==='cancelOrder',
     }))return;
-    const message=new InstantActionBuilder().build(action,store.orderSettings);
-    try{await mqttService.publish(store.mqttSettings.topics.instantActions,JSON.stringify(message),store.mqttSettings.qos,false);
-      if(action==='cancelOrder')stage5BRecording.cancelRequested(message.actions[0]!.actionId,store.sentOrder?.orderId);
+    const live=useAppStore.getState();
+    if(!live.mqttConnected){
+      setToast({severity:'error',message:'MQTT disconnected before the action could be sent.'});return;
+    }
+    const message=new InstantActionBuilder().build(action,live.orderSettings);
+    try{await mqttService.publish(live.mqttSettings.topics.instantActions,JSON.stringify(message),live.mqttSettings.qos,false);
+      if(action==='cancelOrder')stage5BRecording.cancelRequested(message.actions[0]!.actionId,live.sentOrder?.orderId);
+      setToast({severity:'info',message:'Action handed to MQTT. Check Navigator state for the outcome.'});
       LogService.write('mqtt','warning',`Published ${action} (${message.actions[0]!.actionId})`);
-    }catch(error){LogService.write('mqtt','error',String(error));}
+    }catch(error){
+      setToast({severity:'error',message:`Unable to send the action: ${String(error)}`});
+      LogService.write('mqtt','error',String(error));
+    }
   };
-  const importImage=async(file:File):Promise<void>=>{
-    try{const image=await imageFileToPixels(file);const metadata=yamlText
-      ?metadataFromRosYaml(yamlText,image.width,image.height,file.name.replace(/\.[^.]+$/,''))
-      :{name:file.name,mapId:file.name.replace(/\.[^.]+$/,''),width:image.width,height:image.height,resolution:0.05,
-        origin:{x:0,y:0,yaw:0},occupiedThreshold:0.65,freeThreshold:0.196,negate:false};
-      loadGrid({metadata,data:pixelsToOccupancy(image.pixels,metadata)});
-    }catch(error){LogService.write('planner','error',`Map import failed: ${String(error)}`);}
+  const importMap=async(event:ChangeEvent<HTMLInputElement>,format:'yaml'|'image'|'json'):Promise<void>=>{
+    const file=event.target.files?.[0];
+    event.target.value='';
+    if(!file)return;
+    const counter=format==='yaml'?yamlImportToken:mapImportToken;
+    const token=++counter.current;
+    if(format==='yaml')setYamlLoading(true);
+    else setMapImporting(true);
+    try{
+      if(format==='yaml'){
+        const source=await file.text();
+        if(counter.current!==token)return;
+        metadataFromRosYaml(source,1,1,file.name);
+        setYamlText(source);
+        setYamlName(file.name);
+        setToast({severity:'success',message:`${file.name} is ready for the next image import.`});
+        return;
+      }
+      let grid:OccupancyGrid;
+      if(format==='json')grid=parseOccupancyJson(await file.text());
+      else{
+        const image=await imageFileToPixels(file);
+        const mapId=file.name.replace(/\.[^.]+$/,'');
+        const metadata=yamlText?metadataFromRosYaml(yamlText,image.width,image.height,mapId)
+          :{name:file.name,mapId,width:image.width,height:image.height,resolution:0.05,
+            origin:{x:0,y:0,yaw:0},occupiedThreshold:0.65,freeThreshold:0.196,negate:false};
+        grid={metadata,data:pixelsToOccupancy(image.pixels,metadata)};
+      }
+      if(counter.current!==token)return;
+      loadGrid(grid);
+      if(format==='image'){setYamlText(undefined);setYamlName(undefined);}
+      setToast({severity:'success',message:`Loaded ${grid.metadata.name}.`});
+    }catch(error){
+      if(counter.current!==token)return;
+      const message=`Map import failed: ${String(error)}`;
+      setToast({severity:'error',message});
+      LogService.write('planner','error',message);
+    }finally{
+      if(counter.current===token){
+        if(format==='yaml')setYamlLoading(false);
+        else setMapImporting(false);
+      }
+    }
   };
   const routeDistance=store.finalPath.slice(1).reduce((distance,point,index)=>{
     const previous=store.finalPath[index]!;
@@ -765,12 +872,34 @@ export default function App(){
     hasActiveDifferentOrder:Boolean(getActiveNavigatorOrderId(store.state)&&store.generatedOrder&&
       getActiveNavigatorOrderId(store.state)!==store.generatedOrder.orderId),
   });
-  const compatibilityDispatchBlockedReason=!store.generatedOrder
+  const compatibilityDispatchBlockedReason=store.publishingOrder?'An Order publication is already in progress.':!store.generatedOrder
     ?'Generate and validate a route first.'
     :[...dispatchIssues,...getCompatibilitySpecificDispatchIssues(store.state)][0]?.message;
   const activeNavigatorOrderId=getActiveNavigatorOrderId(store.state);
+  const orderAlreadySent=Boolean(store.generatedOrder&&(store.sentOrder?.orderId===store.generatedOrder.orderId||
+    activeNavigatorOrderId===store.generatedOrder.orderId));
+  const currentPlanningFailure=planningFailure?.revision===store.routeRevision?planningFailure:undefined;
+  const orderMapMismatch=Boolean(store.generatedOrder&&navigatorMapId&&!compareMapIds(
+    store.generatedOrder.nodes[0]?.nodePosition?.mapId,navigatorMapId).matches);
+  const routeStatus=getRouteStatus(store,dispatchIssues.length>0||firstNodeStatus!=='Valid'||orderMapMismatch,
+    Boolean(currentPlanningFailure),orderAlreadySent);
+  const countdown=dispatchCountdown?.revision===store.routeRevision&&
+    dispatchCountdown.orderId===store.generatedOrder?.orderId&&store.validation?.valid
+    ?dispatchCountdown.seconds:undefined;
+  const recalculateReason=!store.grid?'Load a map to recalculate.':
+    !store.start?'Select a planning start or connect to the robot.':
+      !store.goal?'Select a destination to recalculate.':undefined;
+  const robotConnectionLabel=!store.mqttConnected?'Robot disconnected':
+    !store.connection?'Robot status unavailable':connectionOnline&&stale?'Robot state unavailable':
+      connectionOnline?'Robot online':'Robot offline';
+  useEffect(()=>{
+    if(diagnosticsOpen&&bottom===0&&!pauseLogScroll&&logViewport.current){
+      logViewport.current.scrollTop=logViewport.current.scrollHeight;
+    }
+  },[diagnosticsOpen,bottom,pauseLogScroll,store.logs,diagnosticSearch,diagnosticSeverity]);
   const runCorridorCompatibilityTest=async(variant:CorridorTestVariant):Promise<void>=>{
     const live=useAppStore.getState();
+    if(live.publishingOrder)return;
     const liveCompatibility=useCorridorCompatibilityStore.getState();
     const baseOrder=liveCompatibility.baseOrder??live.generatedOrder;
     if(!baseOrder){
@@ -779,7 +908,7 @@ export default function App(){
     }
     const order=createCorridorTestOrder(baseOrder,variant);
     const validator=new VdaOrderValidator();
-    const context=validationContext();
+    const context=getLiveRouteContext(live).validation;
     const baseValidation=validator.validateBase(order,context);
     const extensionValidation=new BoschRokitCorridorValidator().validate(order,{
       settings:live.plannerOptions.corridor,grid:live.grid,
@@ -799,7 +928,6 @@ export default function App(){
     if(safetyIssues.length){
       currentValidation.valid=false;
       currentValidation.errors.push(...safetyIssues);
-      live.set({validation:currentValidation});
       setToast({severity:'error',message:safetyIssues[0]!.message});
       return;
     }
@@ -811,6 +939,12 @@ export default function App(){
         'This sends one controlled motion Order. It will not be published automatically.',
       confirmLabel:'Send Test Order',
     }))return;
+    const current=useAppStore.getState();
+    if(current.routeRevision!==live.routeRevision||current.publishingOrder||
+      current.mqttSettings!==live.mqttSettings){
+      setToast({severity:'warning',message:'The route or connection settings changed. Confirm the compatibility test again.'});
+      return;
+    }
     const payload=serializeCorridorTestOrder(
       order,variant,live.mqttSettings.topics.order,new Date().toISOString(),{
         baseVda20ValidationPassed:baseValidation.valid,
@@ -899,12 +1033,17 @@ export default function App(){
   };
   const nav=['MQTT','Map','Planner','Order','Robot State','Global Replanning',
     'Logs','Diagnostics','Settings'];
-  return <Box sx={{display:'flex',height:'100vh',bgcolor:'background.default',overflow:'hidden'}}>
+  return <Box className="mr-app-shell" onKeyDown={handleWorkspaceKey}
+    data-compact={operatorSettings.compactMode} data-reduce-motion={operatorSettings.reduceMotion} sx={{
+    bgcolor:'background.default','--mr-nav-width':`${drawerWidth}px`,'--mr-mission-width':`${rightWidth}px`,
+    '--mr-map-contrast':Number.isFinite(operatorSettings.mapContrast)
+      ?Math.min(2,Math.max(.5,operatorSettings.mapContrast)):1,
+  }}>
     <StartupOverlay/>
-    <AppBar position="fixed" elevation={0} sx={{zIndex:(t)=>t.zIndex.drawer+1,
+    <AppBar position="static" elevation={0} sx={{
       background:'linear-gradient(100deg,#ffffff,#faf4f5)',color:'text.primary',
       borderBottom:'2px solid',borderColor:'primary.main',backdropFilter:'blur(18px)'}}>
-      <Toolbar sx={{gap:1.2,minHeight:'64px!important',px:2}}>
+      <Toolbar sx={{gap:1.2,minHeight:'64px!important',px:2,py:.5,flexWrap:'wrap'}}>
         <MedRobotsLogo compact={tablet}/>
         <Box sx={{mr:1,minWidth:tablet?0:225}}>
           <Typography variant="h3" noWrap>Med Robots Navigation Control</Typography>
@@ -913,34 +1052,40 @@ export default function App(){
         <StatusPill label={store.mqttConnected?'Connected':'Disconnected'} tone={store.mqttConnected?'connected':'error'} pulse={store.mqttConnected}/>
         <StatusPill label={`Locator ${locator.sessionState==='logged-in'?'Connected':locator.connectionState}`}
           tone={locator.sessionState==='logged-in'?'connected':locator.connectionState==='error'?'error':'warning'}/>
-        <StatusPill label={connectionOnline?'Robot online':'Robot offline'} tone={connectionOnline?'connected':'error'}/>
+        <StatusPill label={robotConnectionLabel}
+          tone={store.mqttConnected&&connectionOnline&&!stale?'connected':'error'}/>
         {!tablet&&<><StatusPill label={activeMapId==='—'?'No active map':activeMapId} tone={navigatorMapId?'info':'warning'}/>
-          <StatusPill label={store.state?.operatingMode??'Unknown mode'}
-            tone={store.state?.operatingMode==='AUTOMATIC'?'connected':'warning'}/></>}
-        <StatusPill label={`E-stop ${store.state?.safetyState?.eStop??'unknown'}`}
-          tone={store.state?.safetyState?.eStop==='NONE'?'connected':'error'}/>
-        <StatusPill label={`${store.currentRokitErrors.length} errors`}
-          tone={store.currentRokitErrors.length?'error':'inactive'}/>
+          <StatusPill label={displayedState?.operatingMode??'Unknown mode'}
+            tone={displayedState?.operatingMode==='AUTOMATIC'?'connected':'warning'}/></>}
+        <StatusPill label={`E-stop ${displayedState?.safetyState?.eStop??'unknown'}`}
+          tone={displayedState?.safetyState?.eStop==='NONE'?'connected':'error'}/>
+        <StatusPill label={displayedState?`${store.currentRokitErrors.length} errors`:'Errors unavailable'}
+          tone={displayedState&&store.currentRokitErrors.length?'error':'inactive'}/>
         <Box sx={{flex:1}}/>
-        {tablet&&<Tooltip title="Mission panel"><IconButton color="primary" onClick={()=>setMissionPanelOpen(true)}><AltRoute/></IconButton></Tooltip>}
-        <Tooltip title="Med Robots operator session"><IconButton color="inherit"><AccountCircle/></IconButton></Tooltip>
+        {tablet&&<Tooltip title="Mission panel"><IconButton color="primary" aria-label="Mission panel"
+          aria-expanded={missionPanelOpen} onClick={()=>setMissionPanelOpen(value=>!value)}><AltRoute/></IconButton></Tooltip>}
         <Tooltip title="Settings"><IconButton color="inherit" onClick={()=>setSettingsOpen(true)}><Settings/></IconButton></Tooltip>
       </Toolbar>
       <Alert severity="error" icon={<StopCircle/>} sx={{py:0,minHeight:30,borderRadius:0,fontWeight:700,
         '& .MuiAlert-message':{py:.25}}}>{safety}</Alert>
     </AppBar>
-    <Drawer variant="permanent" sx={{width:drawerWidth,flexShrink:0,transition:'width .22s ease',
-      '& .MuiDrawer-paper':{width:drawerWidth,mt:'94px',mb:`${diagnosticsHeight}px`,boxSizing:'border-box',
-        bgcolor:'rgba(255,255,255,.98)',borderRight:'1px solid',borderColor:'divider',transition:'width .22s ease'}}}>
+    <Box className={`mr-workspace${!tablet||missionPanelOpen?' mr-workspace-mission':''}`}>
+    <Drawer variant="permanent" className="mr-workspace-nav" PaperProps={{component:'nav','aria-label':'Workspace navigation'}} sx={{
+      '& .MuiDrawer-paper':{position:'static',height:'100%',width:'100%',boxSizing:'border-box',
+        bgcolor:'rgba(255,255,255,.98)',borderRight:'1px solid',borderColor:'divider'}}}>
       <Box sx={{display:'flex',justifyContent:navCollapsed?'center':'flex-end',p:.5}}>
-        <IconButton size="small" onClick={()=>setNavCollapsed((value)=>!value)}>
+        <IconButton size="small" aria-label={navCollapsed?'Expand navigation':'Collapse navigation'}
+          onClick={()=>setNavCollapsed((value)=>!value)}>
           {navCollapsed?<ChevronRight/>:<ChevronLeft/>}
         </IconButton>
       </Box>
-      <List dense>{nav.map((label,index)=><Tooltip key={label} title={navCollapsed?label:''} placement="right"><ListItemButton selected={label==='Planner'} onClick={()=>{
+      <List dense>{nav.map((label,index)=><Tooltip key={label} title={navCollapsed?label:''} placement="right"><ListItemButton aria-label={label} selected={label==='Planner'} onClick={()=>{
         if(label==='Settings')setSettingsOpen(true);if(label==='Map')setLocatorOpen(true);
         if(label==='Global Replanning')setGlobalReplanningOpen(true);
-        if(label==='Diagnostics')setDiagnosticsOpen(true);
+        if(label==='Robot State'){setMissionPanelOpen(true);setAdvancedMissionOpen(true);}
+        if(label==='Planner')document.getElementById('planner-workspace')?.focus();
+        const tab={MQTT:7,Order:5,Logs:0,Diagnostics:bottom}[label as 'MQTT'|'Order'|'Logs'|'Diagnostics'];
+        if(tab!==undefined){setBottom(tab);setDiagnosticsOpen(true);}
       }} sx={{mx:.75,my:.25,borderRadius:2,minHeight:44,justifyContent:navCollapsed?'center':'initial'}}>
         <ListItemIcon sx={{minWidth:navCollapsed?0:44,justifyContent:'center'}}>{[
           <Cloud/>,<Map/>,<AltRoute/>,<Timeline/>,<BugReport/>,<Autorenew/>,
@@ -948,57 +1093,65 @@ export default function App(){
         {!navCollapsed&&<ListItemText primary={label}/>}
       </ListItemButton></Tooltip>)}</List><Divider/>
       {!navCollapsed&&<Box sx={{p:1.5}}><Typography variant="overline">Operator workflow</Typography>
-        <Alert severity="info" sx={{my:1}}>Click a free point on the map to calculate and validate a mission automatically.</Alert>
+        <Alert severity="info" sx={{my:1}}>{!store.grid?'Load a map to get started.':
+          !poseSnapshot?'A fresh robot pose is required to prepare a mission.':
+            'Click a free point on the map to calculate and validate a mission.'}</Alert>
         <Typography variant="overline">Advanced click mode</Typography>
-        <Select fullWidth size="small" value={mode} onChange={(e)=>setMode(e.target.value as ClickMode)}>
+        <Select fullWidth size="small" value={mode} inputProps={{'aria-label':'Advanced click mode'}}
+          onChange={(e)=>setMode(e.target.value as ClickMode)}>
           {['goal','start','waypoint','obstacle','erase','inspect'].map((m)=><MenuItem value={m} key={m}>{m}</MenuItem>)}
         </Select>
         <Stack gap={1} mt={2}>
           <Button size="small" variant="contained" startIcon={<Map/>} onClick={()=>setLocatorOpen(true)}>Locator Server</Button>
           {!locator.loadedMap&&<Alert severity="info" sx={{fontSize:11}}>No Locator map loaded</Alert>}
-          <Button size="small" startIcon={<Upload/>} onClick={()=>yamlInput.current?.click()}>Import YAML</Button>
-          <Button size="small" startIcon={<Upload/>} onClick={()=>imageInput.current?.click()}>Import image/PGM</Button>
-          <Button size="small" startIcon={<Upload/>} onClick={()=>jsonInput.current?.click()}>Import grid JSON</Button>
-          <input hidden ref={yamlInput} type="file" accept=".yaml,.yml" onChange={(e)=>{const f=e.target.files?.[0];if(f)void f.text().then(setYamlText);}}/>
-          <input hidden ref={imageInput} type="file" accept=".pgm,.png,.jpg,.jpeg" onChange={(e)=>{const f=e.target.files?.[0];if(f)void importImage(f);}}/>
-          <input hidden ref={jsonInput} type="file" accept=".json" onChange={(e)=>{const f=e.target.files?.[0];if(f)void f.text().then((t)=>loadGrid(parseOccupancyJson(t))).catch((err)=>LogService.write('planner','error',String(err)));}}/>
+          <Button size="small" startIcon={<Upload/>} disabled={yamlLoading||mapImporting} onClick={()=>yamlInput.current?.click()}>
+            {yamlLoading?'Reading YAML…':'Import YAML'}</Button>
+          {yamlName&&<><Typography variant="caption">Staged metadata: {yamlName}</Typography>
+            <Button size="small" onClick={()=>{setYamlText(undefined);setYamlName(undefined);}}
+              disabled={yamlLoading||mapImporting}>Clear staged YAML</Button></>}
+          <Button size="small" startIcon={<Upload/>} disabled={yamlLoading||mapImporting} onClick={()=>imageInput.current?.click()}>Import image/PGM</Button>
+          <Button size="small" startIcon={<Upload/>} disabled={mapImporting} onClick={()=>jsonInput.current?.click()}>Import grid JSON</Button>
+          <input hidden aria-label="YAML file" ref={yamlInput} type="file" accept=".yaml,.yml" onChange={e=>void importMap(e,'yaml')}/>
+          <input hidden aria-label="Map image file" ref={imageInput} type="file" accept=".pgm,.png,.jpg,.jpeg" onChange={e=>void importMap(e,'image')}/>
+          <input hidden aria-label="Grid JSON file" ref={jsonInput} type="file" accept=".json" onChange={e=>void importMap(e,'json')}/>
         </Stack>
       </Box>}
     </Drawer>
-    <Box component="main" sx={{ml:`${drawerWidth}px`,mr:tablet?0:`${rightWidth}px`,mt:'94px',
-      mb:`${diagnosticsHeight}px`,flex:1,position:'relative',transition:'margin .22s ease'}}>
-      <Paper className="mr-glass" square sx={{height:54,display:'flex',alignItems:'center',px:1.5,gap:1,borderRadius:0}}>
-        <Select size="small" value={store.plannerMode} onChange={(e)=>store.set({plannerMode:e.target.value as typeof store.plannerMode})}>
+    <Box component="main" id="planner-workspace" tabIndex={-1} className="mr-workspace-map">
+      <Paper role="group" aria-label="Map controls" className="mr-glass" square sx={{
+        display:'flex',flexWrap:'wrap',alignItems:'center',px:1.5,py:.5,gap:1,borderRadius:0}}>
+        <Select size="small" value={store.plannerMode} inputProps={{'aria-label':'Planner mode'}}
+          onChange={(e)=>store.set({plannerMode:e.target.value as typeof store.plannerMode})}>
           <MenuItem value="automatic">Automatic</MenuItem><MenuItem value="manual">Manual</MenuItem><MenuItem value="hybrid">Hybrid</MenuItem><MenuItem value="motion-state">Motion state (experimental)</MenuItem>
         </Select>
-        <Chip color={routePhase==='Ready to start'?'success':
-          routePhase.startsWith('Failed')?'error':'primary'} label={routePhase}/>
-        <Button variant="outlined" startIcon={<AltRoute/>} disabled={store.planning} onClick={()=>void plan()}>{store.planning?'Planning…':'Recalculate'}</Button>
+        <Chip color={routeStatus.tone} label={routeStatus.label}/>
+        <Tooltip title={recalculateReason??'Calculate a route preview'}><span>
+          <Button variant="outlined" startIcon={<AltRoute/>} disabled={store.planning||Boolean(recalculateReason)}
+            onClick={()=>void plan()}>{store.planning?'Planning…':'Recalculate'}</Button>
+        </span></Tooltip>
         <Button startIcon={<Refresh/>} onClick={()=>{
           planningCoordinator.invalidate();store.invalidateRoute();
         }}>Clear path</Button>
-        <Tooltip title="Grid"><IconButton color={store.showGrid?'primary':'default'} onClick={()=>store.set({showGrid:!store.showGrid})}><GridOn/></IconButton></Tooltip>
-        <Tooltip title="Inflated obstacles"><IconButton color={store.showInflation?'warning':'default'} onClick={()=>store.set({showInflation:!store.showInflation})}><BugReport/></IconButton></Tooltip>
+        <Tooltip title="Grid"><IconButton aria-pressed={store.showGrid} color={store.showGrid?'primary':'default'} onClick={()=>store.set({showGrid:!store.showGrid})}><GridOn/></IconButton></Tooltip>
+        <Tooltip title="Inflated obstacles"><IconButton aria-pressed={store.showInflation} color={store.showInflation?'warning':'default'} onClick={()=>store.set({showInflation:!store.showInflation})}><BugReport/></IconButton></Tooltip>
         <Tooltip title="Rotate view"><IconButton onClick={()=>store.set({viewRotation:normalizeAngle(store.viewRotation+Math.PI/2)})}><RotateRight/></IconButton></Tooltip>
         <Box sx={{flex:1}}/><Typography variant="caption">{store.grid?`${store.grid.metadata.width}×${store.grid.metadata.height} · ${store.grid.metadata.resolution} m/cell`:'No map loaded'}</Typography>
       </Paper>
+      {(locator.downloading||mapImporting)&&<Alert severity="info" role="status">
+        {locator.downloading?'Loading Locator map…':'Importing map…'}
+      </Alert>}
       <MapCanvas mode={mode} onCell={setCell} liveRobotPose={poseSnapshot?.pose}/>
-      {locator.downloading&&<Box className="mr-map-loading" sx={{position:'absolute',inset:'54px 0 0',
-        display:'grid',placeItems:'center',bgcolor:'rgba(255,255,255,.82)',zIndex:4}}>
-        <Typography variant="h2">Loading hospital map…</Typography>
-      </Box>}
     </Box>
-    <Drawer anchor="right" variant={tablet?'temporary':'permanent'} open={!tablet||missionPanelOpen}
-      onClose={()=>setMissionPanelOpen(false)}
-      sx={{width:rightWidth,'& .MuiDrawer-paper':{width:rightWidth,mt:tablet?0:'94px',
-        mb:tablet?0:`${diagnosticsHeight}px`,p:1.5,overflowY:'auto',
-        bgcolor:'rgba(255,255,255,.98)',borderLeft:'1px solid',borderColor:'divider'}}}>
-      <Paper className="mr-glass mr-route-ready" sx={{p:1.5,mb:1.5}}>
+    <Box component="aside" aria-label="Mission panel" className="mr-workspace-mission-panel"
+      hidden={tablet&&!missionPanelOpen}
+      sx={{p:1.5,bgcolor:'rgba(255,255,255,.98)',borderLeft:'1px solid',borderColor:'divider'}}>
+      <Paper component="section" aria-label="Route preview" className="mr-glass mr-route-ready" sx={{p:1.5,mb:1.5}}>
         <Stack direction="row" justifyContent="space-between" alignItems="center">
           <Box><Typography variant="overline">Mission control</Typography>
-            <Typography variant="h2">{routePhase}</Typography></Box>
-          <StatusPill label={store.state?.driving?'Driving':store.state?.paused?'Paused':'Idle'}
-            tone={store.state?.driving?'connected':store.state?.paused?'warning':'inactive'}/>
+            <Typography variant="h2" aria-live="polite">{routeStatus.label}</Typography></Box>
+          <StatusPill label={!displayedState?'Telemetry unavailable':
+            displayedState.driving?'Driving':displayedState.paused?'Paused':'Idle'}
+            tone={displayedState?.driving?'connected':displayedState?.paused?'warning':'inactive'}/>
         </Stack>
         <Alert severity={store.stage5BRecordingStatus?.includes('failed')?'warning':'info'} sx={{mt:1}}>
           {store.stage5BRecordingStatus??'Stage 5B: automatic recording for motion-state runs.'}
@@ -1007,11 +1160,13 @@ export default function App(){
         <Divider sx={{my:1.2}}/>
         <Field label="Destination" value={store.goal?`${store.goal.x.toFixed(2)}, ${store.goal.y.toFixed(2)} m`:'Select on map'}/>
         <Field label="Route distance" value={routeDistance?`${routeDistance.toFixed(2)} m`:'—'}/>
-        <Field label="Estimated duration" value={estimatedDurationSeconds?`${Math.ceil(estimatedDurationSeconds)} s`:'—'}/>
+        <Field label="Time at maximum speed" value={estimatedDurationSeconds?`${Math.ceil(estimatedDurationSeconds)} s`:'—'}/>
         <Field label="Order" value={store.generatedOrder?.orderId??'—'}/>
-        <Field label="Battery" value={store.state?.batteryState?.batteryCharge===undefined?'—':`${store.state.batteryState.batteryCharge}%`}/>
-        <Field label="Current speed" value={`${Math.hypot(store.state?.velocity?.vx??0,store.state?.velocity?.vy??0).toFixed(2)} m/s`}/>
-        <Field label="Emergency state" value={store.state?.safetyState?.eStop??'unknown'}/>
+        <Field label="Battery" value={displayedState?.batteryState?.batteryCharge===undefined?'—':`${displayedState.batteryState.batteryCharge}%`}/>
+        <Field label="Current speed" value={displayedState?.velocity&&
+          (displayedState.velocity.vx!==undefined||displayedState.velocity.vy!==undefined)
+          ?`${Math.hypot(displayedState.velocity.vx??0,displayedState.velocity.vy??0).toFixed(2)} m/s`:'Unavailable'}/>
+        <Field label="Emergency state" value={displayedState?.safetyState?.eStop??'unknown'}/>
         {store.generatedOrder&&<Paper variant="outlined" sx={{p:1,mt:1}}>
           <Typography variant="overline">Obstacle bypass corridor</Typography>
           <Field label="Edges with corridor" value={corridorSummary.withCorridor}/>
@@ -1023,28 +1178,32 @@ export default function App(){
         </Paper>}
         {store.generatedOrder&&store.plannerOptions.corridor.enableBoschRokitCorridorExtension&&
           corridorSummary.withCorridor===0&&<Alert severity="warning" sx={{mt:1}}>
-            Obstacle avoidance is enabled in ROKIT Navigator, but the generated Order contains no bypass corridor information.
+            Corridor generation is enabled in Mission Planner. The generated Order contains no bypass corridor information.
           </Alert>}
         {store.generatedOrder&&corridorSummary.withCorridor>0&&corridorSummary.withoutCorridor>0&&
           <Alert severity="warning" sx={{mt:1}}>Bypass is permitted only on some route segments.</Alert>}
-        {dispatchCountdown!==null&&<Alert severity="warning" sx={{mt:1}}>
-          Direct dispatch in {dispatchCountdown}s. <Button size="small" onClick={()=>{
-            dispatchToken.current+=1;setDispatchCountdown(null);setRoutePhase('Ready to start');
+        {countdown!==undefined&&<Alert severity="warning" sx={{mt:1}}>
+          Direct dispatch in {countdown}s. <Button size="small" onClick={()=>{
+            dispatchToken.current+=1;setDispatchCountdown(undefined);
           }}>Cancel</Button>
         </Alert>}
-        {dispatchIssues.length>0&&store.generatedOrder&&<Alert severity="warning" sx={{mt:1}}>{dispatchIssues[0]?.message}</Alert>}
+        {routeStatus.tone==='error'&&<Alert severity="error" sx={{mt:1}}>
+          {currentPlanningFailure?.message??store.validation?.errors[0]?.message??store.plannerResult?.error??routeStatus.label}
+        </Alert>}
+        {store.validation?.valid&&!routeStatus.ready&&!orderAlreadySent&&<Alert severity="warning" sx={{mt:1}}>
+          {dispatchIssues[0]?.message??(orderMapMismatch?'Order map differs from the active Navigator map.':firstNodeStatus)}
+        </Alert>}
         <Button fullWidth size="large" variant="contained" color="success" startIcon={<PlayArrow/>}
-          disabled={!store.generatedOrder||dispatchIssues.length>0||dispatchCountdown!==null||
-            store.publishingOrder||store.sentOrder?.orderId===store.generatedOrder?.orderId||
-            activeNavigatorOrderId===store.generatedOrder?.orderId}
+          disabled={!routeStatus.ready||countdown!==undefined||store.publishingOrder}
           onClick={()=>void publish() } sx={{mt:1.5,minHeight:52}}>
           {activeNavigatorOrderId&&store.generatedOrder&&activeNavigatorOrderId!==store.generatedOrder.orderId
             ?'Cancel Active Mission First':store.publishingOrder?'Publishing…':'Start Mission'}
         </Button>
         <Stack direction="row" gap={1} mt={1}>
-          <Button fullWidth variant="outlined" onClick={()=>void clearDestination()}>Clear Destination</Button>
+          <Button fullWidth variant="outlined" disabled={!store.goal&&!store.finalPath.length}
+            onClick={()=>void clearDestination()}>Clear Destination</Button>
           <Button fullWidth color="error" variant="outlined"
-            disabled={!store.sentOrder&&!activeNavigatorOrderId}
+            disabled={!store.mqttConnected||(!store.sentOrder&&!activeNavigatorOrderId)}
             onClick={()=>void instant('cancelOrder')}>Cancel Mission</Button>
         </Stack>
       </Paper>
@@ -1063,10 +1222,10 @@ export default function App(){
       </Paper>
       <Typography variant="overline">Current / goal pose</Typography>
       <Paper variant="outlined" sx={{p:1.2,mb:1}}>
-        <Field label="Robot x / y" value={store.start?`${store.start.x.toFixed(3)} / ${store.start.y.toFixed(3)}`:undefined}/>
-        <Field label="Robot θ" value={store.start?`${store.start.theta.toFixed(3)} rad / ${radiansToDegrees(store.start.theta).toFixed(1)}°`:undefined}/>
+        <Field label="Planning start x / y" value={store.start?`${store.start.x.toFixed(3)} / ${store.start.y.toFixed(3)}`:undefined}/>
+        <Field label="Planning start θ" value={store.start?`${store.start.theta.toFixed(3)} rad / ${radiansToDegrees(store.start.theta).toFixed(1)}°`:undefined}/>
         <Field label="Goal x / y" value={store.goal?`${store.goal.x.toFixed(3)} / ${store.goal.y.toFixed(3)}`:undefined}/>
-        <TextField fullWidth size="small" label="Goal theta (rad)" type="number" value={store.goal?.theta??0}
+        <TextField fullWidth size="small" label="Goal theta (rad)" type="number" disabled={!store.goal} value={store.goal?.theta??''}
           onChange={(e)=>store.goal&&store.set({goal:{...store.goal,theta:normalizeAngle(Number(e.target.value))},goalThetaExplicit:true})} sx={{mt:1}}/>
       </Paper>
       <Typography variant="overline">Planner / order</Typography>
@@ -1112,7 +1271,7 @@ export default function App(){
           .reverse().find((stage)=>stage.severity!=='info')?.reason}/>
         <Stack direction="row" gap={.5} flexWrap="wrap" sx={{my:1}}>
           <Chip size="small" color={store.plannerResult?.rawPath.length?'success':'default'}
-            label={store.plannerResult?.rawPath.length?'RAW_PATH_FOUND':'RAW_PATH_FAILED'}/>
+            label={!store.plannerResult?'No route calculated':store.plannerResult.rawPath.length?'RAW_PATH_FOUND':'RAW_PATH_FAILED'}/>
           {Boolean(store.plannerResult?.baselinePath?.length)&&
             <Chip size="small" color="success" label="BASELINE_PATH_VALID"/>}
           {store.plannerResult?.diagnostics?.warnings.some((warning)=>
@@ -1189,8 +1348,8 @@ export default function App(){
           {store.plannerMode!=='motion-state'&&<TextField size="small" label="Max segment m" type="number" value={store.plannerOptions.maximumWaypointDistance}
             onChange={(e)=>store.set({plannerOptions:{...store.plannerOptions,maximumWaypointDistance:Number(e.target.value)}})}/>}
         </Stack>
-         <Button fullWidth sx={{mt:1}} variant="outlined" onClick={generate} disabled={store.finalPath.length<2}>Generate & validate VDA order</Button>
-         <Button fullWidth sx={{mt:.5}} variant="outlined" color="warning" onClick={()=>void rebuildFromCurrentPose()}>
+         <Button fullWidth sx={{mt:1}} variant="outlined" onClick={generate} disabled={store.finalPath.length<2||store.planning}>Generate & validate VDA order</Button>
+         <Button fullWidth sx={{mt:.5}} variant="outlined" color="warning" disabled={!store.goal||store.planning} onClick={()=>void rebuildFromCurrentPose()}>
            Rebuild Order From Current Pose
          </Button>
          <Button fullWidth sx={{mt:.5}} variant="outlined" startIcon={<BugReport/>}
@@ -1212,10 +1371,10 @@ export default function App(){
           }}>Export last motion-state run (success or failure, includes map)</Button>
         <Typography variant="caption">Finalize the current route recording (does not control the robot):</Typography>
         <Stack direction="row" gap={.5}>
-          <Button size="small" onClick={()=>stage5BRecording.finalizePending('success',store.state)}>Finalize success</Button>
-          <Button size="small" onClick={()=>stage5BRecording.finalizePending('failed',store.state)}>Finalize failed</Button>
-          <Button size="small" onClick={()=>stage5BRecording.finalizePending('cancelled',store.state)}>Finalize cancelled</Button>
-          <Button size="small" onClick={()=>stage5BRecording.retry()}>Retry save</Button>
+          <Button size="small" disabled={!store.stage5BPendingCount} onClick={()=>stage5BRecording.finalizePending('success',store.state)}>Finalize success</Button>
+          <Button size="small" disabled={!store.stage5BPendingCount} onClick={()=>stage5BRecording.finalizePending('failed',store.state)}>Finalize failed</Button>
+          <Button size="small" disabled={!store.stage5BPendingCount} onClick={()=>stage5BRecording.finalizePending('cancelled',store.state)}>Finalize cancelled</Button>
+          <Button size="small" disabled={!store.stage5BPendingCount} onClick={()=>stage5BRecording.retry()}>Retry save</Button>
         </Stack>
         {store.lastPlanningScenario&&<Typography variant="caption">
           Captured {store.lastPlanningScenario.capture?.capturedAt??'run'} — {store.lastPlanningScenario.capture?.result.success?'success':'failure'}.
@@ -1245,7 +1404,7 @@ export default function App(){
       {store.validation&&<Alert severity={store.validation.valid?'success':'error'} sx={{mb:1}}>
         {store.validation.valid
           ?`Order valid${store.validation.warnings.length?` with ${store.validation.warnings.length} warning(s)`:''}`
-          :`${store.validation.errors.length} errors`}
+          :store.validation.errors[0]?.message??'Order validation failed.'}
       </Alert>}
       {activeMapResolution.source==='manual-confirmed'&&<Alert severity="warning" sx={{mb:1}}>
         Navigator mapId is not being received through MQTT. A user-confirmed map binding is active.
@@ -1272,18 +1431,18 @@ export default function App(){
           <Stack direction="row" alignItems="center" gap={.5}><Typography variant="caption">{i+1}</Typography>
             <TextField size="small" label="x" type="number" value={w.x} onChange={(e)=>{const a=[...store.waypoints];a[i]={...w,x:Number(e.target.value)};store.set({waypoints:a});}}/>
             <TextField size="small" label="y" type="number" value={w.y} onChange={(e)=>{const a=[...store.waypoints];a[i]={...w,y:Number(e.target.value)};store.set({waypoints:a});}}/>
-            <IconButton size="small" onClick={()=>store.set({waypoints:store.waypoints.filter((x)=>x.id!==w.id)})}><Delete/></IconButton></Stack>
+            <IconButton size="small" aria-label={`Delete waypoint ${i+1}`} onClick={()=>store.set({waypoints:store.waypoints.filter((x)=>x.id!==w.id)})}><Delete/></IconButton></Stack>
           <Stack direction="row" alignItems="center" gap={.5} mt={.5}>
             <TextField size="small" label="θ rad" type="number" value={w.theta} onChange={(e)=>{const a=[...store.waypoints];a[i]={...w,theta:normalizeAngle(Number(e.target.value))};store.set({waypoints:a});}}/>
             <TextField size="small" label="dev m" type="number" value={w.deviationXy} onChange={(e)=>{const a=[...store.waypoints];a[i]={...w,deviationXy:Number(e.target.value)};store.set({waypoints:a});}}/>
             <FormControlLabel control={<Switch size="small" checked={w.orientationLocked} onChange={(e)=>{const a=[...store.waypoints];a[i]={...w,orientationLocked:e.target.checked};store.set({waypoints:a});}}/>} label="Lock"/>
-            <Button disabled={i===0} onClick={()=>{const a=[...store.waypoints];[a[i-1],a[i]]=[a[i]!,a[i-1]!];store.set({waypoints:a});}}>↑</Button>
-            <Button disabled={i===store.waypoints.length-1} onClick={()=>{const a=[...store.waypoints];[a[i],a[i+1]]=[a[i+1]!,a[i]!];store.set({waypoints:a});}}>↓</Button>
+            <Button aria-label={`Move waypoint ${i+1} up`} disabled={i===0} onClick={()=>{const a=[...store.waypoints];[a[i-1],a[i]]=[a[i]!,a[i-1]!];store.set({waypoints:a});}}>↑</Button>
+            <Button aria-label={`Move waypoint ${i+1} down`} disabled={i===store.waypoints.length-1} onClick={()=>{const a=[...store.waypoints];[a[i],a[i+1]]=[a[i+1]!,a[i]!];store.set({waypoints:a});}}>↓</Button>
           </Stack>
         </Paper>)}
       </Box>}
       </Box>
-      {store.sentOrder&&<Paper variant="outlined" sx={{p:1,mt:1}}><Typography variant="overline">Mission</Typography>
+      {(store.sentOrder||store.publishingOrder)&&<Paper variant="outlined" sx={{p:1,mt:1}}><Typography variant="overline">Submitted mission</Typography>
         <Field label="Status" value={mission.status}/><Field label="Progress" value={`${mission.progressPercent}%`}/>
         <Field label="Active order" value={mission.activeOrderId}/><Field label="Distance to next" value={mission.distanceToNextNode?.toFixed(2)}/>
         {mission.rejectionErrors.map((error)=><Alert severity="error" key={`${error.errorType}-${error.errorDescription}`}>{error.errorDescription??error.errorType}</Alert>)}</Paper>}
@@ -1296,12 +1455,15 @@ export default function App(){
         <Button size="small" startIcon={<Autorenew/>}
           onClick={()=>setGlobalReplanningOpen(true)}>Open replanning</Button>
       </Paper>
-    </Drawer>
-    <Paper className="mr-glass" square sx={{position:'fixed',bottom:0,left:drawerWidth,right:0,
-      height:diagnosticsHeight,zIndex:1201,borderTop:'1px solid',borderColor:'divider',
-      transition:'height .22s ease,left .22s ease'}}>
+    </Box>
+    </Box>
+    <Paper className="mr-glass mr-diagnostics-dock" square sx={{
+      borderTop:'1px solid',borderColor:'divider',
+      height:diagnosticsOpen?'min(310px, 38dvh)':48,
+    }}>
       <Stack direction="row" alignItems="center" sx={{height:48,px:1}}>
-        <IconButton onClick={()=>setDiagnosticsOpen((value)=>!value)}>
+        <IconButton aria-label={diagnosticsOpen?'Collapse diagnostics':'Expand diagnostics'}
+          aria-expanded={diagnosticsOpen} onClick={()=>setDiagnosticsOpen((value)=>!value)}>
           {diagnosticsOpen?<ExpandMore/>:<ExpandLess/>}
         </IconButton>
         <Typography variant="overline" sx={{mr:1}}>Diagnostics</Typography>
@@ -1310,9 +1472,9 @@ export default function App(){
           {['Operational Log','Validation','ROKIT Errors','MQTT State','MQTT Visualization',
             'Generated Order','Locator','Network','Raw JSON'].map((label)=><Tab key={label} label={label}/>)}
         </Tabs>}
-        <IconButton onClick={()=>downloadJson('med-robots-diagnostics.json',
+        <IconButton aria-label="Download diagnostics bundle" onClick={()=>downloadJson('med-robots-diagnostics.json',
           sanitizeDiagnostics({logs:store.logs,diagnostics}))}><Save/></IconButton>
-        <Button size="small" startIcon={<Download/>} onClick={() => {
+        <Button size="small" startIcon={<Download/>} onClick={async () => {
           const selected = bottom === 0
             ? store.logs.filter((entry)=>
               (diagnosticSeverity==='all'||entry.level===diagnosticSeverity)&&
@@ -1366,11 +1528,16 @@ export default function App(){
                               },
                             }
                           : sanitizeDiagnostics(diagnostics);
-          void navigator.clipboard.writeText(JSON.stringify(sanitizeDiagnostics(selected), null, 2));
+          try{
+            await navigator.clipboard.writeText(JSON.stringify(sanitizeDiagnostics(selected), null, 2));
+            setToast({severity:'success',message:'Diagnostics copied.'});
+          }catch{
+            setToast({severity:'error',message:'Could not copy diagnostics. Use Download diagnostics bundle instead.'});
+          }
         }}>Copy</Button>
       </Stack>
       {diagnosticsOpen&&<><Divider/>
-        <Stack direction="row" gap={1} px={1.5} py={.7}>
+        {bottom===0&&<Stack direction="row" gap={1} px={1.5} py={.7} flexWrap="wrap">
           <TextField size="small" placeholder="Search diagnostics" value={diagnosticSearch}
             onChange={(event)=>setDiagnosticSearch(event.target.value)} sx={{width:260}}/>
           <Select size="small" value={diagnosticSeverity}
@@ -1380,9 +1547,9 @@ export default function App(){
           </Select>
           <FormControlLabel control={<Switch size="small" checked={pauseLogScroll}
             onChange={(event)=>setPauseLogScroll(event.target.checked)}/>} label="Pause auto-scroll"/>
-          <Button onClick={()=>store.set({logs:[]})}>Clear view</Button>
-        </Stack>
-        <Box sx={{height:205,overflow:'auto',px:1.5,pb:1.5,fontFamily:'monospace',fontSize:12,whiteSpace:'pre-wrap'}}>
+          <Button onClick={()=>store.set({logs:[]})} disabled={!store.logs.length}>Clear operational log</Button>
+        </Stack>}
+        <Box ref={logViewport} sx={{flex:1,minHeight:48,overflow:'auto',px:1.5,pb:1.5,fontFamily:'monospace',fontSize:12,whiteSpace:'pre-wrap'}}>
           {bottom===0&&store.logs.filter((entry)=>
             (diagnosticSeverity==='all'||entry.level===diagnosticSeverity)&&
             (!diagnosticSearch||entry.message.toLowerCase().includes(diagnosticSearch.toLowerCase())))
@@ -1426,7 +1593,7 @@ export default function App(){
         <Alert severity="info">This destination is stored only for map {navigatorMapId??'N/A'}.</Alert>
       </Stack></DialogContent>
       <DialogActions><Button onClick={()=>setSaveDestinationOpen(false)}>Cancel</Button>
-        <Button variant="contained" disabled={!destinationName.trim()||!store.goal}
+        <Button variant="contained" disabled={!destinationName.trim()||!store.goal||!navigatorMapId}
           onClick={saveCurrentDestination}>Save destination</Button></DialogActions>
     </Dialog>
     <Dialog open={locatorOpen} onClose={()=>setLocatorOpen(false)} fullWidth maxWidth="md">
@@ -1438,29 +1605,15 @@ export default function App(){
       </Stack></DialogContent>
       <DialogActions><Button onClick={()=>setLocatorOpen(false)}>Close</Button></DialogActions>
     </Dialog>
-    <SettingsDialog open={settingsOpen} onClose={()=>setSettingsOpen(false)}/>
+    <SettingsDialog open={settingsOpen} onClose={()=>setSettingsOpen(false)} notify={setToast}
+      onReplanningEnabledChange={changeReplanningEnabled} replanningPending={replanningPending}/>
     <CorridorCompatibilityPanel open={corridorCompatibilityOpen}
       onClose={()=>setCorridorCompatibilityOpen(false)}
       onRun={runCorridorCompatibilityTest}
       dispatchBlockedReason={compatibilityDispatchBlockedReason}/>
     <GlobalReplanningPanel open={globalReplanningOpen}
       onClose={()=>setGlobalReplanningOpen(false)}
-      onEnableChange={async(enabled)=>{
-        if(!enabled){
-          globalReplanning.updateSettings({enabled:false});
-          globalReplanning.resetRuntime();
-          return;
-        }
-        const confirmed=await requestConfirmation({
-          title:'Enable automatic global replanning?',
-          message:'When a blocked route is confirmed, the application may cancel the active Order and publish a new independently planned Order without another prompt.\n\n'+safety,
-          confirmLabel:'Enable Automatic Replanning',
-        });
-        if(confirmed){
-          globalReplanning.updateSettings({enabled:true});
-          globalReplanning.resetRuntime();
-        }
-      }}/>
+      onEnableChange={changeReplanningEnabled} enablePending={replanningPending}/>
     <Dialog open={Boolean(confirmation)} onClose={()=>closeConfirmation(false)}
       fullWidth maxWidth="xs" aria-labelledby="confirmation-title">
       <DialogTitle id="confirmation-title">{confirmation?.title}</DialogTitle>
@@ -1475,7 +1628,8 @@ export default function App(){
           onClick={()=>closeConfirmation(true)}>{confirmation?.confirmLabel}</Button>
       </DialogActions>
     </Dialog>
-    <Snackbar open={Boolean(toast)} autoHideDuration={4500} onClose={()=>setToast(undefined)}
+    <Snackbar key={toast?.message} open={Boolean(toast)} autoHideDuration={4500}
+      onClose={(_,reason)=>{if(reason!=='clickaway')setToast(undefined);}}
       anchorOrigin={{vertical:'top',horizontal:'center'}}>
       <Alert severity={toast?.severity??'info'} variant="filled" onClose={()=>setToast(undefined)}>
         {toast?.message}
@@ -1484,12 +1638,16 @@ export default function App(){
   </Box>;
 }
 
-function SettingsDialog({open,onClose}:{open:boolean;onClose:()=>void}){
+function SettingsDialog({open,onClose,notify,onReplanningEnabledChange,replanningPending}:{
+  open:boolean;onClose:()=>void;notify:(notice:Notice)=>void;
+  onReplanningEnabledChange:(enabled:boolean)=>Promise<void>;replanningPending:boolean;
+}){
   const store=useAppStore();const mqtt=store.mqttSettings;const order=store.orderSettings;const fp=store.footprint;
   const locator=useLocatorStore();const operator=useOperatorSettingsStore();
   const replanning=useGlobalReplanningStore();
   const importInput=useRef<HTMLInputElement>(null);
   const vehicleConfigInput=useRef<HTMLInputElement>(null);
+  const [importing,setImporting]=useState(false);
   const connect=():void=>mqttService.connect(store.mqttSettings);
   const updateIdentity=(patch:Partial<Pick<typeof order,'manufacturer'|'serialNumber'>>):void=>{
     const next={...order,...patch};
@@ -1535,8 +1693,14 @@ function SettingsDialog({open,onClose}:{open:boolean;onClose:()=>void}){
           onChange={(event)=>locator.updateSettings({https:event.target.checked})}/>} label="HTTPS"/>
       </Stack>
       <Button color="warning" onClick={()=>void locatorSessionService.forgetCredentials()
-        .then(()=>locator.set({sessionState:'logged-out'}))
-        .catch((error)=>LogService.write('system','error',String(error)))}>
+        .then(()=>{
+          locator.set({sessionState:'logged-out',sessionId:undefined});
+          notify({severity:'success',message:'Saved Locator credentials cleared.'});
+        })
+        .catch((error)=>{
+          notify({severity:'error',message:`Could not clear Locator credentials: ${String(error)}`});
+          LogService.write('system','error',String(error));
+        })}>
         Forget saved Locator credentials
       </Button>
       </Stack></Paper>
@@ -1565,9 +1729,14 @@ function SettingsDialog({open,onClose}:{open:boolean;onClose:()=>void}){
           onChange={(event)=>store.set({plannerOptions:{...store.plannerOptions,maximumWaypointDistance:Number(event.target.value)}})}/>
         }
         <TextField label="Maximum VDA node count" type="number" value={operator.settings.maximumVdaNodeCount}
-          onChange={(event)=>operator.update({maximumVdaNodeCount:Math.max(2,Number(event.target.value))})}/>
+          onChange={(event)=>{
+            const count=Number(event.target.value);
+            if(!Number.isInteger(count)||count<2||count===operator.settings.maximumVdaNodeCount)return;
+            operator.update({maximumVdaNodeCount:count});
+            store.invalidateRoute();
+          }}/>
         <TextField label="Destination validation radius m" type="number" value={operator.settings.destinationValidationRadius}
-          onChange={(event)=>operator.update({destinationValidationRadius:Number(event.target.value)})}/>
+          disabled helperText="Radius adjustment is unavailable. The planner checks the selected cell."/>
         {store.plannerMode!=='motion-state'&&<FormControlLabel control={<Switch checked={store.plannerOptions.diagonalMovement}
           onChange={(event)=>store.set({plannerOptions:{...store.plannerOptions,diagonalMovement:event.target.checked}})}/>}
           label="Diagonal movement"/>}
@@ -1617,9 +1786,9 @@ function SettingsDialog({open,onClose}:{open:boolean;onClose:()=>void}){
             onChange={(event)=>updatePassage({
               enableTurnFeasibilityChecking:event.target.checked})}/>}
             label="Enable optional turn-feasibility enhancement"/>
-          <FormControlLabel control={<Switch checked={replanning.settings.enabled}
-            onChange={(event)=>replanning.updateSettings({enabled:event.target.checked})}/>}
-            label="Enable optional live-obstacle replanning"/>
+          <FormControlLabel control={<Switch checked={replanning.settings.enabled} disabled={replanningPending}
+            onChange={(event)=>void onReplanningEnabledChange(event.target.checked)}/>}
+            label="Enable automatic replanning"/>
         </Stack>
         <Stack direction="row" gap={1} flexWrap="wrap">
           {([
@@ -1673,11 +1842,13 @@ function SettingsDialog({open,onClose}:{open:boolean;onClose:()=>void}){
           label="Enable Bosch ROKIT corridor extension"/>
         <Stack direction="row" gap={1} flexWrap="wrap">
           <TextField label="Robot width m" type="number" value={fp.width}
+            disabled={fp.source==='bosch-client-motion'}
             onChange={(event)=>{const footprint={...fp,width:Number(event.target.value)};
               store.set({footprint,inflatedGrid:store.grid?ObstacleInflation.byRadius(
                 store.grid,store.plannerOptions.passageSafety.planningSafetyMarginM+
                 store.plannerOptions.passageSafety.localizationMarginM):undefined});}}/>
           <TextField label="Robot length m" type="number" value={fp.length}
+            disabled={fp.source==='bosch-client-motion'}
             onChange={(event)=>{const footprint={...fp,length:Number(event.target.value)};
               store.set({footprint,inflatedGrid:store.grid?ObstacleInflation.byRadius(
                 store.grid,store.plannerOptions.passageSafety.planningSafetyMarginM+
@@ -1750,7 +1921,7 @@ function SettingsDialog({open,onClose}:{open:boolean;onClose:()=>void}){
             ...fp,kinematicCentreConfirmed:event.target.checked}})}/>}
           label="Kinematic centre confirmed at configured footprint offset"/>
         <FormControlLabel control={<Switch checked={operator.settings.previewBeforeDispatch}
-          onChange={(event)=>operator.update({previewBeforeDispatch:event.target.checked})}/>} label="Preview before dispatch"/>
+          disabled/>} label="Preview before dispatch (fixed by the dispatch mode)"/>
         <FormControlLabel control={<Switch checked={operator.settings.directDispatchMode}
           onChange={(event)=>operator.update({directDispatchMode:event.target.checked})}/>} label="Direct Dispatch Mode"/>
         <TextField label="Dispatch countdown seconds" type="number" value={operator.settings.dispatchCountdownSeconds}
@@ -1765,9 +1936,12 @@ function SettingsDialog({open,onClose}:{open:boolean;onClose:()=>void}){
         <FormControlLabel control={<Switch checked={operator.settings.reduceMotion}
           onChange={(event)=>operator.update({reduceMotion:event.target.checked})}/>} label="Reduce motion"/>
         <TextField label="Map contrast" type="number" inputProps={{min:.5,max:2,step:.1}}
-          value={operator.settings.mapContrast} onChange={(event)=>operator.update({mapContrast:Number(event.target.value)})}/>
-        <Select value={operator.settings.language} onChange={(event)=>operator.update({language:event.target.value as 'en'|'pt'})}>
-          <MenuItem value="en">English</MenuItem><MenuItem value="pt">Português</MenuItem>
+          value={operator.settings.mapContrast} onChange={(event)=>{
+            const contrast=Number(event.target.value);
+            if(contrast>=.5&&contrast<=2)operator.update({mapContrast:contrast});
+          }}/>
+        <Select value="en" inputProps={{'aria-label':'Interface language'}}>
+          <MenuItem value="en">English</MenuItem><MenuItem value="pt" disabled>Português (unavailable)</MenuItem>
         </Select>
       </Stack>
       <Typography variant="h2">Advanced</Typography>
@@ -1778,6 +1952,7 @@ function SettingsDialog({open,onClose}:{open:boolean;onClose:()=>void}){
     </Stack></DialogContent><DialogActions>
       <input hidden ref={vehicleConfigInput} type="file" accept=".json" onChange={(event)=>{
         const file=event.target.files?.[0];if(!file)return;
+        setImporting(true);
         void file.text().then((text)=>{
           const result=parseBoschVehicleConfiguration(JSON.parse(text),store.footprint);
           store.set({footprint:result.footprint,
@@ -1789,38 +1964,36 @@ function SettingsDialog({open,onClose}:{open:boolean;onClose:()=>void}){
             `vertices, ${result.diagnostic.kinematicsType}.`);
           result.diagnostic.warnings.forEach((warning)=>
             LogService.write('system','warning',warning));
-        }).catch((error)=>LogService.write('system','error',
-          `Bosch ClientMotion configuration import failed: ${String(error)}`));
+          notify({severity:'success',message:'Bosch ClientMotion footprint imported.'});
+        }).catch((error)=>{
+          const message=`Bosch ClientMotion configuration import failed: ${String(error)}`;
+          LogService.write('system','error',message);
+          notify({severity:'error',message});
+        }).finally(()=>setImporting(false));
         event.target.value='';
       }}/>
-      <input hidden ref={importInput} type="file" accept=".json" onChange={(e)=>{
-      const file=e.target.files?.[0];if(!file)return;void file.text().then((text)=>{
-        const value=JSON.parse(text) as {
-          mqttSettings?:typeof mqtt;
-          orderSettings?:Partial<typeof order>&{maxSpeed?:number;testMaximumSpeed?:number};
-          footprint?:typeof fp;plannerOptions?:typeof store.plannerOptions;
-        };
-        const importedOrder=value.orderSettings;
-        const legacyMaxSpeed=importedOrder?.maxSpeed;
-        const currentOrderSettings={...importedOrder};
-        delete currentOrderSettings.maxSpeed;
-        delete currentOrderSettings.testMaximumSpeed;
-        store.resetRobotSession();
-        store.set({...value,
-          mqttSettings:value.mqttSettings?{...mqtt,...value.mqttSettings,password:''}:mqtt,
-          orderSettings:importedOrder?{...order,...currentOrderSettings,
-            missionMaximumSpeedMps:normalizeMissionMaximumSpeed(
-              importedOrder.missionMaximumSpeedMps??legacyMaxSpeed??
-              order.missionMaximumSpeedMps),
-            stateStaleTimeoutMs:clampStateStaleTimeoutMs(
-              importedOrder.stateStaleTimeoutMs??order.stateStaleTimeoutMs)}:order});
-      }).catch((error)=>LogService.write('system','error',`Settings import failed: ${String(error)}`));
-    }}/><Button onClick={store.resetSettings}>Restore defaults</Button>
-      <Button onClick={()=>vehicleConfigInput.current?.click()}>
+      <input hidden aria-label="Settings JSON file" ref={importInput} type="file" accept=".json" onChange={(event)=>{
+        const file=event.target.files?.[0];
+        event.target.value='';
+        if(!file)return;
+        setImporting(true);
+        void file.text().then(text=>{
+          const current=useAppStore.getState();
+          const patch=parseSettingsFile(text,current);
+          current.resetRobotSession();
+          current.set(patch);
+          notify({severity:'success',message:'Planner settings imported.'});
+        }).catch(error=>{
+          const message=`Settings import failed: ${String(error)}`;
+          LogService.write('system','error',message);
+          notify({severity:'error',message});
+        }).finally(()=>setImporting(false));
+      }}/><Button disabled={importing} onClick={store.resetSettings}>Restore planner defaults</Button>
+      <Button disabled={importing} onClick={()=>vehicleConfigInput.current?.click()}>
         Import Bosch ClientMotion
       </Button>
-      <Button onClick={()=>importInput.current?.click()}>Import settings</Button>
-      <Button onClick={exportSettings}>Export</Button>
+      <Button disabled={importing} onClick={()=>importInput.current?.click()}>{importing?'Importing…':'Import settings'}</Button>
+      <Button onClick={exportSettings}>Export planner settings</Button>
       <Button color="error" onClick={()=>{mqttService.disconnect();store.resetRobotSession();}}>Disconnect & reset</Button><Button variant="contained" onClick={connect}>Connect</Button><Button onClick={onClose}>Close</Button></DialogActions>
   </Dialog>;
 }

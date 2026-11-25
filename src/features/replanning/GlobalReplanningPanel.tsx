@@ -10,11 +10,12 @@ interface Props {
   open:boolean;
   onClose:()=>void;
   onEnableChange:(enabled:boolean)=>Promise<void>;
+  enablePending:boolean;
 }
 
 const seconds=(milliseconds:number):number=>milliseconds/1_000;
 
-export const GlobalReplanningPanel=({open,onClose,onEnableChange}:Props)=>{
+export const GlobalReplanningPanel=({open,onClose,onEnableChange,enablePending}:Props)=>{
   const store=useGlobalReplanningStore();
   const settings=store.settings;const runtime=store.runtime;
   const recovery=useRecoveryStore();
@@ -41,7 +42,7 @@ export const GlobalReplanningPanel=({open,onClose,onEnableChange}:Props)=>{
       </Alert>
       <Paper variant="outlined" sx={{p:1.5,mb:2}}>
         <Stack direction={{xs:'column',md:'row'}} gap={2} alignItems={{md:'center'}}>
-          <FormControlLabel control={<Switch checked={settings.enabled}
+          <FormControlLabel control={<Switch checked={settings.enabled} disabled={enablePending}
             onChange={(event)=>void onEnableChange(event.target.checked)}/>}
             label="Enable automatic replanning"/>
           <Typography variant="body2">Status: <strong>{runtime.status}</strong></Typography>

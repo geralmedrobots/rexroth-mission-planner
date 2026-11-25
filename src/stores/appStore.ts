@@ -84,7 +84,7 @@ const persistedDefaults = {
 };
 const routeInputKeys: ReadonlySet<keyof AppState> = new Set([
   'grid','inflatedGrid','start','goal','goalThetaExplicit','waypoints',
-  'plannerMode','plannerOptions','footprint',
+  'plannerMode','plannerOptions','footprint','orderSettings','activeNavigatorMapId',
 ]);
 
 export const useAppStore = create<AppState>()(persist((set, get) => ({
@@ -183,7 +183,7 @@ export const useAppStore = create<AppState>()(persist((set, get) => ({
       } : {}),
     };
   }),
-  setActiveMapResolution: (resolution) => set({
+  setActiveMapResolution: (resolution) => get().set({
     activeNavigatorMapId: resolution.mapId, activeNavigatorMapSource: resolution.source,
   }),
   confirmMapBinding: (locatorMapName,manufacturer,serialNumber) => set(() => {
