@@ -1,0 +1,66 @@
+# Stage 5B — Recorded Stage 5B missions (see per-scenario provenance)
+
+Scenarios: 2; real runs: 0.
+
+Recommendation: PENDING. No real-run artifacts evaluated. Profile selection pending.
+
+Captured default means the exported run configuration, not newly substituted application defaults.
+Failure scores are zero. Success rate ranks first; bounded expectation penalties rank second. Raw total costs use different profile weights and are not comparable.
+Clearance is sampled center-to-obstacle distance, not footprint-edge clearance. Suspicious rotations are review candidates, not proof of redundancy. Open-route preference compares average clearance of successful alternatives; inspect geometry.
+
+| Profile | Success | Mean score | Mean time ms (all runs) |
+|---|---:|---:|---:|
+| CAPTURED_DEFAULT | 2/2 | 100.00 | 7.28 |
+| BALANCED | 2/2 | 100.00 | 4.05 |
+| FORWARD_PREFERRED | 2/2 | 100.00 | 2.28 |
+| CLEARANCE_PREFERRED | 2/2 | 100.00 | 1.90 |
+
+| Scenario / profile | Success | Score | ms / states | Path m / cost | Clearance min / avg m | Reverse m / switches | Rotation deg / actions | Suspicious |
+|---|---|---:|---|---|---|---|---|---|
+| Synthetic_2026-09-11T14-53-49-238Z_6c8d9e98-3df7-4617-9869-9a151f8d7780 / CAPTURED_DEFAULT | true | 100.00 | 12.2 / 1 | 2.000 / 2.000 | 8.485 / 8.485 | 0.000 / 0 | 0.0 / 0 |  |
+| Synthetic_2026-09-11T14-53-49-238Z_6c8d9e98-3df7-4617-9869-9a151f8d7780 / BALANCED | true | 100.00 | 5.8 / 1 | 2.000 / 2.000 | 8.485 / 8.485 | 0.000 / 0 | 0.0 / 0 |  |
+| Synthetic_2026-09-11T14-53-49-238Z_6c8d9e98-3df7-4617-9869-9a151f8d7780 / FORWARD_PREFERRED | true | 100.00 | 2.9 / 1 | 2.000 / 2.000 | 8.485 / 8.485 | 0.000 / 0 | 0.0 / 0 |  |
+| Synthetic_2026-09-11T14-53-49-238Z_6c8d9e98-3df7-4617-9869-9a151f8d7780 / CLEARANCE_PREFERRED | true | 100.00 | 2.3 / 1 | 2.000 / 2.000 | 8.485 / 8.485 | 0.000 / 0 | 0.0 / 0 |  |
+| Synthetic_2026-09-11T15-00-21-993Z_59fb7fd9-5260-4581-b44c-55048c5ccb86 / CAPTURED_DEFAULT | true | 100.00 | 2.3 / 1 | 2.000 / 2.000 | 8.485 / 8.485 | 0.000 / 0 | 0.0 / 0 |  |
+| Synthetic_2026-09-11T15-00-21-993Z_59fb7fd9-5260-4581-b44c-55048c5ccb86 / BALANCED | true | 100.00 | 2.3 / 1 | 2.000 / 2.000 | 8.485 / 8.485 | 0.000 / 0 | 0.0 / 0 |  |
+| Synthetic_2026-09-11T15-00-21-993Z_59fb7fd9-5260-4581-b44c-55048c5ccb86 / FORWARD_PREFERRED | true | 100.00 | 1.7 / 1 | 2.000 / 2.000 | 8.485 / 8.485 | 0.000 / 0 | 0.0 / 0 |  |
+| Synthetic_2026-09-11T15-00-21-993Z_59fb7fd9-5260-4581-b44c-55048c5ccb86 / CLEARANCE_PREFERRED | true | 100.00 | 1.5 / 1 | 2.000 / 2.000 | 8.485 / 8.485 | 0.000 / 0 | 0.0 / 0 |  |
+
+## Captured baseline reproduction
+
+- Synthetic_2026-09-11T14-53-49-238Z_6c8d9e98-3df7-4617-9869-9a151f8d7780: MATCH; recorded=fnv1a32:bddc5959; replay=fnv1a32:bddc5959.
+- Synthetic_2026-09-11T15-00-21-993Z_59fb7fd9-5260-4581-b44c-55048c5ccb86: MATCH; recorded=fnv1a32:bddc5959; replay=fnv1a32:bddc5959.
+
+## Scenario evidence and known limitations
+
+- Synthetic_2026-09-11T14-53-49-238Z_6c8d9e98-3df7-4617-9869-9a151f8d7780 (synthetic): Mission synthetic-recorder-smoke; observed outcome: success; Synthetic local replay; no robot execution; source: ../artifacts/stage5b/missions/Synthetic_2026-09-11T14-53-49-238Z_6c8d9e98-3df7-4617-9869-9a151f8d7780.json
+- Synthetic_2026-09-11T15-00-21-993Z_59fb7fd9-5260-4581-b44c-55048c5ccb86 (synthetic): Mission synthetic-recorder-smoke; observed outcome: success; Synthetic local replay; no robot execution; source: ../artifacts/stage5b/missions/Synthetic_2026-09-11T15-00-21-993Z_59fb7fd9-5260-4581-b44c-55048c5ccb86.json
+- Synthetic_2026-09-11T14-53-49-238Z_6c8d9e98-3df7-4617-9869-9a151f8d7780/CAPTURED_DEFAULT penalties: {"path length":0,"reverse distance":0,"direction switches":0,"rotation angle":0,"rotation actions":0,"planning time":0,"expanded states":0,"total cost (report only; incomparable weights)":0,"average clearance (report only unless open-route preference)":0,"clearance":0,"reverse preference":0,"suspicious manoeuvres":0}
+- Synthetic_2026-09-11T14-53-49-238Z_6c8d9e98-3df7-4617-9869-9a151f8d7780/BALANCED penalties: {"path length":0,"reverse distance":0,"direction switches":0,"rotation angle":0,"rotation actions":0,"planning time":0,"expanded states":0,"total cost (report only; incomparable weights)":0,"average clearance (report only unless open-route preference)":0,"clearance":0,"reverse preference":0,"suspicious manoeuvres":0}
+- Synthetic_2026-09-11T14-53-49-238Z_6c8d9e98-3df7-4617-9869-9a151f8d7780/FORWARD_PREFERRED penalties: {"path length":0,"reverse distance":0,"direction switches":0,"rotation angle":0,"rotation actions":0,"planning time":0,"expanded states":0,"total cost (report only; incomparable weights)":0,"average clearance (report only unless open-route preference)":0,"clearance":0,"reverse preference":0,"suspicious manoeuvres":0}
+- Synthetic_2026-09-11T14-53-49-238Z_6c8d9e98-3df7-4617-9869-9a151f8d7780/CLEARANCE_PREFERRED penalties: {"path length":0,"reverse distance":0,"direction switches":0,"rotation angle":0,"rotation actions":0,"planning time":0,"expanded states":0,"total cost (report only; incomparable weights)":0,"average clearance (report only unless open-route preference)":0,"clearance":0,"reverse preference":0,"suspicious manoeuvres":0}
+- Synthetic_2026-09-11T15-00-21-993Z_59fb7fd9-5260-4581-b44c-55048c5ccb86/CAPTURED_DEFAULT penalties: {"path length":0,"reverse distance":0,"direction switches":0,"rotation angle":0,"rotation actions":0,"planning time":0,"expanded states":0,"total cost (report only; incomparable weights)":0,"average clearance (report only unless open-route preference)":0,"clearance":0,"reverse preference":0,"suspicious manoeuvres":0}
+- Synthetic_2026-09-11T15-00-21-993Z_59fb7fd9-5260-4581-b44c-55048c5ccb86/BALANCED penalties: {"path length":0,"reverse distance":0,"direction switches":0,"rotation angle":0,"rotation actions":0,"planning time":0,"expanded states":0,"total cost (report only; incomparable weights)":0,"average clearance (report only unless open-route preference)":0,"clearance":0,"reverse preference":0,"suspicious manoeuvres":0}
+- Synthetic_2026-09-11T15-00-21-993Z_59fb7fd9-5260-4581-b44c-55048c5ccb86/FORWARD_PREFERRED penalties: {"path length":0,"reverse distance":0,"direction switches":0,"rotation angle":0,"rotation actions":0,"planning time":0,"expanded states":0,"total cost (report only; incomparable weights)":0,"average clearance (report only unless open-route preference)":0,"clearance":0,"reverse preference":0,"suspicious manoeuvres":0}
+- Synthetic_2026-09-11T15-00-21-993Z_59fb7fd9-5260-4581-b44c-55048c5ccb86/CLEARANCE_PREFERRED penalties: {"path length":0,"reverse distance":0,"direction switches":0,"rotation angle":0,"rotation actions":0,"planning time":0,"expanded states":0,"total cost (report only; incomparable weights)":0,"average clearance (report only unless open-route preference)":0,"clearance":0,"reverse preference":0,"suspicious manoeuvres":0}
+
+Tight/complex real routes reported by the operator remain known limitations; without their artifacts their category is unknown. They do not block Stage 5B infrastructure completion.
+Timeout is not physical infeasibility. Guide/lattice/primitive diagnoses require trace evidence or a documented manual audit. A single timing sample is affected by caches and CPU contention; repeat in a fresh process for performance conclusions.
+
+## Profile trade-offs
+
+- BALANCED: May retain short reverse manoeuvres and accepts modest detours for clearance.
+- FORWARD_PREFERRED: Can add rotation and forward distance where a short reverse manoeuvre is valid.
+- CLEARANCE_PREFERRED: Produces longer routes in open alternatives and can search more states.
+
+## Physical robot test checklist
+
+- Verify captured map, localization, footprint, payload, safety margins and operating area match the robot.
+- Review every failed case and suspicious manoeuvre before attempting that scenario.
+- Start at approved low speed in a controlled area with the normal safety system and stop access available.
+- Check forward/reverse execution, switch count, swept turns and clearance against replay.
+- Verify final position/orientation and normal publish-time validation.
+- Repeat with localization variation and representative obstacles; record actual timing and deviations.
+- Export new artifacts, record observations and obtain operational acceptance before changing any default.
+
+Production defaults, planner architecture and safety validation are unchanged by this offline workflow.

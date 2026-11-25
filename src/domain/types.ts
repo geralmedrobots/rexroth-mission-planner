@@ -143,7 +143,7 @@ export type PlannerFailureCode=
   |'VEHICLE_FOOTPRINT_COLLISION'|'FOOTPRINT_COLLISION'
   |'UNKNOWN_SPACE_BLOCKED'|'NO_SAFE_START_PROJECTION'
   |'NO_SAFE_MANOEUVRE_SPACE'|'NO_CONNECTED_FREE_SPACE_ROUTE'
-  |'NO_PHYSICALLY_VALID_ROUTE'|'ORDER_VALIDATION_FAILED'
+  |'NO_PHYSICALLY_VALID_ROUTE'|'MOTION_STATE_SEARCH_TIMEOUT'|'ORDER_VALIDATION_FAILED'
   |'ORDER_TRANSITION_FAILED';
 export interface FreeSpaceDiagnostic {
   startRegion?:number;
@@ -216,6 +216,8 @@ export interface VdaNode {
 }
 export interface VdaEdge {
   edgeId: string; sequenceId: number; released: boolean; startNodeId: string; endNodeId: string;
+  /** VDA 5050 tangential body orientation: 0 forward, pi reverse. */
+  orientation?: number;
   maxSpeed: number; rotationAllowed: boolean; corridor?: BoschRokitCorridor; actions: VdaAction[];
 }
 export interface VdaOrder extends VdaHeader {

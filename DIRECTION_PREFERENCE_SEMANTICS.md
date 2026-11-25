@@ -1,0 +1,36 @@
+The motion-state directionSwitchCost setting now prices a non-preferred manoeuvre direction, rather than a physical direction-change event. Numeric settings and serialized costs.directionSwitch keys are retained for compatibility. New calibration snapshots and plans identify directionCostSemantics as local-manoeuvre-alignment-v1. Physical directionChangeCount is unchanged.
+
+Preferred direction minimizes absolute normalized alignment to a chosen progress bearing: forward uses theta; reverse uses theta + pi. If the two absolute errors differ by at most 1e-7 rad, preserve the direction at the start of preparation. At zero positional displacement also preserve that direction. The epsilon is numerical tie handling, not a heading or position acceptance tolerance.
+
+A manoeuvre consists of zero or more preparation rotations/direction changes followed by a maximal uninterrupted straight translation run. Its preference charge is assigned to the first translation. Rotations and DIRECTION_CHANGE actions carry zero direction-preference cost (their existing rotation/turn costs are unchanged). Further translation primitives in the same run carry zero additional preference cost. An actual subsequent rotation or direction change starts preparation for the next run. No penalty is charged for a turn without subsequent translation.
+
+Keep the heading and physical direction BEFORE preparation in a separate state context. Otherwise a forward candidate could split its 176-degree alignment into lattice rotations, arrive facing the goal, and erase the original choice penalty. Ties use the same pre-preparation direction, so zero-cost switching back and forth cannot change tie preference. This cost context is not the robot's physical theta or direction, and never changes collision geometry.
+
+Terminal connectors use the exact connector-state-to-requested-goal bearing, including projected straight connectors. All four strategies retain full costs and physical feasibility checks. A connector continuing an existing straight run adds no new preference charge. Required final orientation remains controlled solely by explicit goalTheta.
+
+Lattice movement uses the local run's travel bearing, not the final goal bearing: a valid detour should not pay merely for temporarily moving away from the final destination. The lattice stores physical-cost g values and uses existing pose/heading/direction dominance. It tracks local run charges separately and adds them to every completed route candidate before comparison (prefix physical cost + prefix preference cost + complete terminal cost). Action cost components and selected totals contain the full objective.
+
+This is deliberately bounded physical route search plus complete-route preference evaluation, as permitted by the task. It is NOT globally optimal search over every manoeuvre history. Two paths to the same search state can have different preparation histories/preference costs; physical dominance may discard a route that would have a lower preference-inclusive cost. Carrying every preparation heading in the state key enlarged search enough to miss existing corridor/time-budget regressions; that approach was not retained. No search time budgets, heuristics, corridor settings, primitive lengths or adaptive refinement rules were changed. This tradeoff avoids adding a global-goal directional bias to lattice detours.
+
+The optimiser recomputes only direction preference on each source/replacement action list before measuring costs, using the same helper and manoeuvre boundaries. Merging a straight run cannot drop its charge or multiply it. Recomputed costs are cloned before mutation so a rejected optimisation cannot alter the retained plan. All other existing cost computations and validation remain intact.
+
+Diagnostics include goal bearing, current heading, pre-preparation heading, front/rear headings, signed alignment errors in degrees, preferred/candidate directions, tie status, continuation status, actual applied penalty and candidate full cost. Infeasible terminal candidates show zero applied penalty and a separate penaltyIfExecuted. MotionPlan translation metadata carries the same evidence; calibration labels and the Effective Configuration UI now say direction preference.
+
+Synthetic before/after comparison: start (5,2,0), goal (1.4814,2.254,0), goalTheta absent, tolerance .2 m. Projection is 3.5186 m and lateral error .254 m, so straight reverse remains ineligible. Forward alignment is 175.871105673569 degrees; reverse is 4.128894326431 degrees. Translation length is 3.527755938270 m. Weights used: translation 1, rotation .15, reverse .3, direction preference 1, wall 3, narrow 1.5, turn 1, terminal .15. These are the prior reproduction's inputs, not altered production defaults.
+
+| Open-space component | Forward before | Forward after | Reverse before | Reverse after |
+| --- | ---: | ---: | ---: | ---: |
+| Translation | 3.527755938270 | 3.527755938270 | 3.527755938270 | 3.527755938270 |
+| Reverse surcharge | 0 | 0 | 1.058326781481 | 1.058326781481 |
+| Rotation | .460429477969 | .460429477969 | .010809420069 | .010809420069 |
+| Direction cost | 0 | 1 | 1 | 0 |
+| Wall/narrow/turn/terminal | 0 | 0 | 0 | 0 |
+| Total | 3.988185416239 | 4.988185416239 | 5.596892139821 | 4.596892139821 |
+
+Open-space selection changes from R:175.9deg -> F:3.528m to D:F-R -> R:4.1deg -> B:3.528m. With the previous fixture's 1 m start clearance, forward changes from 7.057715269366 to 8.057715269366 and reverse from 5.668954940284 to 4.668954940284; reverse remains selected. Run `npx tsx src/tools/auditManoeuvreComparison.ts` for current numeric diagnostics. The previous MANOEUVRE_COMPARISON.md describes the earlier semantics and remains a historical investigation.
+
+Changed implementation: src/domain/planning/DirectionPreference.ts; MotionStatePlanner.ts; MotionPlanOptimiser.ts; MotionStateConfiguration.ts; MotionPlannerCalibration.ts; CostModel.ts (removed obsolete unused physical-switch helper); src/domain/motion/planningModel.ts; src/App.tsx. Updated tests: directionPreference.test.ts (new), motionStateReverseChoice.test.ts, motionStateManoeuvreComparison.test.ts, motionPlannerStage5Calibration.test.ts. Documentation: this file and MOTION_STATE_CALIBRATION.md. Old assertions about event penalties/oscillation were updated because they conflict with the explicitly requested new semantics; physical safety assertions were preserved.
+
+ReverseCostPerM, all other numeric weights/defaults, safety margins, hard clearance, footprint/translation/rotation collision checks, unknown-cell handling, XY tolerance, final validation, Navigator behavior, and adaptive refinement are unchanged. Physical DIRECTION_CHANGE remains visible. The preference penalty is no longer an oscillation-count penalty by design.
+
+Validation: npm run typecheck and npm run lint passed. npm test -- --maxWorkers=1 passed 367 tests across 40 files, including 11 new direction-preference regressions and existing terminal-tolerance, adaptive-refinement, performance and safety tests. Full-size clutter and detour checks took approximately 536 ms and 511 ms in the final run; these are observations, not a controlled timing comparison.

@@ -1,0 +1,1453 @@
+{
+  "measuredAt": "2026-09-09T15:27:28.090Z",
+  "baselineSha256": "786cc9b4a9d1b41da8ee2b16d7615f87ee9066c69fba33661e9c05384df4e5e1",
+  "method": "One warmup per implementation/case, five alternating runs; median wall time includes postprocessing. Synthetic maps.",
+  "comparisons": [
+    {
+      "name": "open-18m",
+      "before": {
+        "successes": 5,
+        "runs": 5,
+        "medianExpanded": 24,
+        "medianPlanningMs": 4.0634000000000015,
+        "medianFinalNodes": 2,
+        "samples": [
+          {
+            "success": true,
+            "expanded": 24,
+            "planningMs": 7.587400000000002,
+            "nodes": 2
+          },
+          {
+            "success": true,
+            "expanded": 24,
+            "planningMs": 5.079299999999989,
+            "nodes": 2
+          },
+          {
+            "success": true,
+            "expanded": 24,
+            "planningMs": 4.0634000000000015,
+            "nodes": 2
+          },
+          {
+            "success": true,
+            "expanded": 24,
+            "planningMs": 3.522500000000008,
+            "nodes": 2
+          },
+          {
+            "success": true,
+            "expanded": 24,
+            "planningMs": 3.650499999999994,
+            "nodes": 2
+          }
+        ],
+        "diagnostics": {
+          "eventType": "motionplanner.completed",
+          "guideDurationMs": 0.17830000000000723,
+          "guidePreprocessingMs": 0.028300000000001546,
+          "guideSearchMs": 0.12109999999998422,
+          "guideResolutionM": 0.2,
+          "guideStatus": "found",
+          "guideCache": "hit",
+          "searchDurationMs": 2.0424999999999898,
+          "searchBudgetMs": 2000,
+          "analyticConnectorAttempts": 1,
+          "analyticConnectorSuccesses": 1,
+          "unrestrictedExpanded": 0,
+          "unrestrictedFallbackRequired": false,
+          "candidates": 105,
+          "rejected": 0,
+          "translationCollisions": 0,
+          "rotationCollisions": 0,
+          "primitiveAttempts": {
+            "0.500": 23,
+            "0.250": 21,
+            "0.100": 13
+          },
+          "primitiveCollisions": {},
+          "primitiveClearanceRejections": {},
+          "primitiveAccepted": {
+            "0.500": 23,
+            "0.250": 21,
+            "0.100": 13
+          },
+          "primitivePruned": {
+            "0.250": 3,
+            "0.500": 1
+          },
+          "connectorTranslationCollisions": 0,
+          "connectorClearanceRejections": 0,
+          "success": true,
+          "durationMs": 3.650499999999994,
+          "expanded": 24
+        }
+      },
+      "after": {
+        "successes": 5,
+        "runs": 5,
+        "medianExpanded": 24,
+        "medianPlanningMs": 4.098000000000013,
+        "medianFinalNodes": 2,
+        "samples": [
+          {
+            "success": true,
+            "expanded": 24,
+            "planningMs": 6.2187000000000126,
+            "nodes": 2
+          },
+          {
+            "success": true,
+            "expanded": 24,
+            "planningMs": 5.252700000000004,
+            "nodes": 2
+          },
+          {
+            "success": true,
+            "expanded": 24,
+            "planningMs": 3.6180000000000234,
+            "nodes": 2
+          },
+          {
+            "success": true,
+            "expanded": 24,
+            "planningMs": 4.098000000000013,
+            "nodes": 2
+          },
+          {
+            "success": true,
+            "expanded": 24,
+            "planningMs": 3.9251000000000147,
+            "nodes": 2
+          }
+        ],
+        "diagnostics": {
+          "eventType": "motionplanner.completed",
+          "refinementMediumClearanceM": 0.5282542442102666,
+          "refinementTightClearanceM": 0.32825424421026655,
+          "refinedPositionResolutionM": 0.025,
+          "guideDurationMs": 0.1863999999999919,
+          "guidePreprocessingMs": 0.013800000000003365,
+          "guideSearchMs": 0.13220000000001164,
+          "guideResolutionM": 0.2,
+          "guideStatus": "found",
+          "guideCache": "hit",
+          "searchDurationMs": 2.078199999999981,
+          "searchBudgetMs": 2000,
+          "analyticConnectorAttempts": 1,
+          "analyticConnectorSuccesses": 1,
+          "unrestrictedExpanded": 0,
+          "unrestrictedFallbackRequired": false,
+          "candidates": 92,
+          "rejected": 0,
+          "translationCollisions": 0,
+          "rotationCollisions": 0,
+          "primitiveAttempts": {
+            "0.500": 23,
+            "0.250": 21
+          },
+          "primitiveCollisions": {},
+          "primitiveClearanceRejections": {},
+          "primitiveAccepted": {
+            "0.500": 23,
+            "0.250": 21
+          },
+          "primitivePruned": {
+            "0.250": 3,
+            "0.500": 1
+          },
+          "generatedStatesByMode": {
+            "normal": 92,
+            "medium": 0,
+            "tight": 0
+          },
+          "minimumRefinementClearanceM": null,
+          "connectorTranslationCollisions": 0,
+          "connectorClearanceRejections": 0,
+          "success": true,
+          "durationMs": 3.9251000000000147,
+          "expanded": 24
+        }
+      }
+    },
+    {
+      "name": "warehouse-open",
+      "before": {
+        "successes": 5,
+        "runs": 5,
+        "medianExpanded": 1,
+        "medianPlanningMs": 12.423799999999972,
+        "medianFinalNodes": 4,
+        "samples": [
+          {
+            "success": true,
+            "expanded": 1,
+            "planningMs": 13.158599999999979,
+            "nodes": 4
+          },
+          {
+            "success": true,
+            "expanded": 1,
+            "planningMs": 12.423799999999972,
+            "nodes": 4
+          },
+          {
+            "success": true,
+            "expanded": 1,
+            "planningMs": 12.492600000000039,
+            "nodes": 4
+          },
+          {
+            "success": true,
+            "expanded": 1,
+            "planningMs": 11.976400000000012,
+            "nodes": 4
+          },
+          {
+            "success": true,
+            "expanded": 1,
+            "planningMs": 12.23320000000001,
+            "nodes": 4
+          }
+        ],
+        "diagnostics": {
+          "eventType": "motionplanner.completed",
+          "guideDurationMs": 3.689900000000023,
+          "guidePreprocessingMs": 3.621600000000001,
+          "guideSearchMs": 0.05060000000003129,
+          "guideResolutionM": 0.2,
+          "guideStatus": "found",
+          "guideCache": "hit",
+          "searchDurationMs": 0.8462000000000103,
+          "searchBudgetMs": 3000,
+          "analyticConnectorAttempts": 1,
+          "analyticConnectorSuccesses": 1,
+          "unrestrictedExpanded": 0,
+          "unrestrictedFallbackRequired": false,
+          "candidates": 5,
+          "rejected": 0,
+          "translationCollisions": 0,
+          "rotationCollisions": 0,
+          "primitiveAttempts": {
+            "0.500": 1,
+            "0.250": 1,
+            "0.050": 1
+          },
+          "primitiveCollisions": {},
+          "primitiveClearanceRejections": {},
+          "primitiveAccepted": {
+            "0.500": 1,
+            "0.250": 1,
+            "0.050": 1
+          },
+          "primitivePruned": {},
+          "connectorTranslationCollisions": 0,
+          "connectorClearanceRejections": 0,
+          "success": true,
+          "durationMs": 12.23320000000001,
+          "expanded": 1
+        }
+      },
+      "after": {
+        "successes": 5,
+        "runs": 5,
+        "medianExpanded": 1,
+        "medianPlanningMs": 12.31819999999999,
+        "medianFinalNodes": 4,
+        "samples": [
+          {
+            "success": true,
+            "expanded": 1,
+            "planningMs": 12.611699999999985,
+            "nodes": 4
+          },
+          {
+            "success": true,
+            "expanded": 1,
+            "planningMs": 12.723099999999988,
+            "nodes": 4
+          },
+          {
+            "success": true,
+            "expanded": 1,
+            "planningMs": 12.31819999999999,
+            "nodes": 4
+          },
+          {
+            "success": true,
+            "expanded": 1,
+            "planningMs": 12.11930000000001,
+            "nodes": 4
+          },
+          {
+            "success": true,
+            "expanded": 1,
+            "planningMs": 12.203600000000051,
+            "nodes": 4
+          }
+        ],
+        "diagnostics": {
+          "eventType": "motionplanner.completed",
+          "refinementMediumClearanceM": 0.9110165870986451,
+          "refinementTightClearanceM": 0.7110165870986451,
+          "refinedPositionResolutionM": 0.025,
+          "guideDurationMs": 3.459899999999948,
+          "guidePreprocessingMs": 3.3987999999999943,
+          "guideSearchMs": 0.0473999999999819,
+          "guideResolutionM": 0.2,
+          "guideStatus": "found",
+          "guideCache": "hit",
+          "searchDurationMs": 0.9799000000000433,
+          "searchBudgetMs": 3000,
+          "analyticConnectorAttempts": 1,
+          "analyticConnectorSuccesses": 1,
+          "unrestrictedExpanded": 0,
+          "unrestrictedFallbackRequired": false,
+          "candidates": 4,
+          "rejected": 0,
+          "translationCollisions": 0,
+          "rotationCollisions": 0,
+          "primitiveAttempts": {
+            "0.500": 1,
+            "0.250": 1
+          },
+          "primitiveCollisions": {},
+          "primitiveClearanceRejections": {},
+          "primitiveAccepted": {
+            "0.500": 1,
+            "0.250": 1
+          },
+          "primitivePruned": {},
+          "generatedStatesByMode": {
+            "normal": 4,
+            "medium": 0,
+            "tight": 0
+          },
+          "minimumRefinementClearanceM": null,
+          "connectorTranslationCollisions": 0,
+          "connectorClearanceRejections": 0,
+          "success": true,
+          "durationMs": 12.203600000000051,
+          "expanded": 1
+        }
+      }
+    },
+    {
+      "name": "warehouse-clutter",
+      "before": {
+        "successes": 5,
+        "runs": 5,
+        "medianExpanded": 1636,
+        "medianPlanningMs": 596.4510999999993,
+        "medianFinalNodes": 7,
+        "samples": [
+          {
+            "success": true,
+            "expanded": 1754,
+            "planningMs": 560.8951999999999,
+            "nodes": 7
+          },
+          {
+            "success": true,
+            "expanded": 1721,
+            "planningMs": 579.5748000000003,
+            "nodes": 7
+          },
+          {
+            "success": true,
+            "expanded": 1582,
+            "planningMs": 611.7852000000003,
+            "nodes": 7
+          },
+          {
+            "success": true,
+            "expanded": 1634,
+            "planningMs": 610.9229000000005,
+            "nodes": 7
+          },
+          {
+            "success": true,
+            "expanded": 1636,
+            "planningMs": 596.4510999999993,
+            "nodes": 7
+          }
+        ],
+        "diagnostics": {
+          "eventType": "motionplanner.completed",
+          "guideDurationMs": 1.0334000000002561,
+          "guidePreprocessingMs": 0.6062999999994645,
+          "guideSearchMs": 0.41129999999975553,
+          "guideResolutionM": 0.2,
+          "guideStatus": "found",
+          "guideCache": "hit",
+          "searchDurationMs": 578.8728000000001,
+          "searchBudgetMs": 3000,
+          "analyticConnectorAttempts": 70,
+          "analyticConnectorSuccesses": 10,
+          "unrestrictedExpanded": 0,
+          "unrestrictedFallbackRequired": false,
+          "candidates": 4255,
+          "rejected": 145,
+          "translationCollisions": 93,
+          "rotationCollisions": 0,
+          "primitiveAttempts": {
+            "0.500": 559,
+            "0.250": 486,
+            "0.050": 822
+          },
+          "primitiveCollisions": {
+            "0.500": 79,
+            "0.250": 6
+          },
+          "primitiveClearanceRejections": {},
+          "primitiveAccepted": {
+            "0.500": 480,
+            "0.250": 480,
+            "0.050": 822
+          },
+          "primitivePruned": {
+            "0.050": 767,
+            "0.250": 1150,
+            "0.500": 1077
+          },
+          "connectorTranslationCollisions": 8,
+          "connectorClearanceRejections": 52,
+          "success": true,
+          "durationMs": 596.4510999999993,
+          "expanded": 1636
+        }
+      },
+      "after": {
+        "successes": 5,
+        "runs": 5,
+        "medianExpanded": 572,
+        "medianPlanningMs": 418.19609999999966,
+        "medianFinalNodes": 10,
+        "samples": [
+          {
+            "success": true,
+            "expanded": 605,
+            "planningMs": 406.77589999999987,
+            "nodes": 10
+          },
+          {
+            "success": true,
+            "expanded": 599,
+            "planningMs": 401.0676000000003,
+            "nodes": 10
+          },
+          {
+            "success": true,
+            "expanded": 549,
+            "planningMs": 418.19609999999966,
+            "nodes": 10
+          },
+          {
+            "success": true,
+            "expanded": 572,
+            "planningMs": 419.1430999999993,
+            "nodes": 10
+          },
+          {
+            "success": true,
+            "expanded": 569,
+            "planningMs": 430.4447,
+            "nodes": 10
+          }
+        ],
+        "diagnostics": {
+          "eventType": "motionplanner.completed",
+          "refinementMediumClearanceM": 0.9110165870986451,
+          "refinementTightClearanceM": 0.7110165870986451,
+          "refinedPositionResolutionM": 0.025,
+          "guideDurationMs": 1.0366000000003623,
+          "guidePreprocessingMs": 0.6051000000006752,
+          "guideSearchMs": 0.4139000000004671,
+          "guideResolutionM": 0.2,
+          "guideStatus": "found",
+          "guideCache": "hit",
+          "searchDurationMs": 405.54529999999977,
+          "searchBudgetMs": 3000,
+          "analyticConnectorAttempts": 25,
+          "analyticConnectorSuccesses": 3,
+          "unrestrictedExpanded": 0,
+          "unrestrictedFallbackRequired": false,
+          "candidates": 1690,
+          "rejected": 110,
+          "translationCollisions": 88,
+          "rotationCollisions": 0,
+          "primitiveAttempts": {
+            "0.500": 303,
+            "0.250": 259,
+            "0.100": 203,
+            "0.050": 48
+          },
+          "primitiveCollisions": {
+            "0.500": 82,
+            "0.250": 6
+          },
+          "primitiveClearanceRejections": {},
+          "primitiveAccepted": {
+            "0.500": 221,
+            "0.250": 253,
+            "0.100": 203,
+            "0.050": 48
+          },
+          "primitivePruned": {
+            "0.250": 310,
+            "0.500": 266,
+            "0.100": 112,
+            "0.050": 121
+          },
+          "generatedStatesByMode": {
+            "normal": 1255,
+            "medium": 297,
+            "tight": 50
+          },
+          "minimumRefinementClearanceM": 0.37071067094802856,
+          "connectorTranslationCollisions": 0,
+          "connectorClearanceRejections": 22,
+          "success": true,
+          "durationMs": 430.4447,
+          "expanded": 569
+        }
+      }
+    },
+    {
+      "name": "warehouse-detour",
+      "before": {
+        "successes": 5,
+        "runs": 5,
+        "medianExpanded": 1416,
+        "medianPlanningMs": 417.313900000001,
+        "medianFinalNodes": 10,
+        "samples": [
+          {
+            "success": true,
+            "expanded": 1416,
+            "planningMs": 413.2627000000002,
+            "nodes": 10
+          },
+          {
+            "success": true,
+            "expanded": 1392,
+            "planningMs": 417.313900000001,
+            "nodes": 10
+          },
+          {
+            "success": true,
+            "expanded": 1530,
+            "planningMs": 416.52829999999994,
+            "nodes": 10
+          },
+          {
+            "success": true,
+            "expanded": 1135,
+            "planningMs": 443.301300000001,
+            "nodes": 10
+          },
+          {
+            "success": true,
+            "expanded": 1416,
+            "planningMs": 422.6897000000008,
+            "nodes": 10
+          }
+        ],
+        "diagnostics": {
+          "eventType": "motionplanner.completed",
+          "guideDurationMs": 1.1432000000004336,
+          "guidePreprocessingMs": 0.6594999999997526,
+          "guideSearchMs": 0.45169999999961874,
+          "guideResolutionM": 0.2,
+          "guideStatus": "found",
+          "guideCache": "hit",
+          "searchDurationMs": 373.7587000000003,
+          "searchBudgetMs": 3000,
+          "analyticConnectorAttempts": 60,
+          "analyticConnectorSuccesses": 3,
+          "unrestrictedExpanded": 0,
+          "unrestrictedFallbackRequired": false,
+          "candidates": 4391,
+          "rejected": 162,
+          "translationCollisions": 114,
+          "rotationCollisions": 0,
+          "primitiveAttempts": {
+            "0.500": 943,
+            "0.250": 573,
+            "0.050": 643
+          },
+          "primitiveCollisions": {
+            "0.500": 105
+          },
+          "primitiveClearanceRejections": {},
+          "primitiveAccepted": {
+            "0.500": 838,
+            "0.250": 573,
+            "0.050": 643
+          },
+          "primitivePruned": {
+            "0.050": 684,
+            "0.250": 843,
+            "0.500": 473
+          },
+          "connectorTranslationCollisions": 9,
+          "connectorClearanceRejections": 48,
+          "success": true,
+          "durationMs": 422.6897000000008,
+          "expanded": 1416
+        }
+      },
+      "after": {
+        "successes": 5,
+        "runs": 5,
+        "medianExpanded": 792,
+        "medianPlanningMs": 391.1311000000005,
+        "medianFinalNodes": 10,
+        "samples": [
+          {
+            "success": true,
+            "expanded": 792,
+            "planningMs": 408.7345000000005,
+            "nodes": 10
+          },
+          {
+            "success": true,
+            "expanded": 792,
+            "planningMs": 391.1311000000005,
+            "nodes": 10
+          },
+          {
+            "success": true,
+            "expanded": 792,
+            "planningMs": 403.63900000000103,
+            "nodes": 10
+          },
+          {
+            "success": true,
+            "expanded": 763,
+            "planningMs": 377.08740000000034,
+            "nodes": 10
+          },
+          {
+            "success": true,
+            "expanded": 792,
+            "planningMs": 387.190700000001,
+            "nodes": 10
+          }
+        ],
+        "diagnostics": {
+          "eventType": "motionplanner.completed",
+          "refinementMediumClearanceM": 0.9110165870986451,
+          "refinementTightClearanceM": 0.7110165870986451,
+          "refinedPositionResolutionM": 0.025,
+          "guideDurationMs": 1.0287000000007538,
+          "guidePreprocessingMs": 0.6185999999997875,
+          "guideSearchMs": 0.39240000000063446,
+          "guideResolutionM": 0.2,
+          "guideStatus": "found",
+          "guideCache": "hit",
+          "searchDurationMs": 369.3173999999999,
+          "searchBudgetMs": 3000,
+          "analyticConnectorAttempts": 34,
+          "analyticConnectorSuccesses": 3,
+          "unrestrictedExpanded": 0,
+          "unrestrictedFallbackRequired": false,
+          "candidates": 2444,
+          "rejected": 156,
+          "translationCollisions": 130,
+          "rotationCollisions": 0,
+          "primitiveAttempts": {
+            "0.500": 625,
+            "0.250": 372,
+            "0.100": 198,
+            "0.050": 53
+          },
+          "primitiveCollisions": {
+            "0.500": 125
+          },
+          "primitiveClearanceRejections": {},
+          "primitiveAccepted": {
+            "0.500": 500,
+            "0.250": 372,
+            "0.100": 198,
+            "0.050": 53
+          },
+          "primitivePruned": {
+            "0.050": 168,
+            "0.250": 420,
+            "0.100": 191,
+            "0.500": 167
+          },
+          "generatedStatesByMode": {
+            "normal": 1787,
+            "medium": 426,
+            "tight": 106
+          },
+          "minimumRefinementClearanceM": 0.3499999940395355,
+          "connectorTranslationCollisions": 5,
+          "connectorClearanceRejections": 26,
+          "success": true,
+          "durationMs": 387.190700000001,
+          "expanded": 792
+        }
+      }
+    },
+    {
+      "name": "tight-turn-0.10-map",
+      "before": {
+        "successes": 0,
+        "runs": 5,
+        "medianExpanded": 351,
+        "medianPlanningMs": 72.7546999999995,
+        "medianFinalNodes": 0,
+        "samples": [
+          {
+            "success": false,
+            "expanded": 351,
+            "planningMs": 71.42009999999937,
+            "nodes": 0
+          },
+          {
+            "success": false,
+            "expanded": 351,
+            "planningMs": 76.62620000000061,
+            "nodes": 0
+          },
+          {
+            "success": false,
+            "expanded": 351,
+            "planningMs": 75.66450000000077,
+            "nodes": 0
+          },
+          {
+            "success": false,
+            "expanded": 351,
+            "planningMs": 71.28499999999985,
+            "nodes": 0
+          },
+          {
+            "success": false,
+            "expanded": 351,
+            "planningMs": 72.7546999999995,
+            "nodes": 0
+          }
+        ],
+        "diagnostics": {
+          "eventType": "motionplanner.completed",
+          "guideDurationMs": 0.03709999999955471,
+          "guidePreprocessingMs": 0.009099999999307329,
+          "guideSearchMs": 0.01929999999993015,
+          "guideResolutionM": 0.2,
+          "guideStatus": "found",
+          "guideCache": "hit",
+          "searchDurationMs": 72.59079999999994,
+          "searchBudgetMs": 2000,
+          "analyticConnectorAttempts": 15,
+          "analyticConnectorSuccesses": 0,
+          "unrestrictedExpanded": 117,
+          "unrestrictedFallbackRequired": true,
+          "candidates": 1188,
+          "rejected": 825,
+          "translationCollisions": 405,
+          "rotationCollisions": 354,
+          "primitiveAttempts": {
+            "0.500": 243,
+            "0.250": 165,
+            "0.100": 255
+          },
+          "primitiveCollisions": {
+            "0.250": 126,
+            "0.100": 120,
+            "0.500": 159
+          },
+          "primitiveClearanceRejections": {
+            "0.500": 66
+          },
+          "primitiveAccepted": {
+            "0.500": 18,
+            "0.250": 39,
+            "0.100": 135
+          },
+          "primitivePruned": {
+            "0.500": 108,
+            "0.250": 186,
+            "0.100": 93
+          },
+          "connectorTranslationCollisions": 0,
+          "connectorClearanceRejections": 0,
+          "success": false,
+          "failureCode": "NO_PHYSICALLY_VALID_ROUTE",
+          "reason": "No physically feasible MotionPlan exists for the requested pose.",
+          "durationMs": 72.7546999999995,
+          "expanded": 351
+        }
+      },
+      "after": {
+        "successes": 5,
+        "runs": 5,
+        "medianExpanded": 48,
+        "medianPlanningMs": 50.96979999999894,
+        "medianFinalNodes": 11,
+        "samples": [
+          {
+            "success": true,
+            "expanded": 48,
+            "planningMs": 60.644099999999526,
+            "nodes": 11
+          },
+          {
+            "success": true,
+            "expanded": 48,
+            "planningMs": 66.59480000000076,
+            "nodes": 11
+          },
+          {
+            "success": true,
+            "expanded": 48,
+            "planningMs": 47.3716000000004,
+            "nodes": 11
+          },
+          {
+            "success": true,
+            "expanded": 48,
+            "planningMs": 45.95550000000003,
+            "nodes": 11
+          },
+          {
+            "success": true,
+            "expanded": 48,
+            "planningMs": 50.96979999999894,
+            "nodes": 11
+          }
+        ],
+        "diagnostics": {
+          "eventType": "motionplanner.completed",
+          "refinementMediumClearanceM": 0.5504495957273638,
+          "refinementTightClearanceM": 0.3504495957273639,
+          "refinedPositionResolutionM": 0.025,
+          "guideDurationMs": 0.03960000000006403,
+          "guidePreprocessingMs": 0.009899999999106512,
+          "guideSearchMs": 0.02049999999871943,
+          "guideResolutionM": 0.2,
+          "guideStatus": "found",
+          "guideCache": "hit",
+          "searchDurationMs": 40.39220000000023,
+          "searchBudgetMs": 2000,
+          "analyticConnectorAttempts": 3,
+          "analyticConnectorSuccesses": 1,
+          "unrestrictedExpanded": 0,
+          "unrestrictedFallbackRequired": false,
+          "candidates": 216,
+          "rejected": 119,
+          "translationCollisions": 44,
+          "rotationCollisions": 57,
+          "primitiveAttempts": {
+            "0.500": 38,
+            "0.250": 30,
+            "0.100": 36,
+            "0.050": 24
+          },
+          "primitiveCollisions": {
+            "0.250": 20,
+            "0.500": 14,
+            "0.100": 7,
+            "0.050": 3
+          },
+          "primitiveClearanceRejections": {
+            "0.500": 18
+          },
+          "primitiveAccepted": {
+            "0.500": 6,
+            "0.250": 10,
+            "0.100": 29,
+            "0.050": 21
+          },
+          "primitivePruned": {
+            "0.250": 18,
+            "0.050": 24,
+            "0.500": 10,
+            "0.100": 12
+          },
+          "generatedStatesByMode": {
+            "normal": 0,
+            "medium": 0,
+            "tight": 101
+          },
+          "minimumRefinementClearanceM": 0,
+          "connectorTranslationCollisions": 0,
+          "connectorClearanceRejections": 0,
+          "success": true,
+          "durationMs": 50.96979999999894,
+          "expanded": 48
+        }
+      }
+    },
+    {
+      "name": "narrow-0.05-map",
+      "before": {
+        "successes": 5,
+        "runs": 5,
+        "medianExpanded": 145,
+        "medianPlanningMs": 126.23099999999977,
+        "medianFinalNodes": 13,
+        "samples": [
+          {
+            "success": true,
+            "expanded": 145,
+            "planningMs": 131.48400000000038,
+            "nodes": 13
+          },
+          {
+            "success": true,
+            "expanded": 145,
+            "planningMs": 151.92159999999967,
+            "nodes": 13
+          },
+          {
+            "success": true,
+            "expanded": 145,
+            "planningMs": 126.23099999999977,
+            "nodes": 13
+          },
+          {
+            "success": true,
+            "expanded": 145,
+            "planningMs": 122.43249999999898,
+            "nodes": 13
+          },
+          {
+            "success": true,
+            "expanded": 145,
+            "planningMs": 122.69659999999931,
+            "nodes": 13
+          }
+        ],
+        "diagnostics": {
+          "eventType": "motionplanner.completed",
+          "guideDurationMs": 0.017400000000634464,
+          "guidePreprocessingMs": 0.012899999999717693,
+          "guideSearchMs": 0.0014000000010128133,
+          "guideResolutionM": 0.2,
+          "guideStatus": "coarse-disconnected",
+          "guideCache": "hit",
+          "searchDurationMs": 110.63539999999921,
+          "searchBudgetMs": 2000,
+          "analyticConnectorAttempts": 7,
+          "analyticConnectorSuccesses": 1,
+          "unrestrictedExpanded": 145,
+          "unrestrictedFallbackRequired": false,
+          "candidates": 528,
+          "rejected": 351,
+          "translationCollisions": 144,
+          "rotationCollisions": 103,
+          "primitiveAttempts": {
+            "0.500": 145,
+            "0.250": 116,
+            "0.050": 64
+          },
+          "primitiveCollisions": {
+            "0.250": 97,
+            "0.050": 32,
+            "0.500": 15
+          },
+          "primitiveClearanceRejections": {
+            "0.500": 102,
+            "0.250": 2
+          },
+          "primitiveAccepted": {
+            "0.500": 28,
+            "0.250": 17,
+            "0.050": 32
+          },
+          "primitivePruned": {
+            "0.050": 77,
+            "0.250": 29
+          },
+          "connectorTranslationCollisions": 0,
+          "connectorClearanceRejections": 0,
+          "success": true,
+          "durationMs": 122.69659999999931,
+          "expanded": 145
+        }
+      },
+      "after": {
+        "successes": 5,
+        "runs": 5,
+        "medianExpanded": 168,
+        "medianPlanningMs": 194.922700000001,
+        "medianFinalNodes": 11,
+        "samples": [
+          {
+            "success": true,
+            "expanded": 168,
+            "planningMs": 194.922700000001,
+            "nodes": 11
+          },
+          {
+            "success": true,
+            "expanded": 168,
+            "planningMs": 205.82819999999992,
+            "nodes": 11
+          },
+          {
+            "success": true,
+            "expanded": 168,
+            "planningMs": 186.26529999999912,
+            "nodes": 11
+          },
+          {
+            "success": true,
+            "expanded": 168,
+            "planningMs": 193.4224000000013,
+            "nodes": 11
+          },
+          {
+            "success": true,
+            "expanded": 168,
+            "planningMs": 204.42669999999998,
+            "nodes": 11
+          }
+        ],
+        "diagnostics": {
+          "eventType": "motionplanner.completed",
+          "refinementMediumClearanceM": 0.5504495957273638,
+          "refinementTightClearanceM": 0.3504495957273639,
+          "refinedPositionResolutionM": 0.025,
+          "guideDurationMs": 0.02410000000054424,
+          "guidePreprocessingMs": 0.016400000000430737,
+          "guideSearchMs": 0.0030999999999039574,
+          "guideResolutionM": 0.2,
+          "guideStatus": "coarse-disconnected",
+          "guideCache": "hit",
+          "searchDurationMs": 183.5506000000005,
+          "searchBudgetMs": 2000,
+          "analyticConnectorAttempts": 8,
+          "analyticConnectorSuccesses": 1,
+          "unrestrictedExpanded": 168,
+          "unrestrictedFallbackRequired": false,
+          "candidates": 757,
+          "rejected": 554,
+          "translationCollisions": 302,
+          "rotationCollisions": 123,
+          "primitiveAttempts": {
+            "0.500": 168,
+            "0.250": 142,
+            "0.100": 122,
+            "0.050": 92
+          },
+          "primitiveCollisions": {
+            "0.250": 125,
+            "0.100": 88,
+            "0.050": 73,
+            "0.500": 16
+          },
+          "primitiveClearanceRejections": {
+            "0.500": 126,
+            "0.250": 3
+          },
+          "primitiveAccepted": {
+            "0.500": 26,
+            "0.250": 14,
+            "0.100": 34,
+            "0.050": 19
+          },
+          "primitivePruned": {
+            "0.050": 76,
+            "0.100": 46,
+            "0.250": 26
+          },
+          "generatedStatesByMode": {
+            "normal": 0,
+            "medium": 0,
+            "tight": 210
+          },
+          "minimumRefinementClearanceM": 0,
+          "connectorTranslationCollisions": 0,
+          "connectorClearanceRejections": 0,
+          "success": true,
+          "durationMs": 204.42669999999998,
+          "expanded": 168
+        }
+      }
+    },
+    {
+      "name": "medium-passage",
+      "before": {
+        "successes": 5,
+        "runs": 5,
+        "medianExpanded": 50,
+        "medianPlanningMs": 13.07010000000082,
+        "medianFinalNodes": 13,
+        "samples": [
+          {
+            "success": true,
+            "expanded": 50,
+            "planningMs": 12.85280000000057,
+            "nodes": 13
+          },
+          {
+            "success": true,
+            "expanded": 50,
+            "planningMs": 12.784200000000055,
+            "nodes": 13
+          },
+          {
+            "success": true,
+            "expanded": 50,
+            "planningMs": 13.07010000000082,
+            "nodes": 13
+          },
+          {
+            "success": true,
+            "expanded": 50,
+            "planningMs": 14.372199999999793,
+            "nodes": 13
+          },
+          {
+            "success": true,
+            "expanded": 50,
+            "planningMs": 13.135000000000218,
+            "nodes": 13
+          }
+        ],
+        "diagnostics": {
+          "eventType": "motionplanner.completed",
+          "guideDurationMs": 0.0422999999991589,
+          "guidePreprocessingMs": 0.008400000000619912,
+          "guideSearchMs": 0.026499999999941792,
+          "guideResolutionM": 0.2,
+          "guideStatus": "found",
+          "guideCache": "hit",
+          "searchDurationMs": 9.929399999999077,
+          "searchBudgetMs": 2000,
+          "analyticConnectorAttempts": 3,
+          "analyticConnectorSuccesses": 2,
+          "unrestrictedExpanded": 0,
+          "unrestrictedFallbackRequired": false,
+          "candidates": 200,
+          "rejected": 56,
+          "translationCollisions": 39,
+          "rotationCollisions": 0,
+          "primitiveAttempts": {
+            "0.500": 48,
+            "0.250": 40,
+            "0.100": 44
+          },
+          "primitiveCollisions": {
+            "0.250": 16,
+            "0.500": 17,
+            "0.100": 6
+          },
+          "primitiveClearanceRejections": {
+            "0.500": 16
+          },
+          "primitiveAccepted": {
+            "0.500": 15,
+            "0.250": 24,
+            "0.100": 38
+          },
+          "primitivePruned": {
+            "0.250": 10,
+            "0.100": 3,
+            "0.500": 2
+          },
+          "connectorTranslationCollisions": 0,
+          "connectorClearanceRejections": 1,
+          "success": true,
+          "durationMs": 13.135000000000218,
+          "expanded": 50
+        }
+      },
+      "after": {
+        "successes": 5,
+        "runs": 5,
+        "medianExpanded": 24,
+        "medianPlanningMs": 7.2269000000014785,
+        "medianFinalNodes": 11,
+        "samples": [
+          {
+            "success": true,
+            "expanded": 24,
+            "planningMs": 7.328799999999319,
+            "nodes": 11
+          },
+          {
+            "success": true,
+            "expanded": 24,
+            "planningMs": 8.297099999999773,
+            "nodes": 11
+          },
+          {
+            "success": true,
+            "expanded": 24,
+            "planningMs": 6.694400000000314,
+            "nodes": 11
+          },
+          {
+            "success": true,
+            "expanded": 24,
+            "planningMs": 7.2269000000014785,
+            "nodes": 11
+          },
+          {
+            "success": true,
+            "expanded": 24,
+            "planningMs": 7.059800000000905,
+            "nodes": 11
+          }
+        ],
+        "diagnostics": {
+          "eventType": "motionplanner.completed",
+          "refinementMediumClearanceM": 0.5067002660859439,
+          "refinementTightClearanceM": 0.30670026608594386,
+          "refinedPositionResolutionM": 0.025,
+          "guideDurationMs": 0.04569999999876018,
+          "guidePreprocessingMs": 0.009399999999004649,
+          "guideSearchMs": 0.028800000000046566,
+          "guideResolutionM": 0.2,
+          "guideStatus": "found",
+          "guideCache": "hit",
+          "searchDurationMs": 4.469500000001062,
+          "searchBudgetMs": 2000,
+          "analyticConnectorAttempts": 2,
+          "analyticConnectorSuccesses": 1,
+          "unrestrictedExpanded": 0,
+          "unrestrictedFallbackRequired": false,
+          "candidates": 107,
+          "rejected": 23,
+          "translationCollisions": 17,
+          "rotationCollisions": 0,
+          "primitiveAttempts": {
+            "0.500": 23,
+            "0.250": 17,
+            "0.100": 19,
+            "0.050": 8
+          },
+          "primitiveCollisions": {
+            "0.250": 6,
+            "0.500": 8,
+            "0.100": 2,
+            "0.050": 1
+          },
+          "primitiveClearanceRejections": {
+            "0.500": 5
+          },
+          "primitiveAccepted": {
+            "0.500": 10,
+            "0.250": 11,
+            "0.100": 17,
+            "0.050": 7
+          },
+          "primitivePruned": {
+            "0.250": 7,
+            "0.100": 5,
+            "0.050": 11,
+            "0.500": 1
+          },
+          "generatedStatesByMode": {
+            "normal": 0,
+            "medium": 59,
+            "tight": 26
+          },
+          "minimumRefinementClearanceM": 0,
+          "connectorTranslationCollisions": 0,
+          "connectorClearanceRejections": 1,
+          "success": true,
+          "durationMs": 7.059800000000905,
+          "expanded": 24
+        }
+      }
+    },
+    {
+      "name": "sealed-passage",
+      "before": {
+        "successes": 0,
+        "runs": 5,
+        "medianExpanded": 24,
+        "medianPlanningMs": 11.689699999998993,
+        "medianFinalNodes": 0,
+        "samples": [
+          {
+            "success": false,
+            "expanded": 24,
+            "planningMs": 10.958399999999529,
+            "nodes": 0
+          },
+          {
+            "success": false,
+            "expanded": 24,
+            "planningMs": 11.949099999999817,
+            "nodes": 0
+          },
+          {
+            "success": false,
+            "expanded": 24,
+            "planningMs": 11.246299999998882,
+            "nodes": 0
+          },
+          {
+            "success": false,
+            "expanded": 24,
+            "planningMs": 11.689699999998993,
+            "nodes": 0
+          },
+          {
+            "success": false,
+            "expanded": 24,
+            "planningMs": 11.747600000000602,
+            "nodes": 0
+          }
+        ],
+        "diagnostics": {
+          "eventType": "motionplanner.completed",
+          "guideDurationMs": 0.04550000000017462,
+          "guidePreprocessingMs": 0.01089999999931024,
+          "guideSearchMs": 0.03169999999954598,
+          "guideResolutionM": 0.2,
+          "guideStatus": "coarse-disconnected",
+          "guideCache": "hit",
+          "searchDurationMs": 11.58179999999993,
+          "searchBudgetMs": 2000,
+          "analyticConnectorAttempts": 2,
+          "analyticConnectorSuccesses": 0,
+          "unrestrictedExpanded": 24,
+          "unrestrictedFallbackRequired": false,
+          "candidates": 86,
+          "rejected": 62,
+          "translationCollisions": 37,
+          "rotationCollisions": 18,
+          "primitiveAttempts": {
+            "0.500": 24,
+            "0.250": 16,
+            "0.100": 14
+          },
+          "primitiveCollisions": {
+            "0.500": 14,
+            "0.250": 13,
+            "0.100": 10
+          },
+          "primitiveClearanceRejections": {
+            "0.500": 7
+          },
+          "primitiveAccepted": {
+            "0.500": 3,
+            "0.250": 3,
+            "0.100": 4
+          },
+          "primitivePruned": {
+            "0.250": 8,
+            "0.100": 10
+          },
+          "connectorTranslationCollisions": 0,
+          "connectorClearanceRejections": 0,
+          "success": false,
+          "failureCode": "NO_PHYSICALLY_VALID_ROUTE",
+          "reason": "No physically feasible MotionPlan exists for the requested pose.",
+          "durationMs": 11.747600000000602,
+          "expanded": 24
+        }
+      },
+      "after": {
+        "successes": 0,
+        "runs": 5,
+        "medianExpanded": 45,
+        "medianPlanningMs": 30.703600000000733,
+        "medianFinalNodes": 0,
+        "samples": [
+          {
+            "success": false,
+            "expanded": 45,
+            "planningMs": 29.219200000001365,
+            "nodes": 0
+          },
+          {
+            "success": false,
+            "expanded": 45,
+            "planningMs": 32.61149999999907,
+            "nodes": 0
+          },
+          {
+            "success": false,
+            "expanded": 45,
+            "planningMs": 31.481299999999464,
+            "nodes": 0
+          },
+          {
+            "success": false,
+            "expanded": 45,
+            "planningMs": 29.66320000000087,
+            "nodes": 0
+          },
+          {
+            "success": false,
+            "expanded": 45,
+            "planningMs": 30.703600000000733,
+            "nodes": 0
+          }
+        ],
+        "diagnostics": {
+          "eventType": "motionplanner.completed",
+          "refinementMediumClearanceM": 0.5504495957273638,
+          "refinementTightClearanceM": 0.3504495957273639,
+          "refinedPositionResolutionM": 0.025,
+          "guideDurationMs": 0.03259999999863794,
+          "guidePreprocessingMs": 0.008599999999205465,
+          "guideSearchMs": 0.021800000000439468,
+          "guideResolutionM": 0.2,
+          "guideStatus": "coarse-disconnected",
+          "guideCache": "hit",
+          "searchDurationMs": 30.557199999999284,
+          "searchBudgetMs": 2000,
+          "analyticConnectorAttempts": 2,
+          "analyticConnectorSuccesses": 0,
+          "unrestrictedExpanded": 45,
+          "unrestrictedFallbackRequired": false,
+          "candidates": 212,
+          "rejected": 170,
+          "translationCollisions": 125,
+          "rotationCollisions": 32,
+          "primitiveAttempts": {
+            "0.500": 45,
+            "0.250": 40,
+            "0.100": 35,
+            "0.050": 32
+          },
+          "primitiveCollisions": {
+            "0.500": 27,
+            "0.250": 35,
+            "0.100": 32,
+            "0.050": 31
+          },
+          "primitiveClearanceRejections": {
+            "0.500": 13
+          },
+          "primitiveAccepted": {
+            "0.500": 5,
+            "0.250": 5,
+            "0.100": 3,
+            "0.050": 1
+          },
+          "primitivePruned": {
+            "0.050": 13,
+            "0.100": 10,
+            "0.250": 5
+          },
+          "generatedStatesByMode": {
+            "normal": 0,
+            "medium": 0,
+            "tight": 44
+          },
+          "minimumRefinementClearanceM": 0,
+          "connectorTranslationCollisions": 0,
+          "connectorClearanceRejections": 0,
+          "success": false,
+          "failureCode": "NO_PHYSICALLY_VALID_ROUTE",
+          "reason": "No physically feasible MotionPlan exists for the requested pose.",
+          "durationMs": 30.703600000000733,
+          "expanded": 45
+        }
+      }
+    }
+  ]
+}

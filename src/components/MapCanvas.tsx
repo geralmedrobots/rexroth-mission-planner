@@ -1,16 +1,23 @@
 import { Box, Chip, FormControlLabel, Paper, Switch, Typography } from '@mui/material';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CoordinateTransformer } from '../domain/geometry/CoordinateTransformer';
-import type { GridCell } from '../domain/types';
+import type { GridCell, RobotPose } from '../domain/types';
 import { useLocatorStore } from '../features/locator/stores/locatorStore';
 import { useGlobalReplanningStore } from '../features/replanning/globalReplanningStore';
 import { useRecoveryStore } from '../features/recovery/recoveryStore';
+import { LogService } from '../services/LogService';
 import { useAppStore } from '../stores/appStore';
+import {
+  analyzeLiveRobotMapConversion,
+  formatLivePoseMapCheck,
+  getLiveRobotVisualization,
+} from './mapRobotVisualization';
 
 export type ClickMode='goal'|'start'|'waypoint'|'obstacle'|'erase'|'inspect';
-interface Props { mode:ClickMode; onCell:(cell:GridCell)=>void }
-export const MapCanvas=({mode,onCell}:Props)=>{
+interface Props { mode:ClickMode; onCell:(cell:GridCell)=>void; liveRobotPose?:RobotPose }
+export const MapCanvas=({mode,onCell,liveRobotPose}:Props)=>{
   const canvas=useRef<HTMLCanvasElement>(null); const container=useRef<HTMLDivElement>(null);
+  const lastPoseMapDiagnostic=useRef<string|undefined>(undefined);
   const [mouse,setMouse]=useState<{cell?:GridCell;world?:{x:number;y:number}}>({});
   const [view,setView]=useState({zoom:1,panX:0,panY:0});
   const [layers,setLayers]=useState({
@@ -28,6 +35,16 @@ export const MapCanvas=({mode,onCell}:Props)=>{
   const showGrid=useAppStore((s)=>s.showGrid); const rotation=useAppStore((s)=>s.viewRotation);
   const robotState=useAppStore((s)=>s.state);
   const generatedOrder=useAppStore((s)=>s.generatedOrder);
+  const robotVisualization=useMemo(
+    ()=>getLiveRobotVisualization(grid,liveRobotPose),
+    [grid,liveRobotPose],
+  );
+  useEffect(()=>{
+    const message = formatLivePoseMapCheck(analyzeLiveRobotMapConversion(grid, liveRobotPose));
+    if (message === lastPoseMapDiagnostic.current) return;
+    lastPoseMapDiagnostic.current = message;
+    LogService.write('system', 'info', message);
+  }, [grid, liveRobotPose]);
   const plannerResult=useAppStore((s)=>s.plannerResult);
   const plannerDiagnostics=plannerResult?.diagnostics;
   const optimizedPath=plannerResult?.simplifiedPath;
@@ -186,11 +203,11 @@ export const MapCanvas=({mode,onCell}:Props)=>{
     if(goal){const q=pixel(goal.x,goal.y);if(q){ctx.strokeStyle='#c8102e';ctx.lineWidth=3;
       ctx.beginPath();ctx.arc(q.x,q.y,13,0,Math.PI*2);ctx.stroke();ctx.fillStyle='rgba(0,191,234,.25)';
       ctx.beginPath();ctx.arc(q.x,q.y,8,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.font='bold 11px sans-serif';ctx.fillText('DESTINATION',q.x+18,q.y-12);}}
-    if(start){const q=pixel(start.x,start.y);if(q){const warning=robotState?.safetyState?.eStop!=='NONE'||(robotState?.errors?.length??0)>0;
-      const color=warning?'#8f0b22':robotState?.driving?'#16875f':'#c8102e';ctx.save();ctx.translate(q.x,q.y);ctx.rotate(-start.theta);
+    if(robotVisualization.status==='visible'&&liveRobotPose){const q=pixel(liveRobotPose.x,liveRobotPose.y);if(q){const warning=robotState?.safetyState?.eStop!=='NONE'||(robotState?.errors?.length??0)>0;
+      const color=warning?'#8f0b22':robotState?.driving?'#16875f':'#c8102e';ctx.save();ctx.translate(q.x,q.y);ctx.rotate(-liveRobotPose.theta);
       ctx.fillStyle=color;ctx.strokeStyle='#f4fafc';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(-11,-8,22,16,5);ctx.fill();ctx.stroke();
       ctx.fillStyle='#f4fafc';ctx.beginPath();ctx.moveTo(14,0);ctx.lineTo(6,-5);ctx.lineTo(6,5);ctx.closePath();ctx.fill();ctx.restore();
-      ctx.strokeStyle=start.positionInitialized?'rgba(56,217,150,.8)':'rgba(244,185,66,.8)';ctx.lineWidth=2;
+      ctx.strokeStyle=liveRobotPose.positionInitialized?'rgba(56,217,150,.8)':'rgba(244,185,66,.8)';ctx.lineWidth=2;
       ctx.beginPath();ctx.arc(q.x,q.y,18,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#fff';ctx.font='bold 11px sans-serif';ctx.fillText('PHARMAROBOT',q.x+22,q.y-13);}}
     if(startProjection?.projectedPose){
       const q=pixel(startProjection.projectedPose.x,startProjection.projectedPose.y);
@@ -207,7 +224,7 @@ export const MapCanvas=({mode,onCell}:Props)=>{
     locatorImage,locatorRaster,layers,robotState,generatedOrder,replanOriginal,replanBlocked,
     replanNew,temporaryObstacleCells,inflatedTemporaryObstacleCells,
     replanExplored,startProjection,recoveryPath,plannerDiagnostics,optimizedPath,
-    baselinePath,rejectedEnhancementPath]);
+    baselinePath,rejectedEnhancementPath,liveRobotPose,robotVisualization]);
   const cellFromEvent=(event:React.MouseEvent<HTMLCanvasElement>):GridCell|null=>{
     if(!grid||!canvas.current)return null;const rect=canvas.current.getBoundingClientRect();
     const base=Math.min(rect.width/grid.metadata.width,rect.height/grid.metadata.height)*view.zoom;
@@ -277,6 +294,9 @@ export const MapCanvas=({mode,onCell}:Props)=>{
     </Paper>
     <Box sx={{position:'absolute',left:12,bottom:12,display:'flex',gap:1}}>
       <Chip size="small" label={`Mode: ${mode}`} color="primary"/>
+      <Chip size="small" label={robotVisualization.label}
+        color={robotVisualization.status==='visible'?'success':
+          robotVisualization.status==='outside-map'?'warning':'default'}/>
       <Chip size="small" label={mouse.cell?`Grid ${mouse.cell.column}, ${mouse.cell.row}`:'Grid —'}/>
       <Chip size="small" label={mouse.world?`World ${mouse.world.x.toFixed(3)}, ${mouse.world.y.toFixed(3)} m`:'World —'}/>
     </Box>

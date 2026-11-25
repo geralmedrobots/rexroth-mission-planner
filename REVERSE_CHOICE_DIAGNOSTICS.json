@@ -1,0 +1,2272 @@
+[
+  {
+    "name": "defaults",
+    "synthetic": true,
+    "start": {
+      "x": 3,
+      "y": 2,
+      "theta": 0
+    },
+    "goal": {
+      "x": 2,
+      "y": 2
+    },
+    "goalTheta": 0,
+    "alternatives": [
+      {
+        "direction": "FORWARD",
+        "feasible": true,
+        "cost": 1.942477796076938,
+        "actions": [
+          {
+            "type": "ROTATE_IN_PLACE",
+            "rotationRad": 3.141592653589793,
+            "costComponents": {
+              "distance": 0,
+              "rotation": 0.47123889803846897,
+              "reverse": 0,
+              "directionSwitch": 0,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0,
+              "total": 0.47123889803846897
+            }
+          },
+          {
+            "type": "TRANSLATE_FORWARD",
+            "distanceM": 1,
+            "costComponents": {
+              "distance": 0.9999999999999999,
+              "rotation": 0,
+              "reverse": 0,
+              "directionSwitch": 0,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0,
+              "total": 0.9999999999999999
+            }
+          },
+          {
+            "type": "ROTATE_IN_PLACE",
+            "rotationRad": 3.141592653589793,
+            "costComponents": {
+              "distance": 0,
+              "rotation": 0,
+              "reverse": 0,
+              "directionSwitch": 0,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0.47123889803846897,
+              "total": 0.47123889803846897
+            }
+          }
+        ],
+        "rejections": []
+      },
+      {
+        "direction": "REVERSE",
+        "feasible": true,
+        "cost": 4,
+        "actions": [
+          {
+            "type": "DIRECTION_CHANGE",
+            "costComponents": {
+              "distance": 0,
+              "rotation": 0,
+              "reverse": 0,
+              "directionSwitch": 1,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0,
+              "total": 1
+            }
+          },
+          {
+            "type": "TRANSLATE_REVERSE",
+            "distanceM": 1,
+            "costComponents": {
+              "distance": 0.9999999999999999,
+              "rotation": 0,
+              "reverse": 1.9999999999999998,
+              "directionSwitch": 0,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0,
+              "total": 3
+            }
+          }
+        ],
+        "rejections": []
+      }
+    ],
+    "started": {
+      "eventType": "motionplanner.started",
+      "planner": "motion-state",
+      "headingBins": 16,
+      "angularResolutionRad": 0.39269908169872414,
+      "angularResolutionDeg": 22.5,
+      "permissions": {
+        "forward": true,
+        "reverse": true,
+        "rotate": true
+      },
+      "effectiveConfiguration": {
+        "schemaVersion": "stage-5a",
+        "weights": {
+          "translationCostPerM": 1,
+          "rotationCostPerRad": 0.15,
+          "reverseCostPerM": 2,
+          "directionSwitchCost": 1,
+          "wallClearanceCost": 2,
+          "narrowPassageCost": 1.5,
+          "turnLocationCost": 1,
+          "terminalOrientationCostPerRad": 0.15
+        },
+        "clearance": {
+          "preferredM": 0.3,
+          "hardMinimumM": 0.1
+        },
+        "passage": {
+          "maximumWidthM": 1.8
+        },
+        "sampling": {
+          "translationCollisionIntervalM": 0.03,
+          "rotationCollisionIntervalDeg": 5,
+          "rotationCollisionIntervalRad": 0.08726646259971647
+        },
+        "lattice": {
+          "headingBinCount": 16,
+          "headingStepRad": 0.39269908169872414,
+          "headingStepDeg": 22.5,
+          "translationStepSource": "GRID_RESOLUTION"
+        },
+        "permissions": {
+          "forward": true,
+          "reverse": true,
+          "rotateInPlace": true
+        },
+        "footprint": {
+          "lengthM": 0.4,
+          "widthM": 0.22,
+          "centerOffsetXM": 0,
+          "centerOffsetYM": 0,
+          "configuredSafetyMarginM": 0,
+          "planningSafetyMarginM": 0.05,
+          "localizationMarginM": 0.05,
+          "effectiveSafetyMarginM": 0.1
+        },
+        "unknownCellsBlocked": true,
+        "maximumPlanningTimeMs": 3000
+      }
+    },
+    "selected": {
+      "plannerMode": "motion-state",
+      "planningDurationMs": 16.49289999999999,
+      "expandedStates": 7,
+      "selectedTotalCost": 1.942477796076938,
+      "translationCost": 0.9999999999999999,
+      "rotationCost": 0.47123889803846897,
+      "reverseCost": 0,
+      "directionSwitchCost": 0,
+      "clearanceWallCost": 0,
+      "narrowPassageCost": 0,
+      "turnLocationCost": 0,
+      "terminalOrientationCost": 0.47123889803846897,
+      "totalPathLengthM": 1,
+      "reversePathLengthM": 0,
+      "totalAbsoluteRotationRad": 6.283185307179586,
+      "totalAbsoluteRotationDeg": 360,
+      "rotationActionCount": 2,
+      "translationActionCount": 1,
+      "directionChangeCount": 0,
+      "minimumClearanceM": 6.4031242374328485,
+      "averageClearanceM": 6.4031242374328485,
+      "actionSequence": [
+        "R:180.0deg",
+        "F:1.000m",
+        "R:180.0deg"
+      ],
+      "actionSequenceTruncated": false,
+      "guideDurationMs": 3.292100000000005,
+      "refinementMediumClearanceM": 0.6278326048648661,
+      "refinementTightClearanceM": 0.4278326048648662,
+      "refinedPositionResolutionM": 0.025,
+      "guidePreprocessingMs": 1.3041999999999803,
+      "guideSearchMs": 0.348700000000008,
+      "guideResolutionM": 0.2,
+      "guideStatus": "found",
+      "guideCache": "miss",
+      "searchDurationMs": 4.98060000000001,
+      "searchBudgetMs": 3000,
+      "analyticConnectorAttempts": 1,
+      "analyticConnectorSuccesses": 1,
+      "unrestrictedExpanded": 0,
+      "unrestrictedFallbackRequired": false,
+      "guideLengthM": 1,
+      "corridorWidthUsedM": 1.25,
+      "weightedHeuristic": 1.25,
+      "longPrimitiveTransitions": 0,
+      "selectedDecisionEvidence": [
+        {
+          "actionIndex": 0,
+          "at": {
+            "x": 3,
+            "y": 2,
+            "theta": 0,
+            "direction": "FORWARD"
+          },
+          "selectedTransition": {
+            "type": "ROTATE_IN_PLACE",
+            "costComponents": {
+              "distance": 0,
+              "rotation": 0.47123889803846897,
+              "reverse": 0,
+              "directionSwitch": 0,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0,
+              "total": 0.47123889803846897
+            },
+            "clearanceM": null
+          },
+          "feasibleAlternatives": [
+            {
+              "type": "ROTATE_IN_PLACE",
+              "feasible": true,
+              "to": {
+                "x": 3,
+                "y": 2,
+                "theta": -0.3926990816987246,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0,
+                "rotation": 0.05890486225480868,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.05890486225480868
+              }
+            },
+            {
+              "type": "ROTATE_IN_PLACE",
+              "feasible": true,
+              "to": {
+                "x": 3,
+                "y": 2,
+                "theta": 0.3926990816987246,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0,
+                "rotation": 0.05890486225480868,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.05890486225480868
+              }
+            },
+            {
+              "type": "TRANSLATE_FORWARD",
+              "feasible": true,
+              "to": {
+                "x": 3.25,
+                "y": 2,
+                "theta": 0,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0.25,
+                "rotation": 0,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.25
+              }
+            },
+            {
+              "type": "TRANSLATE_FORWARD",
+              "feasible": true,
+              "to": {
+                "x": 3.5,
+                "y": 2,
+                "theta": 0,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0.5,
+                "rotation": 0,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.5
+              }
+            }
+          ],
+          "rejectedAlternatives": []
+        },
+        {
+          "actionIndex": 1,
+          "at": {
+            "x": 3,
+            "y": 2,
+            "theta": 3.141592653589793,
+            "direction": "FORWARD"
+          },
+          "selectedTransition": {
+            "type": "TRANSLATE_FORWARD",
+            "costComponents": {
+              "distance": 0.9999999999999999,
+              "rotation": 0,
+              "reverse": 0,
+              "directionSwitch": 0,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0,
+              "total": 0.9999999999999999
+            },
+            "clearanceM": null
+          },
+          "feasibleAlternatives": [
+            {
+              "type": "ROTATE_IN_PLACE",
+              "feasible": true,
+              "to": {
+                "x": 3,
+                "y": 2,
+                "theta": 2.7488935718910685,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0,
+                "rotation": 0.05890486225480868,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.05890486225480868
+              }
+            },
+            {
+              "type": "ROTATE_IN_PLACE",
+              "feasible": true,
+              "to": {
+                "x": 3,
+                "y": 2,
+                "theta": -2.7488935718910685,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0,
+                "rotation": 0.05890486225480868,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.05890486225480868
+              }
+            },
+            {
+              "type": "TRANSLATE_FORWARD",
+              "feasible": true,
+              "to": {
+                "x": 2.75,
+                "y": 2,
+                "theta": 3.141592653589793,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0.25,
+                "rotation": 0,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.25
+              }
+            },
+            {
+              "type": "TRANSLATE_FORWARD",
+              "feasible": true,
+              "to": {
+                "x": 2.5,
+                "y": 2,
+                "theta": 3.141592653589793,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0.5,
+                "rotation": 0,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.5
+              }
+            }
+          ],
+          "rejectedAlternatives": []
+        },
+        {
+          "actionIndex": 2,
+          "at": {
+            "x": 2,
+            "y": 2,
+            "theta": 3.141592653589793,
+            "direction": "FORWARD"
+          },
+          "selectedTransition": {
+            "type": "ROTATE_IN_PLACE",
+            "costComponents": {
+              "distance": 0,
+              "rotation": 0,
+              "reverse": 0,
+              "directionSwitch": 0,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0.47123889803846897,
+              "total": 0.47123889803846897
+            },
+            "clearanceM": null
+          },
+          "feasibleAlternatives": [
+            {
+              "type": "ROTATE_IN_PLACE",
+              "feasible": true,
+              "to": {
+                "x": 2,
+                "y": 2,
+                "theta": 2.7488935718910685,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0,
+                "rotation": 0.05890486225480868,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.05890486225480868
+              }
+            },
+            {
+              "type": "ROTATE_IN_PLACE",
+              "feasible": true,
+              "to": {
+                "x": 2,
+                "y": 2,
+                "theta": -2.7488935718910685,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0,
+                "rotation": 0.05890486225480868,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.05890486225480868
+              }
+            },
+            {
+              "type": "TRANSLATE_FORWARD",
+              "feasible": true,
+              "to": {
+                "x": 1.75,
+                "y": 2,
+                "theta": 3.141592653589793,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0.25,
+                "rotation": 0,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.25
+              }
+            },
+            {
+              "type": "TRANSLATE_FORWARD",
+              "feasible": true,
+              "to": {
+                "x": 1.5,
+                "y": 2,
+                "theta": 3.141592653589793,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0.5,
+                "rotation": 0,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.5
+              }
+            }
+          ],
+          "rejectedAlternatives": []
+        }
+      ],
+      "clearanceDistanceTradeoff": {
+        "selectedDistanceM": 1,
+        "selectedMinimumClearanceM": 6.4031242374328485,
+        "selectedAverageClearanceM": 6.4031242374328485,
+        "selectedWallClearanceCost": 0,
+        "higherClearanceTransitionConsidered": false,
+        "competingTransitionSamples": []
+      }
+    },
+    "completed": {
+      "eventType": "motionplanner.completed",
+      "refinementMediumClearanceM": 0.6278326048648661,
+      "refinementTightClearanceM": 0.4278326048648662,
+      "refinedPositionResolutionM": 0.025,
+      "guideDurationMs": 3.292100000000005,
+      "guidePreprocessingMs": 1.3041999999999803,
+      "guideSearchMs": 0.348700000000008,
+      "guideResolutionM": 0.2,
+      "guideStatus": "found",
+      "guideCache": "miss",
+      "searchDurationMs": 4.98060000000001,
+      "searchBudgetMs": 3000,
+      "analyticConnectorAttempts": 1,
+      "analyticConnectorSuccesses": 1,
+      "unrestrictedExpanded": 0,
+      "unrestrictedFallbackRequired": false,
+      "candidates": 29,
+      "rejected": 0,
+      "translationCollisions": 0,
+      "rotationCollisions": 0,
+      "primitiveAttempts": {
+        "0.500": 7,
+        "0.250": 7
+      },
+      "primitiveCollisions": {},
+      "primitiveClearanceRejections": {},
+      "primitiveAccepted": {
+        "0.500": 7,
+        "0.250": 7
+      },
+      "primitivePruned": {},
+      "generatedStatesByMode": {
+        "normal": 29,
+        "medium": 0,
+        "tight": 0
+      },
+      "minimumRefinementClearanceM": null,
+      "connectorTranslationCollisions": 0,
+      "connectorClearanceRejections": 0,
+      "success": true,
+      "durationMs": 16.49289999999999,
+      "expanded": 7
+    },
+    "initialDirectionChange": {
+      "eventType": "motionplanner.transition.candidate",
+      "transitionType": "DIRECTION_CHANGE",
+      "from": "19,30,0,FORWARD",
+      "to": "19,30,0,REVERSE",
+      "costComponents": {
+        "distance": 0,
+        "rotation": 0,
+        "reverse": 0,
+        "directionSwitch": 1,
+        "wallClearance": 0,
+        "narrowPassage": 0,
+        "turnLocation": 0,
+        "terminalOrientation": 0,
+        "total": 1
+      }
+    }
+  },
+  {
+    "name": "UI reverse risk zero, independent switch unchanged",
+    "synthetic": true,
+    "start": {
+      "x": 3,
+      "y": 2,
+      "theta": 0
+    },
+    "goal": {
+      "x": 2,
+      "y": 2
+    },
+    "goalTheta": 0,
+    "alternatives": [
+      {
+        "direction": "FORWARD",
+        "feasible": true,
+        "cost": 1.942477796076938,
+        "actions": [
+          {
+            "type": "ROTATE_IN_PLACE",
+            "rotationRad": 3.141592653589793,
+            "costComponents": {
+              "distance": 0,
+              "rotation": 0.47123889803846897,
+              "reverse": 0,
+              "directionSwitch": 0,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0,
+              "total": 0.47123889803846897
+            }
+          },
+          {
+            "type": "TRANSLATE_FORWARD",
+            "distanceM": 1,
+            "costComponents": {
+              "distance": 0.9999999999999999,
+              "rotation": 0,
+              "reverse": 0,
+              "directionSwitch": 0,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0,
+              "total": 0.9999999999999999
+            }
+          },
+          {
+            "type": "ROTATE_IN_PLACE",
+            "rotationRad": 3.141592653589793,
+            "costComponents": {
+              "distance": 0,
+              "rotation": 0,
+              "reverse": 0,
+              "directionSwitch": 0,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0.47123889803846897,
+              "total": 0.47123889803846897
+            }
+          }
+        ],
+        "rejections": []
+      },
+      {
+        "direction": "REVERSE",
+        "feasible": true,
+        "cost": 2,
+        "actions": [
+          {
+            "type": "DIRECTION_CHANGE",
+            "costComponents": {
+              "distance": 0,
+              "rotation": 0,
+              "reverse": 0,
+              "directionSwitch": 1,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0,
+              "total": 1
+            }
+          },
+          {
+            "type": "TRANSLATE_REVERSE",
+            "distanceM": 1,
+            "costComponents": {
+              "distance": 0.9999999999999999,
+              "rotation": 0,
+              "reverse": 0,
+              "directionSwitch": 0,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0,
+              "total": 0.9999999999999999
+            }
+          }
+        ],
+        "rejections": []
+      }
+    ],
+    "started": {
+      "eventType": "motionplanner.started",
+      "planner": "motion-state",
+      "headingBins": 16,
+      "angularResolutionRad": 0.39269908169872414,
+      "angularResolutionDeg": 22.5,
+      "permissions": {
+        "forward": true,
+        "reverse": true,
+        "rotate": true
+      },
+      "effectiveConfiguration": {
+        "schemaVersion": "stage-5a",
+        "weights": {
+          "translationCostPerM": 1,
+          "rotationCostPerRad": 0.15,
+          "reverseCostPerM": 0,
+          "directionSwitchCost": 1,
+          "wallClearanceCost": 2,
+          "narrowPassageCost": 1.5,
+          "turnLocationCost": 1,
+          "terminalOrientationCostPerRad": 0.15
+        },
+        "clearance": {
+          "preferredM": 0.3,
+          "hardMinimumM": 0.1
+        },
+        "passage": {
+          "maximumWidthM": 1.8
+        },
+        "sampling": {
+          "translationCollisionIntervalM": 0.03,
+          "rotationCollisionIntervalDeg": 5,
+          "rotationCollisionIntervalRad": 0.08726646259971647
+        },
+        "lattice": {
+          "headingBinCount": 16,
+          "headingStepRad": 0.39269908169872414,
+          "headingStepDeg": 22.5,
+          "translationStepSource": "GRID_RESOLUTION"
+        },
+        "permissions": {
+          "forward": true,
+          "reverse": true,
+          "rotateInPlace": true
+        },
+        "footprint": {
+          "lengthM": 0.4,
+          "widthM": 0.22,
+          "centerOffsetXM": 0,
+          "centerOffsetYM": 0,
+          "configuredSafetyMarginM": 0,
+          "planningSafetyMarginM": 0.05,
+          "localizationMarginM": 0.05,
+          "effectiveSafetyMarginM": 0.1
+        },
+        "unknownCellsBlocked": true,
+        "maximumPlanningTimeMs": 3000
+      }
+    },
+    "selected": {
+      "plannerMode": "motion-state",
+      "planningDurationMs": 7.475500000000011,
+      "expandedStates": 7,
+      "selectedTotalCost": 1.942477796076938,
+      "translationCost": 0.9999999999999999,
+      "rotationCost": 0.47123889803846897,
+      "reverseCost": 0,
+      "directionSwitchCost": 0,
+      "clearanceWallCost": 0,
+      "narrowPassageCost": 0,
+      "turnLocationCost": 0,
+      "terminalOrientationCost": 0.47123889803846897,
+      "totalPathLengthM": 1,
+      "reversePathLengthM": 0,
+      "totalAbsoluteRotationRad": 6.283185307179586,
+      "totalAbsoluteRotationDeg": 360,
+      "rotationActionCount": 2,
+      "translationActionCount": 1,
+      "directionChangeCount": 0,
+      "minimumClearanceM": 6.4031242374328485,
+      "averageClearanceM": 6.4031242374328485,
+      "actionSequence": [
+        "R:180.0deg",
+        "F:1.000m",
+        "R:180.0deg"
+      ],
+      "actionSequenceTruncated": false,
+      "guideDurationMs": 1.780300000000011,
+      "refinementMediumClearanceM": 0.6278326048648661,
+      "refinementTightClearanceM": 0.4278326048648662,
+      "refinedPositionResolutionM": 0.025,
+      "guidePreprocessingMs": 0.23990000000000578,
+      "guideSearchMs": 0.05249999999998067,
+      "guideResolutionM": 0.2,
+      "guideStatus": "found",
+      "guideCache": "miss",
+      "searchDurationMs": 3.312899999999985,
+      "searchBudgetMs": 3000,
+      "analyticConnectorAttempts": 1,
+      "analyticConnectorSuccesses": 1,
+      "unrestrictedExpanded": 0,
+      "unrestrictedFallbackRequired": false,
+      "guideLengthM": 1,
+      "corridorWidthUsedM": 1.25,
+      "weightedHeuristic": 1.25,
+      "longPrimitiveTransitions": 0,
+      "selectedDecisionEvidence": [
+        {
+          "actionIndex": 0,
+          "at": {
+            "x": 3,
+            "y": 2,
+            "theta": 0,
+            "direction": "FORWARD"
+          },
+          "selectedTransition": {
+            "type": "ROTATE_IN_PLACE",
+            "costComponents": {
+              "distance": 0,
+              "rotation": 0.47123889803846897,
+              "reverse": 0,
+              "directionSwitch": 0,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0,
+              "total": 0.47123889803846897
+            },
+            "clearanceM": null
+          },
+          "feasibleAlternatives": [
+            {
+              "type": "ROTATE_IN_PLACE",
+              "feasible": true,
+              "to": {
+                "x": 3,
+                "y": 2,
+                "theta": -0.3926990816987246,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0,
+                "rotation": 0.05890486225480868,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.05890486225480868
+              }
+            },
+            {
+              "type": "ROTATE_IN_PLACE",
+              "feasible": true,
+              "to": {
+                "x": 3,
+                "y": 2,
+                "theta": 0.3926990816987246,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0,
+                "rotation": 0.05890486225480868,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.05890486225480868
+              }
+            },
+            {
+              "type": "TRANSLATE_FORWARD",
+              "feasible": true,
+              "to": {
+                "x": 3.25,
+                "y": 2,
+                "theta": 0,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0.25,
+                "rotation": 0,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.25
+              }
+            },
+            {
+              "type": "TRANSLATE_FORWARD",
+              "feasible": true,
+              "to": {
+                "x": 3.5,
+                "y": 2,
+                "theta": 0,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0.5,
+                "rotation": 0,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.5
+              }
+            }
+          ],
+          "rejectedAlternatives": []
+        },
+        {
+          "actionIndex": 1,
+          "at": {
+            "x": 3,
+            "y": 2,
+            "theta": 3.141592653589793,
+            "direction": "FORWARD"
+          },
+          "selectedTransition": {
+            "type": "TRANSLATE_FORWARD",
+            "costComponents": {
+              "distance": 0.9999999999999999,
+              "rotation": 0,
+              "reverse": 0,
+              "directionSwitch": 0,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0,
+              "total": 0.9999999999999999
+            },
+            "clearanceM": null
+          },
+          "feasibleAlternatives": [
+            {
+              "type": "ROTATE_IN_PLACE",
+              "feasible": true,
+              "to": {
+                "x": 3,
+                "y": 2,
+                "theta": 2.7488935718910685,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0,
+                "rotation": 0.05890486225480868,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.05890486225480868
+              }
+            },
+            {
+              "type": "ROTATE_IN_PLACE",
+              "feasible": true,
+              "to": {
+                "x": 3,
+                "y": 2,
+                "theta": -2.7488935718910685,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0,
+                "rotation": 0.05890486225480868,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.05890486225480868
+              }
+            },
+            {
+              "type": "TRANSLATE_FORWARD",
+              "feasible": true,
+              "to": {
+                "x": 2.75,
+                "y": 2,
+                "theta": 3.141592653589793,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0.25,
+                "rotation": 0,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.25
+              }
+            },
+            {
+              "type": "TRANSLATE_FORWARD",
+              "feasible": true,
+              "to": {
+                "x": 2.5,
+                "y": 2,
+                "theta": 3.141592653589793,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0.5,
+                "rotation": 0,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.5
+              }
+            }
+          ],
+          "rejectedAlternatives": []
+        },
+        {
+          "actionIndex": 2,
+          "at": {
+            "x": 2,
+            "y": 2,
+            "theta": 3.141592653589793,
+            "direction": "FORWARD"
+          },
+          "selectedTransition": {
+            "type": "ROTATE_IN_PLACE",
+            "costComponents": {
+              "distance": 0,
+              "rotation": 0,
+              "reverse": 0,
+              "directionSwitch": 0,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0.47123889803846897,
+              "total": 0.47123889803846897
+            },
+            "clearanceM": null
+          },
+          "feasibleAlternatives": [
+            {
+              "type": "ROTATE_IN_PLACE",
+              "feasible": true,
+              "to": {
+                "x": 2,
+                "y": 2,
+                "theta": 2.7488935718910685,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0,
+                "rotation": 0.05890486225480868,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.05890486225480868
+              }
+            },
+            {
+              "type": "ROTATE_IN_PLACE",
+              "feasible": true,
+              "to": {
+                "x": 2,
+                "y": 2,
+                "theta": -2.7488935718910685,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0,
+                "rotation": 0.05890486225480868,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.05890486225480868
+              }
+            },
+            {
+              "type": "TRANSLATE_FORWARD",
+              "feasible": true,
+              "to": {
+                "x": 1.75,
+                "y": 2,
+                "theta": 3.141592653589793,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0.25,
+                "rotation": 0,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.25
+              }
+            },
+            {
+              "type": "TRANSLATE_FORWARD",
+              "feasible": true,
+              "to": {
+                "x": 1.5,
+                "y": 2,
+                "theta": 3.141592653589793,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0.5,
+                "rotation": 0,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.5
+              }
+            }
+          ],
+          "rejectedAlternatives": []
+        }
+      ],
+      "clearanceDistanceTradeoff": {
+        "selectedDistanceM": 1,
+        "selectedMinimumClearanceM": 6.4031242374328485,
+        "selectedAverageClearanceM": 6.4031242374328485,
+        "selectedWallClearanceCost": 0,
+        "higherClearanceTransitionConsidered": false,
+        "competingTransitionSamples": []
+      }
+    },
+    "completed": {
+      "eventType": "motionplanner.completed",
+      "refinementMediumClearanceM": 0.6278326048648661,
+      "refinementTightClearanceM": 0.4278326048648662,
+      "refinedPositionResolutionM": 0.025,
+      "guideDurationMs": 1.780300000000011,
+      "guidePreprocessingMs": 0.23990000000000578,
+      "guideSearchMs": 0.05249999999998067,
+      "guideResolutionM": 0.2,
+      "guideStatus": "found",
+      "guideCache": "miss",
+      "searchDurationMs": 3.312899999999985,
+      "searchBudgetMs": 3000,
+      "analyticConnectorAttempts": 1,
+      "analyticConnectorSuccesses": 1,
+      "unrestrictedExpanded": 0,
+      "unrestrictedFallbackRequired": false,
+      "candidates": 29,
+      "rejected": 0,
+      "translationCollisions": 0,
+      "rotationCollisions": 0,
+      "primitiveAttempts": {
+        "0.500": 7,
+        "0.250": 7
+      },
+      "primitiveCollisions": {},
+      "primitiveClearanceRejections": {},
+      "primitiveAccepted": {
+        "0.500": 7,
+        "0.250": 7
+      },
+      "primitivePruned": {},
+      "generatedStatesByMode": {
+        "normal": 29,
+        "medium": 0,
+        "tight": 0
+      },
+      "minimumRefinementClearanceM": null,
+      "connectorTranslationCollisions": 0,
+      "connectorClearanceRejections": 0,
+      "success": true,
+      "durationMs": 7.475500000000011,
+      "expanded": 7
+    },
+    "initialDirectionChange": {
+      "eventType": "motionplanner.transition.candidate",
+      "transitionType": "DIRECTION_CHANGE",
+      "from": "19,30,0,FORWARD",
+      "to": "19,30,0,REVERSE",
+      "costComponents": {
+        "distance": 0,
+        "rotation": 0,
+        "reverse": 0,
+        "directionSwitch": 1,
+        "wallClearance": 0,
+        "narrowPassage": 0,
+        "turnLocation": 0,
+        "terminalOrientation": 0,
+        "total": 1
+      }
+    }
+  },
+  {
+    "name": "both reverse costs low",
+    "synthetic": true,
+    "start": {
+      "x": 3,
+      "y": 2,
+      "theta": 0
+    },
+    "goal": {
+      "x": 2,
+      "y": 2
+    },
+    "goalTheta": 0,
+    "alternatives": [
+      {
+        "direction": "FORWARD",
+        "feasible": true,
+        "cost": 1.942477796076938,
+        "actions": [
+          {
+            "type": "ROTATE_IN_PLACE",
+            "rotationRad": 3.141592653589793,
+            "costComponents": {
+              "distance": 0,
+              "rotation": 0.47123889803846897,
+              "reverse": 0,
+              "directionSwitch": 0,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0,
+              "total": 0.47123889803846897
+            }
+          },
+          {
+            "type": "TRANSLATE_FORWARD",
+            "distanceM": 1,
+            "costComponents": {
+              "distance": 0.9999999999999999,
+              "rotation": 0,
+              "reverse": 0,
+              "directionSwitch": 0,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0,
+              "total": 0.9999999999999999
+            }
+          },
+          {
+            "type": "ROTATE_IN_PLACE",
+            "rotationRad": 3.141592653589793,
+            "costComponents": {
+              "distance": 0,
+              "rotation": 0,
+              "reverse": 0,
+              "directionSwitch": 0,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0.47123889803846897,
+              "total": 0.47123889803846897
+            }
+          }
+        ],
+        "rejections": []
+      },
+      {
+        "direction": "REVERSE",
+        "feasible": true,
+        "cost": 1.02,
+        "actions": [
+          {
+            "type": "DIRECTION_CHANGE",
+            "costComponents": {
+              "distance": 0,
+              "rotation": 0,
+              "reverse": 0,
+              "directionSwitch": 0.01,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0,
+              "total": 0.01
+            }
+          },
+          {
+            "type": "TRANSLATE_REVERSE",
+            "distanceM": 1,
+            "costComponents": {
+              "distance": 0.9999999999999999,
+              "rotation": 0,
+              "reverse": 0.010000000000000002,
+              "directionSwitch": 0,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0,
+              "total": 1.01
+            }
+          }
+        ],
+        "rejections": []
+      }
+    ],
+    "started": {
+      "eventType": "motionplanner.started",
+      "planner": "motion-state",
+      "headingBins": 16,
+      "angularResolutionRad": 0.39269908169872414,
+      "angularResolutionDeg": 22.5,
+      "permissions": {
+        "forward": true,
+        "reverse": true,
+        "rotate": true
+      },
+      "effectiveConfiguration": {
+        "schemaVersion": "stage-5a",
+        "weights": {
+          "translationCostPerM": 1,
+          "rotationCostPerRad": 0.15,
+          "reverseCostPerM": 0.01,
+          "directionSwitchCost": 0.01,
+          "wallClearanceCost": 2,
+          "narrowPassageCost": 1.5,
+          "turnLocationCost": 1,
+          "terminalOrientationCostPerRad": 0.15
+        },
+        "clearance": {
+          "preferredM": 0.3,
+          "hardMinimumM": 0.1
+        },
+        "passage": {
+          "maximumWidthM": 1.8
+        },
+        "sampling": {
+          "translationCollisionIntervalM": 0.03,
+          "rotationCollisionIntervalDeg": 5,
+          "rotationCollisionIntervalRad": 0.08726646259971647
+        },
+        "lattice": {
+          "headingBinCount": 16,
+          "headingStepRad": 0.39269908169872414,
+          "headingStepDeg": 22.5,
+          "translationStepSource": "GRID_RESOLUTION"
+        },
+        "permissions": {
+          "forward": true,
+          "reverse": true,
+          "rotateInPlace": true
+        },
+        "footprint": {
+          "lengthM": 0.4,
+          "widthM": 0.22,
+          "centerOffsetXM": 0,
+          "centerOffsetYM": 0,
+          "configuredSafetyMarginM": 0,
+          "planningSafetyMarginM": 0.05,
+          "localizationMarginM": 0.05,
+          "effectiveSafetyMarginM": 0.1
+        },
+        "unknownCellsBlocked": true,
+        "maximumPlanningTimeMs": 3000
+      }
+    },
+    "selected": {
+      "plannerMode": "motion-state",
+      "planningDurationMs": 2.3621000000000265,
+      "expandedStates": 1,
+      "selectedTotalCost": 1.02,
+      "translationCost": 0.9999999999999999,
+      "rotationCost": 0,
+      "reverseCost": 0.010000000000000002,
+      "directionSwitchCost": 0.01,
+      "clearanceWallCost": 0,
+      "narrowPassageCost": 0,
+      "turnLocationCost": 0,
+      "terminalOrientationCost": 0,
+      "totalPathLengthM": 1,
+      "reversePathLengthM": 1,
+      "totalAbsoluteRotationRad": 0,
+      "totalAbsoluteRotationDeg": 0,
+      "rotationActionCount": 0,
+      "translationActionCount": 1,
+      "directionChangeCount": 1,
+      "minimumClearanceM": 6.4031242374328485,
+      "averageClearanceM": 6.4031242374328485,
+      "actionSequence": [
+        "D:F-R",
+        "B:1.000m"
+      ],
+      "actionSequenceTruncated": false,
+      "guideDurationMs": 0.41270000000000095,
+      "refinementMediumClearanceM": 0.6278326048648661,
+      "refinementTightClearanceM": 0.4278326048648662,
+      "refinedPositionResolutionM": 0.025,
+      "guidePreprocessingMs": 0.22299999999998477,
+      "guideSearchMs": 0.02230000000000132,
+      "guideResolutionM": 0.2,
+      "guideStatus": "found",
+      "guideCache": "miss",
+      "searchDurationMs": 0.7371000000000265,
+      "searchBudgetMs": 3000,
+      "analyticConnectorAttempts": 1,
+      "analyticConnectorSuccesses": 1,
+      "unrestrictedExpanded": 0,
+      "unrestrictedFallbackRequired": false,
+      "guideLengthM": 1,
+      "corridorWidthUsedM": 1.25,
+      "weightedHeuristic": 1.25,
+      "longPrimitiveTransitions": 0,
+      "selectedDecisionEvidence": [
+        {
+          "actionIndex": 0,
+          "at": {
+            "x": 3,
+            "y": 2,
+            "theta": 0,
+            "direction": "FORWARD"
+          },
+          "selectedTransition": {
+            "type": "DIRECTION_CHANGE",
+            "costComponents": {
+              "distance": 0,
+              "rotation": 0,
+              "reverse": 0,
+              "directionSwitch": 0.01,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0,
+              "total": 0.01
+            }
+          },
+          "feasibleAlternatives": [
+            {
+              "type": "DIRECTION_CHANGE",
+              "feasible": true,
+              "to": {
+                "x": 3,
+                "y": 2,
+                "theta": 0,
+                "direction": "REVERSE"
+              },
+              "costComponents": {
+                "distance": 0,
+                "rotation": 0,
+                "reverse": 0,
+                "directionSwitch": 0.01,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.01
+              }
+            },
+            {
+              "type": "ROTATE_IN_PLACE",
+              "feasible": true,
+              "to": {
+                "x": 3,
+                "y": 2,
+                "theta": -0.3926990816987246,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0,
+                "rotation": 0.05890486225480868,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.05890486225480868
+              }
+            },
+            {
+              "type": "ROTATE_IN_PLACE",
+              "feasible": true,
+              "to": {
+                "x": 3,
+                "y": 2,
+                "theta": 0.3926990816987246,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0,
+                "rotation": 0.05890486225480868,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.05890486225480868
+              }
+            },
+            {
+              "type": "TRANSLATE_FORWARD",
+              "feasible": true,
+              "to": {
+                "x": 3.25,
+                "y": 2,
+                "theta": 0,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0.25,
+                "rotation": 0,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.25
+              }
+            }
+          ],
+          "rejectedAlternatives": []
+        },
+        {
+          "actionIndex": 1,
+          "at": {
+            "x": 3,
+            "y": 2,
+            "theta": 0,
+            "direction": "REVERSE"
+          },
+          "selectedTransition": {
+            "type": "TRANSLATE_REVERSE",
+            "costComponents": {
+              "distance": 0.9999999999999999,
+              "rotation": 0,
+              "reverse": 0.010000000000000002,
+              "directionSwitch": 0,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0,
+              "total": 1.01
+            },
+            "clearanceM": null
+          },
+          "feasibleAlternatives": [
+            {
+              "type": "DIRECTION_CHANGE",
+              "feasible": true,
+              "to": {
+                "x": 3,
+                "y": 2,
+                "theta": 0,
+                "direction": "FORWARD"
+              },
+              "costComponents": {
+                "distance": 0,
+                "rotation": 0,
+                "reverse": 0,
+                "directionSwitch": 0.01,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.01
+              }
+            },
+            {
+              "type": "ROTATE_IN_PLACE",
+              "feasible": true,
+              "to": {
+                "x": 3,
+                "y": 2,
+                "theta": -0.3926990816987246,
+                "direction": "REVERSE"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0,
+                "rotation": 0.05890486225480868,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.05890486225480868
+              }
+            },
+            {
+              "type": "ROTATE_IN_PLACE",
+              "feasible": true,
+              "to": {
+                "x": 3,
+                "y": 2,
+                "theta": 0.3926990816987246,
+                "direction": "REVERSE"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0,
+                "rotation": 0.05890486225480868,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.05890486225480868
+              }
+            },
+            {
+              "type": "TRANSLATE_REVERSE",
+              "feasible": true,
+              "to": {
+                "x": 2.75,
+                "y": 2,
+                "theta": 0,
+                "direction": "REVERSE"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0.25,
+                "rotation": 0,
+                "reverse": 0.0024999999999999996,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.2525
+              }
+            }
+          ],
+          "rejectedAlternatives": []
+        }
+      ],
+      "clearanceDistanceTradeoff": {
+        "selectedDistanceM": 1,
+        "selectedMinimumClearanceM": 6.4031242374328485,
+        "selectedAverageClearanceM": 6.4031242374328485,
+        "selectedWallClearanceCost": 0,
+        "higherClearanceTransitionConsidered": false,
+        "competingTransitionSamples": []
+      }
+    },
+    "completed": {
+      "eventType": "motionplanner.completed",
+      "refinementMediumClearanceM": 0.6278326048648661,
+      "refinementTightClearanceM": 0.4278326048648662,
+      "refinedPositionResolutionM": 0.025,
+      "guideDurationMs": 0.41270000000000095,
+      "guidePreprocessingMs": 0.22299999999998477,
+      "guideSearchMs": 0.02230000000000132,
+      "guideResolutionM": 0.2,
+      "guideStatus": "found",
+      "guideCache": "miss",
+      "searchDurationMs": 0.7371000000000265,
+      "searchBudgetMs": 3000,
+      "analyticConnectorAttempts": 1,
+      "analyticConnectorSuccesses": 1,
+      "unrestrictedExpanded": 0,
+      "unrestrictedFallbackRequired": false,
+      "candidates": 5,
+      "rejected": 0,
+      "translationCollisions": 0,
+      "rotationCollisions": 0,
+      "primitiveAttempts": {
+        "0.500": 1,
+        "0.250": 1
+      },
+      "primitiveCollisions": {},
+      "primitiveClearanceRejections": {},
+      "primitiveAccepted": {
+        "0.500": 1,
+        "0.250": 1
+      },
+      "primitivePruned": {},
+      "generatedStatesByMode": {
+        "normal": 5,
+        "medium": 0,
+        "tight": 0
+      },
+      "minimumRefinementClearanceM": null,
+      "connectorTranslationCollisions": 0,
+      "connectorClearanceRejections": 0,
+      "success": true,
+      "durationMs": 2.3621000000000265,
+      "expanded": 1
+    },
+    "initialDirectionChange": {
+      "eventType": "motionplanner.transition.candidate",
+      "transitionType": "DIRECTION_CHANGE",
+      "from": "19,30,0,FORWARD",
+      "to": "19,30,0,REVERSE",
+      "costComponents": {
+        "distance": 0,
+        "rotation": 0,
+        "reverse": 0,
+        "directionSwitch": 0.01,
+        "wallClearance": 0,
+        "narrowPassage": 0,
+        "turnLocation": 0,
+        "terminalOrientation": 0,
+        "total": 0.01
+      }
+    }
+  },
+  {
+    "name": "no final heading, UI reverse risk zero",
+    "synthetic": true,
+    "start": {
+      "x": 3,
+      "y": 2,
+      "theta": 0
+    },
+    "goal": {
+      "x": 2,
+      "y": 2
+    },
+    "goalTheta": null,
+    "alternatives": [
+      {
+        "direction": "FORWARD",
+        "feasible": true,
+        "cost": 1.471238898038469,
+        "actions": [
+          {
+            "type": "ROTATE_IN_PLACE",
+            "rotationRad": 3.141592653589793,
+            "costComponents": {
+              "distance": 0,
+              "rotation": 0.47123889803846897,
+              "reverse": 0,
+              "directionSwitch": 0,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0,
+              "total": 0.47123889803846897
+            }
+          },
+          {
+            "type": "TRANSLATE_FORWARD",
+            "distanceM": 1,
+            "costComponents": {
+              "distance": 0.9999999999999999,
+              "rotation": 0,
+              "reverse": 0,
+              "directionSwitch": 0,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0,
+              "total": 0.9999999999999999
+            }
+          }
+        ],
+        "rejections": []
+      },
+      {
+        "direction": "REVERSE",
+        "feasible": true,
+        "cost": 2,
+        "actions": [
+          {
+            "type": "DIRECTION_CHANGE",
+            "costComponents": {
+              "distance": 0,
+              "rotation": 0,
+              "reverse": 0,
+              "directionSwitch": 1,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0,
+              "total": 1
+            }
+          },
+          {
+            "type": "TRANSLATE_REVERSE",
+            "distanceM": 1,
+            "costComponents": {
+              "distance": 0.9999999999999999,
+              "rotation": 0,
+              "reverse": 0,
+              "directionSwitch": 0,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0,
+              "total": 0.9999999999999999
+            }
+          }
+        ],
+        "rejections": []
+      }
+    ],
+    "started": {
+      "eventType": "motionplanner.started",
+      "planner": "motion-state",
+      "headingBins": 16,
+      "angularResolutionRad": 0.39269908169872414,
+      "angularResolutionDeg": 22.5,
+      "permissions": {
+        "forward": true,
+        "reverse": true,
+        "rotate": true
+      },
+      "effectiveConfiguration": {
+        "schemaVersion": "stage-5a",
+        "weights": {
+          "translationCostPerM": 1,
+          "rotationCostPerRad": 0.15,
+          "reverseCostPerM": 0,
+          "directionSwitchCost": 1,
+          "wallClearanceCost": 2,
+          "narrowPassageCost": 1.5,
+          "turnLocationCost": 1,
+          "terminalOrientationCostPerRad": 0.15
+        },
+        "clearance": {
+          "preferredM": 0.3,
+          "hardMinimumM": 0.1
+        },
+        "passage": {
+          "maximumWidthM": 1.8
+        },
+        "sampling": {
+          "translationCollisionIntervalM": 0.03,
+          "rotationCollisionIntervalDeg": 5,
+          "rotationCollisionIntervalRad": 0.08726646259971647
+        },
+        "lattice": {
+          "headingBinCount": 16,
+          "headingStepRad": 0.39269908169872414,
+          "headingStepDeg": 22.5,
+          "translationStepSource": "GRID_RESOLUTION"
+        },
+        "permissions": {
+          "forward": true,
+          "reverse": true,
+          "rotateInPlace": true
+        },
+        "footprint": {
+          "lengthM": 0.4,
+          "widthM": 0.22,
+          "centerOffsetXM": 0,
+          "centerOffsetYM": 0,
+          "configuredSafetyMarginM": 0,
+          "planningSafetyMarginM": 0.05,
+          "localizationMarginM": 0.05,
+          "effectiveSafetyMarginM": 0.1
+        },
+        "unknownCellsBlocked": true,
+        "maximumPlanningTimeMs": 3000
+      }
+    },
+    "selected": {
+      "plannerMode": "motion-state",
+      "planningDurationMs": 3.0851000000000113,
+      "expandedStates": 7,
+      "selectedTotalCost": 1.471238898038469,
+      "translationCost": 0.9999999999999999,
+      "rotationCost": 0.47123889803846897,
+      "reverseCost": 0,
+      "directionSwitchCost": 0,
+      "clearanceWallCost": 0,
+      "narrowPassageCost": 0,
+      "turnLocationCost": 0,
+      "terminalOrientationCost": 0,
+      "totalPathLengthM": 1,
+      "reversePathLengthM": 0,
+      "totalAbsoluteRotationRad": 3.141592653589793,
+      "totalAbsoluteRotationDeg": 180,
+      "rotationActionCount": 1,
+      "translationActionCount": 1,
+      "directionChangeCount": 0,
+      "minimumClearanceM": 6.4031242374328485,
+      "averageClearanceM": 6.4031242374328485,
+      "actionSequence": [
+        "R:180.0deg",
+        "F:1.000m"
+      ],
+      "actionSequenceTruncated": false,
+      "guideDurationMs": 0.08109999999999218,
+      "refinementMediumClearanceM": 0.6278326048648661,
+      "refinementTightClearanceM": 0.4278326048648662,
+      "refinedPositionResolutionM": 0.025,
+      "guidePreprocessingMs": 0.05010000000001469,
+      "guideSearchMs": 0.020600000000001728,
+      "guideResolutionM": 0.2,
+      "guideStatus": "found",
+      "guideCache": "hit",
+      "searchDurationMs": 1.3385999999999854,
+      "searchBudgetMs": 3000,
+      "analyticConnectorAttempts": 1,
+      "analyticConnectorSuccesses": 1,
+      "unrestrictedExpanded": 0,
+      "unrestrictedFallbackRequired": false,
+      "guideLengthM": 1,
+      "corridorWidthUsedM": 1.25,
+      "weightedHeuristic": 1.25,
+      "longPrimitiveTransitions": 0,
+      "selectedDecisionEvidence": [
+        {
+          "actionIndex": 0,
+          "at": {
+            "x": 3,
+            "y": 2,
+            "theta": 0,
+            "direction": "FORWARD"
+          },
+          "selectedTransition": {
+            "type": "ROTATE_IN_PLACE",
+            "costComponents": {
+              "distance": 0,
+              "rotation": 0.47123889803846897,
+              "reverse": 0,
+              "directionSwitch": 0,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0,
+              "total": 0.47123889803846897
+            },
+            "clearanceM": null
+          },
+          "feasibleAlternatives": [
+            {
+              "type": "ROTATE_IN_PLACE",
+              "feasible": true,
+              "to": {
+                "x": 3,
+                "y": 2,
+                "theta": -0.3926990816987246,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0,
+                "rotation": 0.05890486225480868,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.05890486225480868
+              }
+            },
+            {
+              "type": "ROTATE_IN_PLACE",
+              "feasible": true,
+              "to": {
+                "x": 3,
+                "y": 2,
+                "theta": 0.3926990816987246,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0,
+                "rotation": 0.05890486225480868,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.05890486225480868
+              }
+            },
+            {
+              "type": "TRANSLATE_FORWARD",
+              "feasible": true,
+              "to": {
+                "x": 3.25,
+                "y": 2,
+                "theta": 0,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0.25,
+                "rotation": 0,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.25
+              }
+            },
+            {
+              "type": "TRANSLATE_FORWARD",
+              "feasible": true,
+              "to": {
+                "x": 3.5,
+                "y": 2,
+                "theta": 0,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0.5,
+                "rotation": 0,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.5
+              }
+            }
+          ],
+          "rejectedAlternatives": []
+        },
+        {
+          "actionIndex": 1,
+          "at": {
+            "x": 3,
+            "y": 2,
+            "theta": 3.141592653589793,
+            "direction": "FORWARD"
+          },
+          "selectedTransition": {
+            "type": "TRANSLATE_FORWARD",
+            "costComponents": {
+              "distance": 0.9999999999999999,
+              "rotation": 0,
+              "reverse": 0,
+              "directionSwitch": 0,
+              "wallClearance": 0,
+              "narrowPassage": 0,
+              "turnLocation": 0,
+              "terminalOrientation": 0,
+              "total": 0.9999999999999999
+            },
+            "clearanceM": null
+          },
+          "feasibleAlternatives": [
+            {
+              "type": "ROTATE_IN_PLACE",
+              "feasible": true,
+              "to": {
+                "x": 3,
+                "y": 2,
+                "theta": 2.7488935718910685,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0,
+                "rotation": 0.05890486225480868,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.05890486225480868
+              }
+            },
+            {
+              "type": "ROTATE_IN_PLACE",
+              "feasible": true,
+              "to": {
+                "x": 3,
+                "y": 2,
+                "theta": -2.7488935718910685,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0,
+                "rotation": 0.05890486225480868,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.05890486225480868
+              }
+            },
+            {
+              "type": "TRANSLATE_FORWARD",
+              "feasible": true,
+              "to": {
+                "x": 2.75,
+                "y": 2,
+                "theta": 3.141592653589793,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0.25,
+                "rotation": 0,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.25
+              }
+            },
+            {
+              "type": "TRANSLATE_FORWARD",
+              "feasible": true,
+              "to": {
+                "x": 2.5,
+                "y": 2,
+                "theta": 3.141592653589793,
+                "direction": "FORWARD"
+              },
+              "clearanceM": null,
+              "costComponents": {
+                "distance": 0.5,
+                "rotation": 0,
+                "reverse": 0,
+                "directionSwitch": 0,
+                "wallClearance": 0,
+                "narrowPassage": 0,
+                "turnLocation": 0,
+                "terminalOrientation": 0,
+                "total": 0.5
+              }
+            }
+          ],
+          "rejectedAlternatives": []
+        }
+      ],
+      "clearanceDistanceTradeoff": {
+        "selectedDistanceM": 1,
+        "selectedMinimumClearanceM": 6.4031242374328485,
+        "selectedAverageClearanceM": 6.4031242374328485,
+        "selectedWallClearanceCost": 0,
+        "higherClearanceTransitionConsidered": false,
+        "competingTransitionSamples": []
+      }
+    },
+    "completed": {
+      "eventType": "motionplanner.completed",
+      "refinementMediumClearanceM": 0.6278326048648661,
+      "refinementTightClearanceM": 0.4278326048648662,
+      "refinedPositionResolutionM": 0.025,
+      "guideDurationMs": 0.08109999999999218,
+      "guidePreprocessingMs": 0.05010000000001469,
+      "guideSearchMs": 0.020600000000001728,
+      "guideResolutionM": 0.2,
+      "guideStatus": "found",
+      "guideCache": "hit",
+      "searchDurationMs": 1.3385999999999854,
+      "searchBudgetMs": 3000,
+      "analyticConnectorAttempts": 1,
+      "analyticConnectorSuccesses": 1,
+      "unrestrictedExpanded": 0,
+      "unrestrictedFallbackRequired": false,
+      "candidates": 29,
+      "rejected": 0,
+      "translationCollisions": 0,
+      "rotationCollisions": 0,
+      "primitiveAttempts": {
+        "0.500": 7,
+        "0.250": 7
+      },
+      "primitiveCollisions": {},
+      "primitiveClearanceRejections": {},
+      "primitiveAccepted": {
+        "0.500": 7,
+        "0.250": 7
+      },
+      "primitivePruned": {},
+      "generatedStatesByMode": {
+        "normal": 29,
+        "medium": 0,
+        "tight": 0
+      },
+      "minimumRefinementClearanceM": null,
+      "connectorTranslationCollisions": 0,
+      "connectorClearanceRejections": 0,
+      "success": true,
+      "durationMs": 3.0851000000000113,
+      "expanded": 7
+    },
+    "initialDirectionChange": {
+      "eventType": "motionplanner.transition.candidate",
+      "transitionType": "DIRECTION_CHANGE",
+      "from": "19,30,0,FORWARD",
+      "to": "19,30,0,REVERSE",
+      "costComponents": {
+        "distance": 0,
+        "rotation": 0,
+        "reverse": 0,
+        "directionSwitch": 1,
+        "wallClearance": 0,
+        "narrowPassage": 0,
+        "turnLocation": 0,
+        "terminalOrientation": 0,
+        "total": 1
+      }
+    }
+  }
+]

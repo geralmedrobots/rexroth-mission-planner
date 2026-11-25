@@ -61,7 +61,8 @@ export const useMqtt = ():void => {
           });
            afterMap.receiveRokitErrors(state.errors??[],receivedAt,state.orderId??'');
            set({state,rawStatePayload:raw,stateReceivedAt:receivedAt,
-             mqttReceiveMetadata:metadata,start:snapshot?.pose??afterMap.start});
+             mqttReceiveMetadata:metadata});
+           afterMap.updateTelemetryStart(snapshot?.pose??afterMap.start);
            useCorridorCompatibilityStore.getState().receiveState(
              state,receivedAtMs,0,
              metadata.lastVisualizationReceiveTime===null?Number.POSITIVE_INFINITY:
@@ -113,7 +114,8 @@ export const useMqtt = ():void => {
             activeMapResolution:mapResolution,
           });
            set({visualization,rawVisualizationPayload:raw,visualizationReceivedAt:receivedAt,
-             mqttReceiveMetadata:metadata,start:snapshot?.pose??afterMap.start});
+             mqttReceiveMetadata:metadata});
+           afterMap.updateTelemetryStart(snapshot?.pose??afterMap.start);
            useCorridorCompatibilityStore.getState().receiveVisualization(
              visualization,raw,receivedAtMs);
           LogService.write('mqtt','info',

@@ -71,9 +71,12 @@ import { createDiagnosticEvent, OperationalLogDiagnosticSink } from './features/
 import { mqttService } from './services/MqttService';
 import { useAppStore } from './stores/appStore';
 import { PlanningCoordinator } from './features/planning/PlanningCoordinator';
-import { createPlanningConfigurationSnapshot, type PlanningConfigurationSnapshot } from './domain/planning/PlanningConfigurationSnapshot';
-import { createMotionPlannerScenarioArtifact } from './domain/planning/MotionPlannerScenarioArtifact';
+import { isCurrentRouteOrder, RoutePreparationGuard } from './features/planning/RouteRevisionGuard';
+import { createPlanningConfigurationSnapshot } from './domain/planning/PlanningConfigurationSnapshot';
+import { validateMotionPlannerScenarioArtifact } from './domain/planning/MotionPlannerScenarioArtifact';
+import { buildLegacyMotionPlan } from './domain/motion/LegacyMotionPlanBuilder';
 import { MissionController } from './features/mission/MissionController';
+import { stage5BRecording } from './services/Stage5BRecordingService';
 
 const navExpandedWidth=224; const navCollapsedWidth=76; const rightWidth=360;
 const safety='This application is not a safety function. Vehicle safety must be provided by certified safety hardware and the machine safety system.';
@@ -81,7 +84,10 @@ const publishWarning='Test only in a controlled area. Use a low maximum speed. E
 const operationalDiagnosticSink = new OperationalLogDiagnosticSink((category, level, message) =>
   LogService.write(category, level, message));
 const appSessionId = crypto.randomUUID();
-const planningCoordinator = new PlanningCoordinator({ diagnostics: operationalDiagnosticSink });
+const planningCoordinator = new PlanningCoordinator({ diagnostics: operationalDiagnosticSink,
+  onRecordingStart: (inputs, configuration) => stage5BRecording.start(inputs, configuration),
+  onScenarioCaptured: artifact => useAppStore.getState().set({lastPlanningScenario:artifact}),
+});
 const missionController = new MissionController(operationalDiagnosticSink);
 interface ConfirmationState {
   title:string;
@@ -123,7 +129,7 @@ const EffectiveMotionStateConfigurationPanel=({plannerOptions,footprint}:{
         <Field label="Translation" value={`${effective.weights.translationCostPerM} cost/m`}/>
         <Field label="Rotation" value={`${effective.weights.rotationCostPerRad} cost/rad`}/>
         <Field label="Reverse" value={`${effective.weights.reverseCostPerM} cost/m`}/>
-        <Field label="Direction switch" value={`${effective.weights.directionSwitchCost} cost/switch`}/>
+        <Field label="Direction preference" value={`${effective.weights.directionSwitchCost} cost/non-preferred manoeuvre`}/>
         <Field label="Wall clearance" value={effective.weights.wallClearanceCost}/>
         <Field label="Preferred / hard clearance" value={`${effective.clearance.preferredM} / ${effective.clearance.hardMinimumM} m`}/>
         <Field label="Narrow passage" value={effective.weights.narrowPassageCost}/>
@@ -156,12 +162,13 @@ export default function App(){
   const [diagnosticSeverity,setDiagnosticSeverity]=useState<'all'|'info'|'warning'|'error'>('all');
   const [pauseLogScroll,setPauseLogScroll]=useState(false);
   const [toast,setToast]=useState<{severity:'success'|'warning'|'error'|'info';message:string}>();
-  const planningConfigurationRef=useRef<PlanningConfigurationSnapshot|undefined>(undefined);
   const [confirmation,setConfirmation]=useState<ConfirmationState>();
   const confirmationResolver=useRef<((confirmed:boolean)=>void)|null>(null);
+  const lastLivePoseResolutionDiagnostic=useRef<string|undefined>(undefined);
   const [routePhase,setRoutePhase]=useState('Selecting destination');
   const [dispatchCountdown,setDispatchCountdown]=useState<number|null>(null);
   const dispatchToken=useRef(0);
+  const routePreparationGuard=useRef(new RoutePreparationGuard());
   const [saveDestinationOpen,setSaveDestinationOpen]=useState(false);
   const [destinationName,setDestinationName]=useState('');
   const [destinationCategory,setDestinationCategory]=useState<DestinationCategory>('other');
@@ -228,6 +235,29 @@ export default function App(){
   const activeMapId=navigatorMapId??'—';
   const locatorComparison=compareMapIds(locator.loadedMap?.mapName,navigatorMapId);
   const locatorMismatch=Boolean(navigatorMapId&&locator.loadedMap&&!locatorComparison.matches);
+  useEffect(()=>{
+    const pose=poseSnapshot?.pose;
+    const message=[
+      '[live-pose-resolution-check]',
+      `poseSnapshot=${pose?'present':'missing'}`,
+      `source=${poseSnapshot?.source??'<none>'}`,
+      `mapIdSource=${poseSnapshot?.mapIdSource??'<none>'}`,
+      `activeMap=${navigatorMapId??'<none>'}`,
+      `activeMapSource=${activeMapResolution.source}`,
+      `loadedLocatorMap=${locator.loadedMap?.mapName??'<none>'}`,
+      `confirmedBinding=${store.confirmedMapBinding?.locatorMapName??'<none>'}`,
+      `stateMapId=${store.stateMapId??'<empty>'}`,
+      `visualizationMapId=${store.visualizationMapId??'<empty>'}`,
+      `world=${pose?`(${pose.x.toFixed(3)},${pose.y.toFixed(3)},theta=${pose.theta.toFixed(3)})`:'<none>'}`,
+      `positionInitialized=${pose?.positionInitialized??false}`,
+    ].join('\n');
+    if(message===lastLivePoseResolutionDiagnostic.current)return;
+    lastLivePoseResolutionDiagnostic.current=message;
+    LogService.write('system','info',message);
+  },[
+    activeMapResolution.source,locator.loadedMap?.mapName,navigatorMapId,poseSnapshot,
+    store.confirmedMapBinding?.locatorMapName,store.stateMapId,store.visualizationMapId,
+  ]);
   const mission=new MissionMonitor().calculate(store.sentOrder,store.state,{
     publishedAtMs:store.sentOrderPublishedAtMs,nowMs:now,acceptanceTimeoutMs:store.orderSettings.acceptanceTimeoutMs,
     publishing:store.publishingOrder,
@@ -287,30 +317,41 @@ export default function App(){
     }else store.set({selectedCell:cell});
   };
   const calculatePath=async(startOverride?:RobotPose,goalOverride?:RobotPose):Promise<PathPoint[]|undefined>=>{
-    const routeStart=startOverride??store.start;
-    const routeGoal=goalOverride??store.goal;
-    if(!store.grid||!routeStart||!routeGoal){LogService.write('planner','error','Load a map and set start and goal first.');return;}
-    if(store.plannerMode==='manual'){
-      const finalPath:PathPoint[]=[routeStart,...store.waypoints,routeGoal];
-      const valid=new PathCollisionValidator().pathIsFree(store.grid,finalPath,store.footprint,store.plannerOptions.collisionSampleInterval);
-      store.set({rawPath:finalPath,finalPath,plannerResult:{success:valid,error:valid?undefined:'Manual path intersects obstacles.',
+    const selected=useAppStore.getState();
+    const revision=selected.routeRevision;
+    const routeStart=startOverride??selected.start;
+    const routeGoal=goalOverride??selected.goal;
+    if(!selected.grid||!routeStart||!routeGoal){LogService.write('planner','error','Load a map and set start and goal first.');return;}
+    if(selected.plannerMode==='manual'){
+      const finalPath:PathPoint[]=[routeStart,...selected.waypoints,routeGoal];
+      const valid=new PathCollisionValidator().pathIsFree(selected.grid,finalPath,selected.footprint,selected.plannerOptions.collisionSampleInterval);
+      const plannerResult:PlannerResult={success:valid,error:valid?undefined:'Manual path intersects obstacles.',
         rawPath:finalPath,simplifiedPath:finalPath,finalPath,statistics:{visitedCells:0,durationMs:0,rawPointCount:finalPath.length,
-          simplifiedPointCount:finalPath.length,finalPointCount:finalPath.length}}});
-      return valid?finalPath:undefined;
+          simplifiedPointCount:finalPath.length,finalPointCount:finalPath.length}};
+      const accepted=selected.commitPlannedRoute(revision,{start:routeStart,rawPath:finalPath,finalPath,
+        plannerResult,planningConfiguration:planningCoordinator.createSnapshot(selected)});
+      return accepted&&valid?finalPath:undefined;
     }
-    store.set({planning:true,rawPath:[],finalPath:[]});
+    if(!selected.beginPlanning(revision))return undefined;
+    selected.set({rawPath:[],finalPath:[],plannerResult:undefined,
+      plannedRouteRevision:undefined,generatedOrder:undefined,generatedOrderRouteRevision:undefined,
+      validation:undefined,corridorDiagnostics:[],planningConfiguration:undefined});
     try{
       const result=await planningCoordinator.plan({
-        grid:structuredClone(store.grid), start:structuredClone(routeStart), goal:structuredClone(routeGoal),
-        waypoints:structuredClone(store.waypoints), plannerMode:store.plannerMode,
-        plannerOptions:structuredClone(store.plannerOptions), footprint:structuredClone(store.footprint),
-        orderSettings:structuredClone(store.orderSettings), goalThetaExplicit:store.goalThetaExplicit,
-        sessionId:appSessionId, missionId:missionController.snapshot.missionId,
+        grid:structuredClone(selected.grid), start:structuredClone(routeStart), goal:structuredClone(routeGoal),
+        waypoints:structuredClone(selected.waypoints), plannerMode:selected.plannerMode,
+        plannerOptions:structuredClone(selected.plannerOptions), footprint:structuredClone(selected.footprint),
+        orderSettings:structuredClone(selected.orderSettings), goalThetaExplicit:selected.goalThetaExplicit,
+        sessionId:appSessionId, missionId:missionController.snapshot.missionId,routeRevision:revision,
       });
-      if(!result){ store.set({planning:false}); return undefined; }
-      planningConfigurationRef.current=result.planningConfiguration;
+      if(!result||result.routeRevision!==revision){
+        return undefined;
+      }
       const fallback=result.success ? result.finalPath : (result.baselinePath?.length ? result.baselinePath : result.finalPath);
-      store.set({start:routeStart,rawPath:result.rawPath,finalPath:fallback,planning:false,plannerResult:{...result,finalPath:fallback}});
+      const accepted=selected.commitPlannedRoute(revision,{start:routeStart,rawPath:result.rawPath,
+        finalPath:fallback,plannerResult:{...result,finalPath:fallback},
+        planningConfiguration:result.planningConfiguration});
+      if(!accepted)return undefined;
       if(!result.success){
         const failedStage=[...(result.diagnostics?.stages??[])].reverse().find((item)=>!item.success);
         LogService.write('planner','error',failedStage?.reason??result.error??'RAW_PATH_FAILED');
@@ -318,7 +359,11 @@ export default function App(){
       }
       LogService.write('planner','info',`Path planned: ${result.rawPath.length} raw cells → ${result.simplifiedPath.length} geometry points → ${result.finalPath.length} final points in ${result.statistics.durationMs.toFixed(1)} ms`);
       return result.finalPath;
-    }catch(error){store.set({planning:false});LogService.write('planner','error',String(error));return undefined;}
+    }catch(error){
+      LogService.write('planner','error',String(error));return undefined;
+    }finally{
+      selected.finishPlanning(revision);
+    }
   };
   const plan=async():Promise<void>=>{await calculatePath();};
   const appendOrderStages=(stages:NonNullable<PlannerResult['diagnostics']>['stages']):void=>{
@@ -337,7 +382,12 @@ export default function App(){
       },
     }});
   };
-  const buildOrder=(path:PathPoint[]=store.finalPath,finalGoalTheta?:number):VdaOrder|undefined=>{
+  const buildOrder=(pathOverride?:PathPoint[],finalGoalTheta?:number,
+    expectedRevision?:number):VdaOrder|undefined=>{
+    const live=useAppStore.getState();
+    const revision=expectedRevision??live.routeRevision;
+    if(revision!==live.routeRevision||live.plannedRouteRevision!==revision)return undefined;
+    const path=pathOverride??live.finalPath;
     const readiness=getOrderGenerationIssues(generationPrerequisites());
     const readinessErrors=readiness.filter((issue)=>issue.severity==='error');
     const readinessWarnings=readiness.filter((issue)=>issue.severity==='warning');
@@ -347,21 +397,22 @@ export default function App(){
         success:false,severity:'error',code:readinessErrors[0]?.code??'ORDER_NOT_READY',
         reason:readinessErrors[0]?.message??'Order prerequisites are not satisfied.',
       }]);
-      store.set({generatedOrder:undefined,validation:{valid:false,errors:readinessErrors,warnings:readinessWarnings,context:{
-        stateAgeMs:stateAge,stateStaleTimeoutMs:store.orderSettings.stateStaleTimeoutMs,
+      live.set({generatedOrder:undefined,generatedOrderRouteRevision:undefined,
+        validation:{valid:false,errors:readinessErrors,warnings:readinessWarnings,context:{
+        stateAgeMs:stateAge,stateStaleTimeoutMs:live.orderSettings.stateStaleTimeoutMs,
         activeNavigatorMapId:navigatorMapId,mapIdSource:activeMapResolution.source,
         loadedLocatorMap:locator.loadedMap?.mapName??null,
       }}});
       readiness.forEach((issue)=>LogService.write('validation',issue.severity==='error'?'error':'warning',issue.message));return undefined;
     }
-    if(!store.grid||!poseSnapshot||path.length<1)return undefined;
+    if(!live.grid||!poseSnapshot||path.length<1)return undefined;
     try{
       const corridorDiagnostics:import('./domain/planner/EdgeCorridorPlanner').CorridorDiagnostic[]=[];
       const order=new VdaOrderBuilder().build(path,{
         robotPose:poseSnapshot.pose,activeMapId:navigatorMapId!,
-        finalGoalTheta:finalGoalTheta??(store.goalThetaExplicit?store.goal?.theta:undefined),
-        planningConfiguration:planningConfigurationRef.current,
-        motionPlan: store.plannerResult?.motionPlan,
+        finalGoalTheta:finalGoalTheta??(live.goalThetaExplicit?live.goal?.theta:undefined),
+        planningConfiguration:live.planningConfiguration,
+        motionPlan: live.plannerResult?.motionPlan,
         onMotionPlanValidation:(result)=>operationalDiagnosticSink.emit(createDiagnosticEvent({
           sessionId:appSessionId,missionId:missionController.snapshot.missionId,
           stage:'motionplan',severity:result.valid?'info':'error',
@@ -370,10 +421,10 @@ export default function App(){
           payload:{issues:result.issues},
         })),
         corridorPlanning:{
-          grid:store.grid,footprint:store.footprint,plannerOptions:store.plannerOptions,
+          grid:live.grid,footprint:live.footprint,plannerOptions:live.plannerOptions,
           onDiagnostic:(diagnostic)=>corridorDiagnostics.push(diagnostic),
         },
-      },store.orderSettings);
+      },live.orderSettings);
       const validation=new VdaOrderValidator().validate(order,validationContext());
       if(order.nodes.length>operatorSettings.maximumVdaNodeCount){
         validation.errors.push({code:'nodes.maximum',
@@ -381,7 +432,7 @@ export default function App(){
           severity:'error'});
         validation.valid=false;
       }
-      const failedCorridor=store.plannerOptions.corridor.enableBoschRokitCorridorExtension
+      const failedCorridor=live.plannerOptions.corridor.enableBoschRokitCorridorExtension
         ?corridorDiagnostics.find((diagnostic)=>!diagnostic.corridorAdded&&diagnostic.reason)
         :undefined;
       appendOrderStages([
@@ -403,8 +454,9 @@ export default function App(){
       ]);
       // Building a preview must never forget an Order that may still be active
       // in Navigator. sentOrder is changed only after a successful publish.
-      store.set({generatedOrder:order,validation,corridorDiagnostics});
+      if(!live.commitGeneratedOrder(revision,order,validation,corridorDiagnostics))return undefined;
       missionController.prepareOrder(appSessionId,order);
+      stage5BRecording.order(order,revision);
       missionController.markValidated(appSessionId,validation.valid,order.orderId);
       LogService.write('planner','info',
         `Corridor planning: ${order.edges.filter((edge)=>edge.corridor).length}/${order.edges.length} edges allow local bypass.`);
@@ -418,7 +470,9 @@ export default function App(){
         {stage:'vda-order-validation',inputPointCount:path.length,outputPointCount:0,
           success:false,severity:'error',code:'ORDER_BUILD_FAILED',reason:message},
       ]);
-      store.set({generatedOrder:undefined,validation:{valid:false,errors:[{code:'generation.builder',message,severity:'error'}],warnings:[]}});
+      if(useAppStore.getState().routeRevision===revision)live.set({generatedOrder:undefined,
+        generatedOrderRouteRevision:undefined,
+        validation:{valid:false,errors:[{code:'generation.builder',message,severity:'error'}],warnings:[]}});
       LogService.write('validation','error',message);
       return undefined;
     }
@@ -437,7 +491,9 @@ export default function App(){
     const live=useAppStore.getState();
     const baseline=live.plannerResult?.baselinePath;
     const currentDiagnostics=live.plannerResult?.diagnostics;
-    if(!baseline?.length||!live.plannerResult||!currentDiagnostics)return;
+    const planningConfiguration=live.planningConfiguration;
+    if(!baseline?.length||!live.plannerResult||!currentDiagnostics||
+      !planningConfiguration||!live.start||!live.grid)return;
     const diagnostics={
       ...currentDiagnostics,
       finalPathSource:'baseline' as const,
@@ -445,15 +501,24 @@ export default function App(){
         ...currentDiagnostics.warnings,'BASELINE_PATH_USED',
       ])),
     };
-    live.set({
-      finalPath:baseline.map((point)=>({...point})),
-      generatedOrder:undefined,
-      validation:undefined,
+    const selectedBaseline=baseline.map((point)=>({...point}));
+    const selectedMotionPlan=buildLegacyMotionPlan(selectedBaseline,live.start.theta,
+      planningConfiguration.planner,live.grid,live.footprint,
+      live.goalThetaExplicit?live.goal?.theta:undefined);
+    planningCoordinator.invalidate();
+    const revision=live.invalidateRoute();
+    live.commitPlannedRoute(revision,{
+      start:live.start,rawPath:selectedBaseline,finalPath:selectedBaseline,
+      planningConfiguration,
       plannerResult:{
         ...live.plannerResult,
         success:true,
         error:undefined,
-        finalPath:baseline.map((point)=>({...point})),
+        rawPath:selectedBaseline,simplifiedPath:selectedBaseline,finalPath:selectedBaseline,
+        // The previous MotionPlan describes the enhanced route. Rebuild one
+        // for the selected baseline so publish-time swept validation remains
+        // mandatory for exactly the geometry shown in the UI.
+        motionPlan:selectedMotionPlan,
         diagnostics,
         statistics:{...live.plannerResult.statistics,finalPointCount:baseline.length},
       },
@@ -473,10 +538,16 @@ export default function App(){
     const path=await calculatePath(poseSnapshot.pose);
     if(path)buildOrder(path);
   };
-  const publish=async(orderOverride?:VdaOrder,skipConfirmation=false):Promise<void>=>{
+  const publish=async(orderOverride?:VdaOrder,skipConfirmation=false,
+    expectedRevision?:number):Promise<void>=>{
     const live=useAppStore.getState();
     const order=orderOverride??live.generatedOrder;
     if(!order)return;
+    const revision=expectedRevision??live.generatedOrderRouteRevision;
+    if(!isCurrentRouteOrder(live,order,revision)){
+      setToast({severity:'warning',message:'The selected route changed. Generate and validate the current route before publishing.'});
+      return;
+    }
     if(live.publishingOrder){
       setToast({severity:'warning',message:'An Order publication is already in progress.'});
       return;
@@ -514,20 +585,29 @@ export default function App(){
       message:`${publishWarning}\n\nTopic: ${live.mqttSettings.topics.order}\nOrder: ${order.orderId}\nMaximum speed: ${live.orderSettings.missionMaximumSpeedMps} m/s`,
       confirmLabel:'Send Mission',
     }))return;
-    setRoutePhase('Dispatching');live.set({publishingOrder:true});
-    try{await mqttService.publish(live.mqttSettings.topics.order,JSON.stringify(order),live.mqttSettings.qos,false);
-      live.set({sentOrder:order,sentOrderPublishedAtMs:Date.now(),publishingOrder:false});
+    const current=useAppStore.getState();
+    if(!isCurrentRouteOrder(current,order,revision)){
+      setToast({severity:'warning',message:'Publication cancelled because the selected route changed.'});
+      return;
+    }
+    setRoutePhase('Dispatching');current.set({publishingOrder:true});
+    try{await mqttService.publish(current.mqttSettings.topics.order,JSON.stringify(order),current.mqttSettings.qos,false);
+      current.set({sentOrder:order,sentOrderPublishedAtMs:Date.now(),publishingOrder:false});
+      stage5BRecording.order(order,revision,true);
       missionController.markPublished(appSessionId);
       setRoutePhase('Dispatching');setToast({severity:'success',message:'Order sent. Waiting for Navigator acceptance.'});
       LogService.write('mqtt','info',`Published Order ${order.orderId}; awaiting Navigator acceptance.`);
-    }catch(error){live.set({publishingOrder:false});
+    }catch(error){current.set({publishingOrder:false});
+      stage5BRecording.observe(order.orderId,'failed',`Order publication failed: ${String(error)}`,
+        poseSnapshot?.pose ? { agvPosition: poseSnapshot.pose } : undefined);
       setRoutePhase('Failed');setToast({severity:'error',message:'Unable to dispatch the mission.'});LogService.write('mqtt','error',String(error));}
   };
-  const beginDirectDispatch=async(order:VdaOrder):Promise<void>=>{
+  const beginDirectDispatch=async(order:VdaOrder,revision:number):Promise<void>=>{
     const token=++dispatchToken.current;
     for(let remaining=operatorSettings.dispatchCountdownSeconds;remaining>0;remaining-=1){
       if(token!==dispatchToken.current)return;
       const live=useAppStore.getState();
+      if(!isCurrentRouteOrder(live,order,revision))return;
       if(!live.mqttConnected||!isLocalMessageFresh(
         live.mqttReceiveMetadata.lastStateReceiveTime,live.orderSettings.stateStaleTimeoutMs)){
         setDispatchCountdown(null);setToast({severity:'warning',message:'Automatic dispatch cancelled because robot data is not ready.'});return;
@@ -535,24 +615,35 @@ export default function App(){
       setDispatchCountdown(remaining);
       await new Promise((resolve)=>setTimeout(resolve,1_000));
     }
-    if(token===dispatchToken.current){setDispatchCountdown(null);await publish(order,true);}
+    if(token===dispatchToken.current){setDispatchCountdown(null);await publish(order,true,revision);}
   };
   const prepareDestination=async(goal:RobotPose,explicitTheta=false):Promise<void>=>{
     dispatchToken.current+=1;setDispatchCountdown(null);
+    const preparationToken=routePreparationGuard.current.begin();
+    const setCurrentRoutePhase=(phase:string):void=>{
+      if(routePreparationGuard.current.isCurrent(preparationToken))setRoutePhase(phase);
+    };
     const live=useAppStore.getState();const grid=live.grid;
-    if(!grid||!poseSnapshot){setToast({severity:'error',message:'A loaded map and fresh robot pose are required.'});return;}
+    if(!grid||!poseSnapshot){setCurrentRoutePhase('Failed: ROUTE_NOT_READY');setToast({severity:'error',message:'A loaded map and fresh robot pose are required.'});return;}
     const collisionGrid=live.inflatedGrid??grid;
     const destination=validateDestination(goal,navigatorMapId,grid,collisionGrid);
     if(!destination.valid||!destination.cell){
+      setCurrentRoutePhase('Failed: INVALID_DESTINATION');
       setToast({severity:'error',message:destination.message??'Destination is not navigable.'});return;
     }
     const cell=destination.cell;
     live.set({goal,goalThetaExplicit:explicitTheta,selectedCell:cell,rawPath:[],finalPath:[],
       generatedOrder:undefined,validation:undefined});
+    const revision=useAppStore.getState().routeRevision;
     missionController.createMission(appSessionId,crypto.randomUUID());
-    setRoutePhase('Validating destination');
-    setRoutePhase('Calculating route');
+    setCurrentRoutePhase('Validating destination');
+    setCurrentRoutePhase('Calculating route');
     const path=await calculatePath(poseSnapshot.pose,goal);
+    if(!routePreparationGuard.current.isCurrent(preparationToken))return;
+    if(useAppStore.getState().routeRevision!==revision){
+      setCurrentRoutePhase('Selection changed');
+      return;
+    }
     if(!path){
       const planner=useAppStore.getState().plannerResult;
       const rejected=[...(planner?.diagnostics?.stages??[])].reverse()
@@ -561,23 +652,23 @@ export default function App(){
         rejected?.code??'NO_PHYSICALLY_VALID_ROUTE';
       const reason=rejected?.reason??planner?.error??
         'No route satisfies the configured map, vehicle footprint, and margins.';
-      setRoutePhase(`Failed: ${code}`);
+      setCurrentRoutePhase(`Failed: ${code}`);
       setToast({severity:'error',message:`${code}: ${reason}`});
       return;
     }
-    setRoutePhase('Simplifying route');
-    setRoutePhase('Generating order');
-    const order=buildOrder(path,explicitTheta?goal.theta:undefined);
+    setCurrentRoutePhase('Simplifying route');
+    setCurrentRoutePhase('Generating order');
+    const order=buildOrder(path,explicitTheta?goal.theta:undefined,revision);
     const result=useAppStore.getState().validation;
     if(!order||!result?.valid){
       const reason=result?.errors[0]?.message??
         'Generated Order did not pass validation.';
-      setRoutePhase('Failed: ORDER_VALIDATION_FAILED');
+      setCurrentRoutePhase('Failed: ORDER_VALIDATION_FAILED');
       setToast({severity:'error',message:`ORDER_VALIDATION_FAILED: ${reason}`});
       return;
     }
-    setRoutePhase('Ready to start');setToast({severity:'success',message:'Route calculated. Order validated and ready.'});
-    if(operatorSettings.directDispatchMode)void beginDirectDispatch(order);
+    setCurrentRoutePhase('Ready to start');setToast({severity:'success',message:'Route calculated. Order validated and ready.'});
+    if(operatorSettings.directDispatchMode)void beginDirectDispatch(order,revision);
   };
   const prepareDestinationCell=(cell:{row:number;column:number}):void=>{
     const live=useAppStore.getState();if(!live.grid)return;
@@ -592,14 +683,16 @@ export default function App(){
       message:'Clear the active destination and route preview?',
       confirmLabel:'Clear Destination',destructive:true,
     }))return;
-    dispatchToken.current+=1;setDispatchCountdown(null);setRoutePhase('Selecting destination');
+    dispatchToken.current+=1;routePreparationGuard.current.cancel();
+    setDispatchCountdown(null);setRoutePhase('Selecting destination');
     live.set({goal:undefined,rawPath:[],finalPath:[],generatedOrder:undefined,validation:undefined,
       plannerResult:undefined,selectedCell:undefined});
   };
   useEffect(()=>{
     const onKey=(event:KeyboardEvent):void=>{
       if(event.key!=='Escape')return;
-      dispatchToken.current+=1;setDispatchCountdown(null);setRoutePhase('Selecting destination');
+      dispatchToken.current+=1;routePreparationGuard.current.cancel();
+      setDispatchCountdown(null);setRoutePhase('Selecting destination');
       useAppStore.getState().set({goal:undefined,rawPath:[],finalPath:[],generatedOrder:undefined,
         validation:undefined,plannerResult:undefined,selectedCell:undefined});
     };
@@ -617,6 +710,13 @@ export default function App(){
     else if(mission.status==='Rejected'||mission.status==='Timed out')setRoutePhase('Failed');
     else if(mission.status==='Cancelled')setRoutePhase('Cancelled');
   },[mission.status,mission.progressPercent]);
+  useEffect(()=>{
+    const outcome = mission.status==='Completed' ? 'success' : mission.status==='Cancelled' ? 'cancelled'
+      : mission.status==='Rejected'||mission.status==='Timed out' ? 'failed' : undefined;
+    stage5BRecording.observeActions(store.state);
+    if(outcome) stage5BRecording.observe(store.sentOrder?.orderId,outcome,mission.status,store.state);
+  },[mission.status,store.sentOrder?.orderId,store.state]);
+  useEffect(()=>{ stage5BRecording.routeChanged(store.routeRevision); },[store.routeRevision]);
   const instant=async(action:VdaInstantAction):Promise<void>=>{
     if(!isInstantActionSupported(action)){LogService.write('mqtt','warning',`${action} is disabled because the current ROKIT configuration rejected its blocking type.`);return;}
     if(!store.mqttConnected)return;
@@ -629,6 +729,7 @@ export default function App(){
     }))return;
     const message=new InstantActionBuilder().build(action,store.orderSettings);
     try{await mqttService.publish(store.mqttSettings.topics.instantActions,JSON.stringify(message),store.mqttSettings.qos,false);
+      if(action==='cancelOrder')stage5BRecording.cancelRequested(message.actions[0]!.actionId,store.sentOrder?.orderId);
       LogService.write('mqtt','warning',`Published ${action} (${message.actions[0]!.actionId})`);
     }catch(error){LogService.write('mqtt','error',String(error));}
   };
@@ -873,13 +974,15 @@ export default function App(){
         <Chip color={routePhase==='Ready to start'?'success':
           routePhase.startsWith('Failed')?'error':'primary'} label={routePhase}/>
         <Button variant="outlined" startIcon={<AltRoute/>} disabled={store.planning} onClick={()=>void plan()}>{store.planning?'Planning…':'Recalculate'}</Button>
-        <Button startIcon={<Refresh/>} onClick={()=>store.set({rawPath:[],finalPath:[],generatedOrder:undefined})}>Clear path</Button>
+        <Button startIcon={<Refresh/>} onClick={()=>{
+          planningCoordinator.invalidate();store.invalidateRoute();
+        }}>Clear path</Button>
         <Tooltip title="Grid"><IconButton color={store.showGrid?'primary':'default'} onClick={()=>store.set({showGrid:!store.showGrid})}><GridOn/></IconButton></Tooltip>
         <Tooltip title="Inflated obstacles"><IconButton color={store.showInflation?'warning':'default'} onClick={()=>store.set({showInflation:!store.showInflation})}><BugReport/></IconButton></Tooltip>
         <Tooltip title="Rotate view"><IconButton onClick={()=>store.set({viewRotation:normalizeAngle(store.viewRotation+Math.PI/2)})}><RotateRight/></IconButton></Tooltip>
         <Box sx={{flex:1}}/><Typography variant="caption">{store.grid?`${store.grid.metadata.width}×${store.grid.metadata.height} · ${store.grid.metadata.resolution} m/cell`:'No map loaded'}</Typography>
       </Paper>
-      <MapCanvas mode={mode} onCell={setCell}/>
+      <MapCanvas mode={mode} onCell={setCell} liveRobotPose={poseSnapshot?.pose}/>
       {locator.downloading&&<Box className="mr-map-loading" sx={{position:'absolute',inset:'54px 0 0',
         display:'grid',placeItems:'center',bgcolor:'rgba(255,255,255,.82)',zIndex:4}}>
         <Typography variant="h2">Loading hospital map…</Typography>
@@ -897,6 +1000,10 @@ export default function App(){
           <StatusPill label={store.state?.driving?'Driving':store.state?.paused?'Paused':'Idle'}
             tone={store.state?.driving?'connected':store.state?.paused?'warning':'inactive'}/>
         </Stack>
+        <Alert severity={store.stage5BRecordingStatus?.includes('failed')?'warning':'info'} sx={{mt:1}}>
+          {store.stage5BRecordingStatus??'Stage 5B: automatic recording for motion-state runs.'}
+          {' '}Pending recordings: {store.stage5BPendingCount??0}
+        </Alert>
         <Divider sx={{my:1.2}}/>
         <Field label="Destination" value={store.goal?`${store.goal.x.toFixed(2)}, ${store.goal.y.toFixed(2)} m`:'Select on map'}/>
         <Field label="Route distance" value={routeDistance?`${routeDistance.toFixed(2)} m`:'—'}/>
@@ -1094,18 +1201,26 @@ export default function App(){
           <Button size="small" disabled={!store.generatedOrder} onClick={()=>store.generatedOrder&&downloadJson('vda-order.json',store.generatedOrder)}>Export order</Button>
           <Button size="small" disabled={store.finalPath.length<2} onClick={()=>downloadJson('planner-path.json',store.finalPath)}>Export path</Button>
         </Stack>
-        {store.plannerMode==='motion-state'&&<Button size="small" fullWidth sx={{mt:.5}}
-          disabled={!store.grid||!store.start||!store.goal||!planningConfigurationRef.current||
-            !store.plannerResult?.motionPlannerCalibration}
+        <Button size="small" fullWidth sx={{mt:.5}}
+          disabled={!store.lastPlanningScenario}
           onClick={()=>{
-            if(!store.grid||!store.start||!store.goal||!planningConfigurationRef.current)return;
-            downloadJson('motion-planner-calibration-scenario.json',
-              createMotionPlannerScenarioArtifact({grid:store.grid,footprint:store.footprint,
-                startPose:store.start,goalPose:store.goal,
-                goalTheta:store.goalThetaExplicit?store.goal.theta:undefined,
-                configuration:planningConfigurationRef.current,
-                originalCalibration:store.plannerResult?.motionPlannerCalibration}));
-          }}>Export calibration scenario (includes grid)</Button>}
+            try {
+              const artifact=useAppStore.getState().lastPlanningScenario;
+              if(!artifact)return;
+              downloadJson(`motion-scenario-${Date.now()}.json`,validateMotionPlannerScenarioArtifact(artifact));
+            }catch(error){setToast({severity:'error',message:`Scenario export failed: ${String(error)}`});}
+          }}>Export last motion-state run (success or failure, includes map)</Button>
+        <Typography variant="caption">Finalize the current route recording (does not control the robot):</Typography>
+        <Stack direction="row" gap={.5}>
+          <Button size="small" onClick={()=>stage5BRecording.finalizePending('success',store.state)}>Finalize success</Button>
+          <Button size="small" onClick={()=>stage5BRecording.finalizePending('failed',store.state)}>Finalize failed</Button>
+          <Button size="small" onClick={()=>stage5BRecording.finalizePending('cancelled',store.state)}>Finalize cancelled</Button>
+          <Button size="small" onClick={()=>stage5BRecording.retry()}>Retry save</Button>
+        </Stack>
+        {store.lastPlanningScenario&&<Typography variant="caption">
+          Captured {store.lastPlanningScenario.capture?.capturedAt??'run'} — {store.lastPlanningScenario.capture?.result.success?'success':'failure'}.
+          Later selections and telemetry do not alter this export.
+        </Typography>}
       </Paper>
       <Typography variant="overline">First node check</Typography>
       <Paper variant="outlined" sx={{p:1.2,mb:1}}>

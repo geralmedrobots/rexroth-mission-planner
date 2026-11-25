@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "stage-5b-v1",
+  "dataset": {
+    "schemaVersion": "motion-planner-dataset-v1",
+    "name": "Real-world validation — awaiting exported artifacts",
+    "scenarios": []
+  },
+  "rows": [],
+  "recommendation": {
+    "profile": null,
+    "reason": "No real-run artifacts evaluated. Profile selection pending."
+  }
+}

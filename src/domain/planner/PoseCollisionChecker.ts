@@ -11,15 +11,57 @@ export interface PoseCollisionDiagnostic {
 
 /** Checks one complete robot pose against the occupancy grid. */
 export class PoseCollisionChecker {
+  private readonly occupiedPrefix?: Uint32Array;
+  private readonly poseResults = new Map<string, boolean>();
+  private cachedFootprint?: RobotFootprint;
+  private polygonFootprint?: RobotFootprint;
+  private expandedPolygon?: Array<{ x: number; y: number }>;
+  /** Optional immutable, synchronous planning-request map. No cross-request cache. */
+  public constructor(private readonly requestGrid?: OccupancyGrid) {
+    if (!requestGrid) return;
+    const { width, height, occupiedThreshold } = requestGrid.metadata;
+    const prefix = new Uint32Array((width + 1) * (height + 1));
+    for (let row = 0; row < height; row += 1) {
+      let count = 0;
+      for (let column = 0; column < width; column += 1) {
+        if (isOccupiedValue(requestGrid.data[row * width + column] ?? 100, occupiedThreshold)) count += 1;
+        prefix[(row + 1) * (width + 1) + column + 1] =
+          prefix[row * (width + 1) + column + 1]! + count;
+      }
+    }
+    this.occupiedPrefix = prefix;
+  }
+
   public pointIsFree(grid: OccupancyGrid, point: PathPoint, footprint: RobotFootprint): boolean {
-    return !this.inspectPose(grid, point, footprint).collision;
+    if (grid !== this.requestGrid) return !this.inspectPose(grid, point, footprint).collision;
+    if (footprint !== this.cachedFootprint) {
+      this.poseResults.clear(); this.cachedFootprint = footprint;
+    }
+    // Exact coordinates/headings only: never reuse a cell/bin collision answer
+    // for a different sub-cell pose. Lifetime is one synchronous plan request.
+    const key = `${point.x},${point.y},${point.theta}`;
+    const cached = this.poseResults.get(key);
+    if (cached !== undefined) return cached;
+    const free = !this.inspectPose(grid, point, footprint).collision;
+    if (this.poseResults.size >= 32_768) this.poseResults.clear();
+    this.poseResults.set(key, free);
+    return free;
   }
 
   public inspectPose(grid: OccupancyGrid, point: PathPoint,
     footprint: RobotFootprint): PoseCollisionDiagnostic {
     const transform = new CoordinateTransformer(grid.metadata);
-    const model = FootprintModel.from(footprint);
-    const corners = model.polygonAt(point);
+    let corners: Array<{ x: number; y: number }>;
+    if (grid === this.requestGrid) {
+      if (this.polygonFootprint !== footprint) {
+        this.expandedPolygon = FootprintModel.from(footprint).expandedLocalPolygon();
+        this.polygonFootprint = footprint;
+      }
+      const c = Math.cos(point.theta); const s = Math.sin(point.theta);
+      corners = this.expandedPolygon!.map(({ x, y }) => ({
+        x: point.x + c * x - s * y, y: point.y + s * x + c * y,
+      }));
+    } else corners = FootprintModel.from(footprint).polygonAt(point);
     if (corners.some((corner) => transform.worldToGrid(corner.x, corner.y) === null))
       return { collision: true, footprintPolygon: corners };
     const cells = corners.map((corner) => this.unboundedWorldToGrid(grid, corner.x, corner.y));
@@ -29,6 +71,16 @@ export class PoseCollisionChecker {
     const minColumn = Math.max(0, Math.floor(Math.min(...cells.map((cell) => cell.column))));
     const maxColumn = Math.min(grid.metadata.width - 1,
       Math.ceil(Math.max(...cells.map((cell) => cell.column))));
+    if (grid === this.requestGrid && this.occupiedPrefix) {
+      const stride = grid.metadata.width + 1;
+      const prefix = this.occupiedPrefix;
+      // Exact broad phase over the SAME bounding cells as the loop below.
+      // Zero occupied/unknown cells proves the loop would find no collision.
+      const count = prefix[(maxRow + 1) * stride + maxColumn + 1]! -
+        prefix[minRow * stride + maxColumn + 1]! -
+        prefix[(maxRow + 1) * stride + minColumn]! + prefix[minRow * stride + minColumn]!;
+      if (count === 0) return { collision: false, footprintPolygon: corners };
+    }
     for (let row = minRow; row <= maxRow; row += 1) for (let column = minColumn;
       column <= maxColumn; column += 1) {
       const index = row * grid.metadata.width + column;

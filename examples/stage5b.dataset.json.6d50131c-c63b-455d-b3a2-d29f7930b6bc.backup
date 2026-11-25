@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "motion-planner-dataset-v1",
+  "name": "Recorded Stage 5B missions (see per-scenario provenance)",
+  "scenarios": [
+    {
+      "id": "Synthetic_2026-09-11T14-53-49-238Z_6c8d9e98-3df7-4617-9869-9a151f8d7780",
+      "artifact": "../artifacts/stage5b/missions/Synthetic_2026-09-11T14-53-49-238Z_6c8d9e98-3df7-4617-9869-9a151f8d7780.json",
+      "provenance": "synthetic",
+      "notes": "Mission synthetic-recorder-smoke; observed outcome: success; Synthetic local replay; no robot execution",
+      "expectations": {
+        "reverse": "either",
+        "preferOpenRoute": false,
+        "avoidSuspiciousManoeuvres": true,
+        "shortMoveM": 0.2
+      }
+    },
+    {
+      "id": "Synthetic_2026-09-11T15-00-21-993Z_59fb7fd9-5260-4581-b44c-55048c5ccb86",
+      "artifact": "../artifacts/stage5b/missions/Synthetic_2026-09-11T15-00-21-993Z_59fb7fd9-5260-4581-b44c-55048c5ccb86.json",
+      "provenance": "synthetic",
+      "notes": "Mission synthetic-recorder-smoke; observed outcome: success; Synthetic local replay; no robot execution",
+      "expectations": {
+        "reverse": "either",
+        "preferOpenRoute": false,
+        "avoidSuspiciousManoeuvres": true,
+        "shortMoveM": 0.2
+      }
+    }
+  ]
+}

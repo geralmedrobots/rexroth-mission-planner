@@ -627,9 +627,13 @@ export const publishReplacement=async(
   replanning.setRuntime({status:'PUBLISHING_REPLACEMENT'});
   const payload=JSON.stringify(result.order);
   await mqttService.publish(app.mqttSettings.topics.order,payload,app.mqttSettings.qos,false);
+  // The replacement geometry supersedes the original planned route. Give it
+  // a fresh route identity so the UI cannot pair it with the old MotionPlan.
+  const replacementRevision=app.invalidateRoute();
   app.set({
     generatedOrder:result.order,sentOrder:result.order,sentOrderPublishedAtMs:Date.now(),
     rawPath:result.rawPath,finalPath:result.finalPath,
+    plannedRouteRevision:replacementRevision,generatedOrderRouteRevision:replacementRevision,
   });
   replanning.log('OrderPublisher','info','Replacement Order published.',{
     topic:app.mqttSettings.topics.order,orderId:result.order.orderId,

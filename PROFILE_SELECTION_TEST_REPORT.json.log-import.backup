@@ -1,0 +1,551 @@
+{
+  "schemaVersion": "stage-5b-v1",
+  "dataset": {
+    "schemaVersion": "motion-planner-dataset-v1",
+    "name": "Real-world validation — awaiting exported artifacts",
+    "scenarios": [
+      {
+        "id": "Mission 001",
+        "artifact": "mission-logs/first_mission.txt",
+        "provenance": "real-run",
+        "notes": "Observed outcome: assumed successful per operator; not independently verified from the log. Original JSON log array preserved byte-for-byte. This is log evidence, not a motion-planner-scenario-v1 replay artifact: full occupancy grid and validated configuration export are missing. Stage 5B artifact loading will reject this file; load failures are not mission outcomes.",
+        "expectations": {
+          "reverse": "either",
+          "preferOpenRoute": false,
+          "avoidSuspiciousManoeuvres": true,
+          "shortMoveM": 0.2
+        }
+      },
+      {
+        "id": "Mission 002",
+        "artifact": "mission-logs/second_mission.txt",
+        "provenance": "real-run",
+        "notes": "Observed outcome: assumed successful per operator; not independently verified from the log. Original JSON log array preserved byte-for-byte. This is log evidence, not a motion-planner-scenario-v1 replay artifact: full occupancy grid and validated configuration export are missing. Stage 5B artifact loading will reject this file; load failures are not mission outcomes.",
+        "expectations": {
+          "reverse": "either",
+          "preferOpenRoute": false,
+          "avoidSuspiciousManoeuvres": true,
+          "shortMoveM": 0.2
+        }
+      },
+      {
+        "id": "Mission 003",
+        "artifact": "mission-logs/third_mission.txt",
+        "provenance": "real-run",
+        "notes": "Observed outcome: assumed successful per operator; not independently verified from the log. Original JSON log array preserved byte-for-byte. This is log evidence, not a motion-planner-scenario-v1 replay artifact: full occupancy grid and validated configuration export are missing. Stage 5B artifact loading will reject this file; load failures are not mission outcomes.",
+        "expectations": {
+          "reverse": "either",
+          "preferOpenRoute": false,
+          "avoidSuspiciousManoeuvres": true,
+          "shortMoveM": 0.2
+        }
+      },
+      {
+        "id": "Mission 004",
+        "artifact": "mission-logs/fourth_mission.txt",
+        "provenance": "real-run",
+        "notes": "Observed outcome: assumed successful per operator; not independently verified from the log. Original JSON log array preserved byte-for-byte. This is log evidence, not a motion-planner-scenario-v1 replay artifact: full occupancy grid and validated configuration export are missing. Stage 5B artifact loading will reject this file; load failures are not mission outcomes.",
+        "expectations": {
+          "reverse": "either",
+          "preferOpenRoute": false,
+          "avoidSuspiciousManoeuvres": true,
+          "shortMoveM": 0.2
+        }
+      },
+      {
+        "id": "Mission 005",
+        "artifact": "mission-logs/fifth_mission.txt",
+        "provenance": "real-run",
+        "notes": "Observed outcome: assumed successful per operator; not independently verified from the log. Original JSON log array preserved byte-for-byte. This is log evidence, not a motion-planner-scenario-v1 replay artifact: full occupancy grid and validated configuration export are missing. Stage 5B artifact loading will reject this file; load failures are not mission outcomes.",
+        "expectations": {
+          "reverse": "either",
+          "preferOpenRoute": false,
+          "avoidSuspiciousManoeuvres": true,
+          "shortMoveM": 0.2
+        }
+      },
+      {
+        "id": "Mission 006",
+        "artifact": "mission-logs/sixth_mission.txt",
+        "provenance": "real-run",
+        "notes": "Observed outcome: FAILED (operator-confirmed; cause unclassified). Original JSON log array preserved byte-for-byte. This is log evidence, not a motion-planner-scenario-v1 replay artifact: full occupancy grid and validated configuration export are missing. Stage 5B artifact loading will reject this file; load failures are not mission outcomes.",
+        "expectations": {
+          "reverse": "either",
+          "preferOpenRoute": false,
+          "avoidSuspiciousManoeuvres": true,
+          "shortMoveM": 0.2
+        },
+        "failureAudit": {
+          "category": "unknown",
+          "evidence": "Operator explicitly identified sixth_mission.txt as a FAILED real mission. Execution failure cause is not established; planner completion does not prove mission success. Raw log is not replayable."
+        }
+      },
+      {
+        "id": "Mission 007",
+        "artifact": "mission-logs/seventh_mission.txt",
+        "provenance": "real-run",
+        "notes": "Observed outcome: assumed successful per operator; not independently verified from the log. Original JSON log array preserved byte-for-byte. This is log evidence, not a motion-planner-scenario-v1 replay artifact: full occupancy grid and validated configuration export are missing. Stage 5B artifact loading will reject this file; load failures are not mission outcomes.",
+        "expectations": {
+          "reverse": "either",
+          "preferOpenRoute": false,
+          "avoidSuspiciousManoeuvres": true,
+          "shortMoveM": 0.2
+        }
+      }
+    ]
+  },
+  "rows": [
+    {
+      "scenario": "Mission 001",
+      "profile": "CAPTURED_DEFAULT",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 001",
+      "profile": "BALANCED",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 001",
+      "profile": "FORWARD_PREFERRED",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 001",
+      "profile": "CLEARANCE_PREFERRED",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 002",
+      "profile": "CAPTURED_DEFAULT",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 002",
+      "profile": "BALANCED",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 002",
+      "profile": "FORWARD_PREFERRED",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 002",
+      "profile": "CLEARANCE_PREFERRED",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 003",
+      "profile": "CAPTURED_DEFAULT",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 003",
+      "profile": "BALANCED",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 003",
+      "profile": "FORWARD_PREFERRED",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 003",
+      "profile": "CLEARANCE_PREFERRED",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 004",
+      "profile": "CAPTURED_DEFAULT",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 004",
+      "profile": "BALANCED",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 004",
+      "profile": "FORWARD_PREFERRED",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 004",
+      "profile": "CLEARANCE_PREFERRED",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 005",
+      "profile": "CAPTURED_DEFAULT",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 005",
+      "profile": "BALANCED",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 005",
+      "profile": "FORWARD_PREFERRED",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 005",
+      "profile": "CLEARANCE_PREFERRED",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 006",
+      "profile": "CAPTURED_DEFAULT",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 006",
+      "profile": "BALANCED",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 006",
+      "profile": "FORWARD_PREFERRED",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 006",
+      "profile": "CLEARANCE_PREFERRED",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 007",
+      "profile": "CAPTURED_DEFAULT",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 007",
+      "profile": "BALANCED",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 007",
+      "profile": "FORWARD_PREFERRED",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    },
+    {
+      "scenario": "Mission 007",
+      "profile": "CLEARANCE_PREFERRED",
+      "provenance": "real-run",
+      "mapRevision": "",
+      "footprintHash": "",
+      "success": false,
+      "score": 0,
+      "penalties": {},
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "failure": {
+        "category": "unknown",
+        "evidence": "Artifact load failed: [\n  {\n    \"expected\": \"object\",\n    \"code\": \"invalid_type\",\n    \"path\": [],\n    \"message\": \"Invalid input: expected object, received array\"\n  }\n]"
+      }
+    }
+  ],
+  "recommendation": {
+    "profile": null,
+    "reason": "No successful real-run replay; no evidence for profile selection."
+  }
+}

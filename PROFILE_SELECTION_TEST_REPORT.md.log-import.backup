@@ -1,0 +1,302 @@
+# Stage 5B — Real-world validation — awaiting exported artifacts
+
+Scenarios: 7; real runs: 7.
+
+Recommendation: PENDING. No successful real-run replay; no evidence for profile selection.
+
+Captured default means the exported run configuration, not newly substituted application defaults.
+Failure scores are zero. Success rate ranks first; bounded expectation penalties rank second. Raw total costs use different profile weights and are not comparable.
+Clearance is sampled center-to-obstacle distance, not footprint-edge clearance. Suspicious rotations are review candidates, not proof of redundancy. Open-route preference compares average clearance of successful alternatives; inspect geometry.
+
+| Profile | Success | Mean score | Mean time ms (all runs) |
+|---|---:|---:|---:|
+| CAPTURED_DEFAULT | 0/7 | 0.00 | N/A |
+| BALANCED | 0/7 | 0.00 | N/A |
+| FORWARD_PREFERRED | 0/7 | 0.00 | N/A |
+| CLEARANCE_PREFERRED | 0/7 | 0.00 | N/A |
+
+| Scenario / profile | Success | Score | ms / states | Path m / cost | Clearance min / avg m | Reverse m / switches | Rotation deg / actions | Suspicious |
+|---|---|---:|---|---|---|---|---|---|
+| Mission 001 / CAPTURED_DEFAULT | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 001 / BALANCED | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 001 / FORWARD_PREFERRED | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 001 / CLEARANCE_PREFERRED | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 002 / CAPTURED_DEFAULT | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 002 / BALANCED | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 002 / FORWARD_PREFERRED | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 002 / CLEARANCE_PREFERRED | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 003 / CAPTURED_DEFAULT | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 003 / BALANCED | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 003 / FORWARD_PREFERRED | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 003 / CLEARANCE_PREFERRED | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 004 / CAPTURED_DEFAULT | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 004 / BALANCED | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 004 / FORWARD_PREFERRED | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 004 / CLEARANCE_PREFERRED | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 005 / CAPTURED_DEFAULT | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 005 / BALANCED | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 005 / FORWARD_PREFERRED | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 005 / CLEARANCE_PREFERRED | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 006 / CAPTURED_DEFAULT | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 006 / BALANCED | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 006 / FORWARD_PREFERRED | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 006 / CLEARANCE_PREFERRED | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 007 / CAPTURED_DEFAULT | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 007 / BALANCED | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 007 / FORWARD_PREFERRED | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+| Mission 007 / CLEARANCE_PREFERRED | false | 0.00 | N/A | N/A | N/A | N/A | N/A |  |
+
+## Scenario evidence and known limitations
+
+- Mission 001 (real-run): Observed outcome: assumed successful per operator; not independently verified from the log. Original JSON log array preserved byte-for-byte. This is log evidence, not a motion-planner-scenario-v1 replay artifact: full occupancy grid and validated configuration export are missing. Stage 5B artifact loading will reject this file; load failures are not mission outcomes.; source: mission-logs/first_mission.txt
+- Mission 002 (real-run): Observed outcome: assumed successful per operator; not independently verified from the log. Original JSON log array preserved byte-for-byte. This is log evidence, not a motion-planner-scenario-v1 replay artifact: full occupancy grid and validated configuration export are missing. Stage 5B artifact loading will reject this file; load failures are not mission outcomes.; source: mission-logs/second_mission.txt
+- Mission 003 (real-run): Observed outcome: assumed successful per operator; not independently verified from the log. Original JSON log array preserved byte-for-byte. This is log evidence, not a motion-planner-scenario-v1 replay artifact: full occupancy grid and validated configuration export are missing. Stage 5B artifact loading will reject this file; load failures are not mission outcomes.; source: mission-logs/third_mission.txt
+- Mission 004 (real-run): Observed outcome: assumed successful per operator; not independently verified from the log. Original JSON log array preserved byte-for-byte. This is log evidence, not a motion-planner-scenario-v1 replay artifact: full occupancy grid and validated configuration export are missing. Stage 5B artifact loading will reject this file; load failures are not mission outcomes.; source: mission-logs/fourth_mission.txt
+- Mission 005 (real-run): Observed outcome: assumed successful per operator; not independently verified from the log. Original JSON log array preserved byte-for-byte. This is log evidence, not a motion-planner-scenario-v1 replay artifact: full occupancy grid and validated configuration export are missing. Stage 5B artifact loading will reject this file; load failures are not mission outcomes.; source: mission-logs/fifth_mission.txt
+- Mission 006 (real-run): Observed outcome: FAILED (operator-confirmed; cause unclassified). Original JSON log array preserved byte-for-byte. This is log evidence, not a motion-planner-scenario-v1 replay artifact: full occupancy grid and validated configuration export are missing. Stage 5B artifact loading will reject this file; load failures are not mission outcomes.; source: mission-logs/sixth_mission.txt
+- Mission 007 (real-run): Observed outcome: assumed successful per operator; not independently verified from the log. Original JSON log array preserved byte-for-byte. This is log evidence, not a motion-planner-scenario-v1 replay artifact: full occupancy grid and validated configuration export are missing. Stage 5B artifact loading will reject this file; load failures are not mission outcomes.; source: mission-logs/seventh_mission.txt
+- Mission 001/CAPTURED_DEFAULT: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 001/BALANCED: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 001/FORWARD_PREFERRED: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 001/CLEARANCE_PREFERRED: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 002/CAPTURED_DEFAULT: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 002/BALANCED: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 002/FORWARD_PREFERRED: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 002/CLEARANCE_PREFERRED: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 003/CAPTURED_DEFAULT: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 003/BALANCED: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 003/FORWARD_PREFERRED: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 003/CLEARANCE_PREFERRED: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 004/CAPTURED_DEFAULT: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 004/BALANCED: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 004/FORWARD_PREFERRED: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 004/CLEARANCE_PREFERRED: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 005/CAPTURED_DEFAULT: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 005/BALANCED: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 005/FORWARD_PREFERRED: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 005/CLEARANCE_PREFERRED: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 006/CAPTURED_DEFAULT: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 006/BALANCED: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 006/FORWARD_PREFERRED: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 006/CLEARANCE_PREFERRED: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 007/CAPTURED_DEFAULT: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 007/BALANCED: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 007/FORWARD_PREFERRED: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+- Mission 007/CLEARANCE_PREFERRED: unknown: Artifact load failed: [
+  {
+    "expected": "object",
+    "code": "invalid_type",
+    "path": [],
+    "message": "Invalid input: expected object, received array"
+  }
+]
+
+Tight/complex real routes reported by the operator remain known limitations; without their artifacts their category is unknown. They do not block Stage 5B infrastructure completion.
+Timeout is not physical infeasibility. Guide/lattice/primitive diagnoses require trace evidence or a documented manual audit. A single timing sample is affected by caches and CPU contention; repeat in a fresh process for performance conclusions.
+
+## Profile trade-offs
+
+- BALANCED: May retain short reverse manoeuvres and accepts modest detours for clearance.
+- FORWARD_PREFERRED: Can add rotation and forward distance where a short reverse manoeuvre is valid.
+- CLEARANCE_PREFERRED: Produces longer routes in open alternatives and can search more states.
+
+## Physical robot test checklist
+
+- Verify captured map, localization, footprint, payload, safety margins and operating area match the robot.
+- Review every failed case and suspicious manoeuvre before attempting that scenario.
+- Start at approved low speed in a controlled area with the normal safety system and stop access available.
+- Check forward/reverse execution, switch count, swept turns and clearance against replay.
+- Verify final position/orientation and normal publish-time validation.
+- Repeat with localization variation and representative obstacles; record actual timing and deviations.
+- Export new artifacts, record observations and obtain operational acceptance before changing any default.
+
+Production defaults, planner architecture and safety validation are unchanged by this offline workflow.

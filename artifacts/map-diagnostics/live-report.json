@@ -1,0 +1,47 @@
+{
+  "mapName": "Quickstart_2026-11-10_14-45-11_built_001",
+  "locatorBuild": {
+    "componentType": 2,
+    "majorVersion": 2,
+    "minorVersion": 0,
+    "patchVersion": 8,
+    "responseCode": 0
+  },
+  "serverMapModule": {
+    "majorVersion": 9,
+    "minorVersion": 0,
+    "name": "ServerMap"
+  },
+  "fingerprint": "7722289214529635000",
+  "pointCount": 86204,
+  "binaryBytes": 689632,
+  "imagePixels": [
+    482,
+    503
+  ],
+  "imageMeters": [
+    24.100000381469727,
+    25.200000762939453
+  ],
+  "origin": {
+    "a": 0,
+    "x": -15.103087425231934,
+    "y": -5.066710948944092
+  },
+  "resolution": 0.05,
+  "extentDeltaMeters": [
+    3.8146972514141453e-07,
+    0.05000076293945099
+  ],
+  "occupiedCells": 5035,
+  "occupiedCellsWithoutPoints": 4,
+  "inBoundsPoints": 86204,
+  "outOfBoundsPoints": 0,
+  "pointsInOccupiedCells": 86204,
+  "pointsOutsideOccupiedCells": 0,
+  "nonfinitePoints": 0,
+  "pngAlphaRange": [
+    255,
+    255
+  ]
+}

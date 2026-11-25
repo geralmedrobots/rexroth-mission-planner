@@ -1,0 +1,1392 @@
+{
+  "schemaVersion": "stage-5b-v1",
+  "dataset": {
+    "schemaVersion": "motion-planner-dataset-v1",
+    "name": "Recorded Stage 5B missions (see per-scenario provenance)",
+    "scenarios": [
+      {
+        "id": "Synthetic_2026-09-11T14-53-49-238Z_6c8d9e98-3df7-4617-9869-9a151f8d7780",
+        "artifact": "../artifacts/stage5b/missions/Synthetic_2026-09-11T14-53-49-238Z_6c8d9e98-3df7-4617-9869-9a151f8d7780.json",
+        "provenance": "synthetic",
+        "notes": "Mission synthetic-recorder-smoke; observed outcome: success; Synthetic local replay; no robot execution",
+        "expectations": {
+          "reverse": "either",
+          "preferOpenRoute": false,
+          "avoidSuspiciousManoeuvres": true,
+          "shortMoveM": 0.2
+        }
+      },
+      {
+        "id": "Synthetic_2026-09-11T15-00-21-993Z_59fb7fd9-5260-4581-b44c-55048c5ccb86",
+        "artifact": "../artifacts/stage5b/missions/Synthetic_2026-09-11T15-00-21-993Z_59fb7fd9-5260-4581-b44c-55048c5ccb86.json",
+        "provenance": "synthetic",
+        "notes": "Mission synthetic-recorder-smoke; observed outcome: success; Synthetic local replay; no robot execution",
+        "expectations": {
+          "reverse": "either",
+          "preferOpenRoute": false,
+          "avoidSuspiciousManoeuvres": true,
+          "shortMoveM": 0.2
+        }
+      },
+      {
+        "id": "Synthetic_2026-09-14T09-59-58-783Z_d72fb90c-c834-4cfa-b743-b3264cc783b1",
+        "artifact": "../artifacts/stage5b/missions/Synthetic_2026-09-14T09-59-58-783Z_d72fb90c-c834-4cfa-b743-b3264cc783b1.json",
+        "provenance": "synthetic",
+        "notes": "Mission synthetic-recorder-smoke; observed outcome: success; Synthetic local replay; no robot execution",
+        "expectations": {
+          "reverse": "either",
+          "preferOpenRoute": false,
+          "avoidSuspiciousManoeuvres": true,
+          "shortMoveM": 0.2
+        }
+      }
+    ]
+  },
+  "rows": [
+    {
+      "scenario": "Synthetic_2026-09-11T14-53-49-238Z_6c8d9e98-3df7-4617-9869-9a151f8d7780",
+      "profile": "CAPTURED_DEFAULT",
+      "provenance": "synthetic",
+      "mapRevision": "fnv1a32:842d19ba",
+      "footprintHash": "08791e4c",
+      "metrics": {
+        "success": true,
+        "planningDurationMs": 12.267000000000024,
+        "expandedStates": 1,
+        "planFingerprint": "fnv1a32:bddc5959",
+        "totalPathLengthM": 1.9999999999999996,
+        "forwardPathLengthM": 1.9999999999999996,
+        "reversePathLengthM": 0,
+        "totalAbsoluteRotationRad": 0,
+        "totalAbsoluteRotationDeg": 0,
+        "rotationActionCount": 0,
+        "directionChangeCount": 0,
+        "minimumClearanceM": 8.485281374238571,
+        "averageClearanceM": 8.485281374238577,
+        "costs": {
+          "distance": 2.0000000000000004,
+          "rotation": 0,
+          "reverse": 0,
+          "directionSwitch": 0,
+          "wallClearance": 0,
+          "narrowPassage": 0,
+          "turnLocation": 0,
+          "terminalOrientation": 0,
+          "total": 2.0000000000000004
+        },
+        "actionSequence": [
+          "F:2.000m"
+        ],
+        "actionSequenceTruncated": false
+      },
+      "effectiveParameters": {
+        "schemaVersion": "stage-5a",
+        "weights": {
+          "translationCostPerM": 1,
+          "rotationCostPerRad": 0.15,
+          "reverseCostPerM": 2,
+          "directionSwitchCost": 1,
+          "wallClearanceCost": 2,
+          "narrowPassageCost": 1.5,
+          "turnLocationCost": 1,
+          "terminalOrientationCostPerRad": 0.15
+        },
+        "clearance": {
+          "preferredM": 0.3,
+          "hardMinimumM": 0.1
+        },
+        "passage": {
+          "maximumWidthM": 1.8
+        },
+        "sampling": {
+          "translationCollisionIntervalM": 0.03,
+          "rotationCollisionIntervalDeg": 5,
+          "rotationCollisionIntervalRad": 0.08726646259971647
+        },
+        "lattice": {
+          "headingBinCount": 16,
+          "headingStepRad": 0.39269908169872414,
+          "headingStepDeg": 22.5,
+          "translationStepSource": "GRID_RESOLUTION"
+        },
+        "permissions": {
+          "forward": true,
+          "reverse": true,
+          "rotateInPlace": true
+        },
+        "footprint": {
+          "lengthM": 0.2,
+          "widthM": 0.2,
+          "centerOffsetXM": 0,
+          "centerOffsetYM": 0,
+          "configuredSafetyMarginM": 0,
+          "planningSafetyMarginM": 0,
+          "localizationMarginM": 0,
+          "effectiveSafetyMarginM": 0
+        },
+        "unknownCellsBlocked": true,
+        "maximumPlanningTimeMs": 5000,
+        "directionCostSemantics": "local-manoeuvre-alignment-v1",
+        "translationTransitionStepM": 0.1,
+        "translationPrimitiveLengthsM": [
+          0.5,
+          0.25,
+          0.1
+        ]
+      },
+      "success": true,
+      "score": 100,
+      "penalties": {
+        "path length": 0,
+        "reverse distance": 0,
+        "direction switches": 0,
+        "rotation angle": 0,
+        "rotation actions": 0,
+        "planning time": 0,
+        "expanded states": 0,
+        "total cost (report only; incomparable weights)": 0,
+        "average clearance (report only unless open-route preference)": 0,
+        "clearance": 0,
+        "reverse preference": 0,
+        "suspicious manoeuvres": 0
+      },
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "baselineComparison": {
+        "recordedSuccess": true,
+        "replaySuccess": true,
+        "recordedPlanFingerprint": "fnv1a32:bddc5959",
+        "replayPlanFingerprint": "fnv1a32:bddc5959",
+        "matches": true
+      }
+    },
+    {
+      "scenario": "Synthetic_2026-09-11T14-53-49-238Z_6c8d9e98-3df7-4617-9869-9a151f8d7780",
+      "profile": "BALANCED",
+      "provenance": "synthetic",
+      "mapRevision": "fnv1a32:842d19ba",
+      "footprintHash": "08791e4c",
+      "metrics": {
+        "success": true,
+        "planningDurationMs": 5.6451000000000136,
+        "expandedStates": 1,
+        "planFingerprint": "fnv1a32:bddc5959",
+        "totalPathLengthM": 1.9999999999999996,
+        "forwardPathLengthM": 1.9999999999999996,
+        "reversePathLengthM": 0,
+        "totalAbsoluteRotationRad": 0,
+        "totalAbsoluteRotationDeg": 0,
+        "rotationActionCount": 0,
+        "directionChangeCount": 0,
+        "minimumClearanceM": 8.485281374238571,
+        "averageClearanceM": 8.485281374238577,
+        "costs": {
+          "distance": 2.0000000000000004,
+          "rotation": 0,
+          "reverse": 0,
+          "directionSwitch": 0,
+          "wallClearance": 0,
+          "narrowPassage": 0,
+          "turnLocation": 0,
+          "terminalOrientation": 0,
+          "total": 2.0000000000000004
+        },
+        "actionSequence": [
+          "F:2.000m"
+        ],
+        "actionSequenceTruncated": false
+      },
+      "effectiveParameters": {
+        "schemaVersion": "stage-5a",
+        "weights": {
+          "translationCostPerM": 1,
+          "rotationCostPerRad": 0.25,
+          "reverseCostPerM": 0.5,
+          "directionSwitchCost": 1.2,
+          "wallClearanceCost": 3,
+          "narrowPassageCost": 1.5,
+          "turnLocationCost": 1,
+          "terminalOrientationCostPerRad": 0.15
+        },
+        "clearance": {
+          "preferredM": 0.35,
+          "hardMinimumM": 0.1
+        },
+        "passage": {
+          "maximumWidthM": 1.8
+        },
+        "sampling": {
+          "translationCollisionIntervalM": 0.03,
+          "rotationCollisionIntervalDeg": 5,
+          "rotationCollisionIntervalRad": 0.08726646259971647
+        },
+        "lattice": {
+          "headingBinCount": 16,
+          "headingStepRad": 0.39269908169872414,
+          "headingStepDeg": 22.5,
+          "translationStepSource": "GRID_RESOLUTION"
+        },
+        "permissions": {
+          "forward": true,
+          "reverse": true,
+          "rotateInPlace": true
+        },
+        "footprint": {
+          "lengthM": 0.2,
+          "widthM": 0.2,
+          "centerOffsetXM": 0,
+          "centerOffsetYM": 0,
+          "configuredSafetyMarginM": 0,
+          "planningSafetyMarginM": 0,
+          "localizationMarginM": 0,
+          "effectiveSafetyMarginM": 0
+        },
+        "unknownCellsBlocked": true,
+        "maximumPlanningTimeMs": 5000,
+        "directionCostSemantics": "local-manoeuvre-alignment-v1",
+        "translationTransitionStepM": 0.1,
+        "translationPrimitiveLengthsM": [
+          0.5,
+          0.25,
+          0.1
+        ]
+      },
+      "success": true,
+      "score": 100,
+      "penalties": {
+        "path length": 0,
+        "reverse distance": 0,
+        "direction switches": 0,
+        "rotation angle": 0,
+        "rotation actions": 0,
+        "planning time": 0,
+        "expanded states": 0,
+        "total cost (report only; incomparable weights)": 0,
+        "average clearance (report only unless open-route preference)": 0,
+        "clearance": 0,
+        "reverse preference": 0,
+        "suspicious manoeuvres": 0
+      },
+      "violations": [],
+      "suspiciousActionIndices": []
+    },
+    {
+      "scenario": "Synthetic_2026-09-11T14-53-49-238Z_6c8d9e98-3df7-4617-9869-9a151f8d7780",
+      "profile": "FORWARD_PREFERRED",
+      "provenance": "synthetic",
+      "mapRevision": "fnv1a32:842d19ba",
+      "footprintHash": "08791e4c",
+      "metrics": {
+        "success": true,
+        "planningDurationMs": 2.815799999999996,
+        "expandedStates": 1,
+        "planFingerprint": "fnv1a32:bddc5959",
+        "totalPathLengthM": 1.9999999999999996,
+        "forwardPathLengthM": 1.9999999999999996,
+        "reversePathLengthM": 0,
+        "totalAbsoluteRotationRad": 0,
+        "totalAbsoluteRotationDeg": 0,
+        "rotationActionCount": 0,
+        "directionChangeCount": 0,
+        "minimumClearanceM": 8.485281374238571,
+        "averageClearanceM": 8.485281374238577,
+        "costs": {
+          "distance": 2.0000000000000004,
+          "rotation": 0,
+          "reverse": 0,
+          "directionSwitch": 0,
+          "wallClearance": 0,
+          "narrowPassage": 0,
+          "turnLocation": 0,
+          "terminalOrientation": 0,
+          "total": 2.0000000000000004
+        },
+        "actionSequence": [
+          "F:2.000m"
+        ],
+        "actionSequenceTruncated": false
+      },
+      "effectiveParameters": {
+        "schemaVersion": "stage-5a",
+        "weights": {
+          "translationCostPerM": 1,
+          "rotationCostPerRad": 0.25,
+          "reverseCostPerM": 3,
+          "directionSwitchCost": 1,
+          "wallClearanceCost": 3,
+          "narrowPassageCost": 1.5,
+          "turnLocationCost": 1,
+          "terminalOrientationCostPerRad": 0.15
+        },
+        "clearance": {
+          "preferredM": 0.35,
+          "hardMinimumM": 0.1
+        },
+        "passage": {
+          "maximumWidthM": 1.8
+        },
+        "sampling": {
+          "translationCollisionIntervalM": 0.03,
+          "rotationCollisionIntervalDeg": 5,
+          "rotationCollisionIntervalRad": 0.08726646259971647
+        },
+        "lattice": {
+          "headingBinCount": 16,
+          "headingStepRad": 0.39269908169872414,
+          "headingStepDeg": 22.5,
+          "translationStepSource": "GRID_RESOLUTION"
+        },
+        "permissions": {
+          "forward": true,
+          "reverse": true,
+          "rotateInPlace": true
+        },
+        "footprint": {
+          "lengthM": 0.2,
+          "widthM": 0.2,
+          "centerOffsetXM": 0,
+          "centerOffsetYM": 0,
+          "configuredSafetyMarginM": 0,
+          "planningSafetyMarginM": 0,
+          "localizationMarginM": 0,
+          "effectiveSafetyMarginM": 0
+        },
+        "unknownCellsBlocked": true,
+        "maximumPlanningTimeMs": 5000,
+        "directionCostSemantics": "local-manoeuvre-alignment-v1",
+        "translationTransitionStepM": 0.1,
+        "translationPrimitiveLengthsM": [
+          0.5,
+          0.25,
+          0.1
+        ]
+      },
+      "success": true,
+      "score": 100,
+      "penalties": {
+        "path length": 0,
+        "reverse distance": 0,
+        "direction switches": 0,
+        "rotation angle": 0,
+        "rotation actions": 0,
+        "planning time": 0,
+        "expanded states": 0,
+        "total cost (report only; incomparable weights)": 0,
+        "average clearance (report only unless open-route preference)": 0,
+        "clearance": 0,
+        "reverse preference": 0,
+        "suspicious manoeuvres": 0
+      },
+      "violations": [],
+      "suspiciousActionIndices": []
+    },
+    {
+      "scenario": "Synthetic_2026-09-11T14-53-49-238Z_6c8d9e98-3df7-4617-9869-9a151f8d7780",
+      "profile": "CLEARANCE_PREFERRED",
+      "provenance": "synthetic",
+      "mapRevision": "fnv1a32:842d19ba",
+      "footprintHash": "08791e4c",
+      "metrics": {
+        "success": true,
+        "planningDurationMs": 2.254899999999992,
+        "expandedStates": 1,
+        "planFingerprint": "fnv1a32:bddc5959",
+        "totalPathLengthM": 1.9999999999999996,
+        "forwardPathLengthM": 1.9999999999999996,
+        "reversePathLengthM": 0,
+        "totalAbsoluteRotationRad": 0,
+        "totalAbsoluteRotationDeg": 0,
+        "rotationActionCount": 0,
+        "directionChangeCount": 0,
+        "minimumClearanceM": 8.485281374238571,
+        "averageClearanceM": 8.485281374238577,
+        "costs": {
+          "distance": 2.0000000000000004,
+          "rotation": 0,
+          "reverse": 0,
+          "directionSwitch": 0,
+          "wallClearance": 0,
+          "narrowPassage": 0,
+          "turnLocation": 0,
+          "terminalOrientation": 0,
+          "total": 2.0000000000000004
+        },
+        "actionSequence": [
+          "F:2.000m"
+        ],
+        "actionSequenceTruncated": false
+      },
+      "effectiveParameters": {
+        "schemaVersion": "stage-5a",
+        "weights": {
+          "translationCostPerM": 1,
+          "rotationCostPerRad": 0.25,
+          "reverseCostPerM": 1.5,
+          "directionSwitchCost": 1.5,
+          "wallClearanceCost": 8,
+          "narrowPassageCost": 1.5,
+          "turnLocationCost": 1,
+          "terminalOrientationCostPerRad": 0.15
+        },
+        "clearance": {
+          "preferredM": 0.8,
+          "hardMinimumM": 0.1
+        },
+        "passage": {
+          "maximumWidthM": 1.8
+        },
+        "sampling": {
+          "translationCollisionIntervalM": 0.03,
+          "rotationCollisionIntervalDeg": 5,
+          "rotationCollisionIntervalRad": 0.08726646259971647
+        },
+        "lattice": {
+          "headingBinCount": 16,
+          "headingStepRad": 0.39269908169872414,
+          "headingStepDeg": 22.5,
+          "translationStepSource": "GRID_RESOLUTION"
+        },
+        "permissions": {
+          "forward": true,
+          "reverse": true,
+          "rotateInPlace": true
+        },
+        "footprint": {
+          "lengthM": 0.2,
+          "widthM": 0.2,
+          "centerOffsetXM": 0,
+          "centerOffsetYM": 0,
+          "configuredSafetyMarginM": 0,
+          "planningSafetyMarginM": 0,
+          "localizationMarginM": 0,
+          "effectiveSafetyMarginM": 0
+        },
+        "unknownCellsBlocked": true,
+        "maximumPlanningTimeMs": 5000,
+        "directionCostSemantics": "local-manoeuvre-alignment-v1",
+        "translationTransitionStepM": 0.1,
+        "translationPrimitiveLengthsM": [
+          0.5,
+          0.25,
+          0.1
+        ]
+      },
+      "success": true,
+      "score": 100,
+      "penalties": {
+        "path length": 0,
+        "reverse distance": 0,
+        "direction switches": 0,
+        "rotation angle": 0,
+        "rotation actions": 0,
+        "planning time": 0,
+        "expanded states": 0,
+        "total cost (report only; incomparable weights)": 0,
+        "average clearance (report only unless open-route preference)": 0,
+        "clearance": 0,
+        "reverse preference": 0,
+        "suspicious manoeuvres": 0
+      },
+      "violations": [],
+      "suspiciousActionIndices": []
+    },
+    {
+      "scenario": "Synthetic_2026-09-11T15-00-21-993Z_59fb7fd9-5260-4581-b44c-55048c5ccb86",
+      "profile": "CAPTURED_DEFAULT",
+      "provenance": "synthetic",
+      "mapRevision": "fnv1a32:842d19ba",
+      "footprintHash": "08791e4c",
+      "metrics": {
+        "success": true,
+        "planningDurationMs": 2.3597000000000037,
+        "expandedStates": 1,
+        "planFingerprint": "fnv1a32:bddc5959",
+        "totalPathLengthM": 1.9999999999999996,
+        "forwardPathLengthM": 1.9999999999999996,
+        "reversePathLengthM": 0,
+        "totalAbsoluteRotationRad": 0,
+        "totalAbsoluteRotationDeg": 0,
+        "rotationActionCount": 0,
+        "directionChangeCount": 0,
+        "minimumClearanceM": 8.485281374238571,
+        "averageClearanceM": 8.485281374238577,
+        "costs": {
+          "distance": 2.0000000000000004,
+          "rotation": 0,
+          "reverse": 0,
+          "directionSwitch": 0,
+          "wallClearance": 0,
+          "narrowPassage": 0,
+          "turnLocation": 0,
+          "terminalOrientation": 0,
+          "total": 2.0000000000000004
+        },
+        "actionSequence": [
+          "F:2.000m"
+        ],
+        "actionSequenceTruncated": false
+      },
+      "effectiveParameters": {
+        "schemaVersion": "stage-5a",
+        "weights": {
+          "translationCostPerM": 1,
+          "rotationCostPerRad": 0.15,
+          "reverseCostPerM": 2,
+          "directionSwitchCost": 1,
+          "wallClearanceCost": 2,
+          "narrowPassageCost": 1.5,
+          "turnLocationCost": 1,
+          "terminalOrientationCostPerRad": 0.15
+        },
+        "clearance": {
+          "preferredM": 0.3,
+          "hardMinimumM": 0.1
+        },
+        "passage": {
+          "maximumWidthM": 1.8
+        },
+        "sampling": {
+          "translationCollisionIntervalM": 0.03,
+          "rotationCollisionIntervalDeg": 5,
+          "rotationCollisionIntervalRad": 0.08726646259971647
+        },
+        "lattice": {
+          "headingBinCount": 16,
+          "headingStepRad": 0.39269908169872414,
+          "headingStepDeg": 22.5,
+          "translationStepSource": "GRID_RESOLUTION"
+        },
+        "permissions": {
+          "forward": true,
+          "reverse": true,
+          "rotateInPlace": true
+        },
+        "footprint": {
+          "lengthM": 0.2,
+          "widthM": 0.2,
+          "centerOffsetXM": 0,
+          "centerOffsetYM": 0,
+          "configuredSafetyMarginM": 0,
+          "planningSafetyMarginM": 0,
+          "localizationMarginM": 0,
+          "effectiveSafetyMarginM": 0
+        },
+        "unknownCellsBlocked": true,
+        "maximumPlanningTimeMs": 5000,
+        "directionCostSemantics": "local-manoeuvre-alignment-v1",
+        "translationTransitionStepM": 0.1,
+        "translationPrimitiveLengthsM": [
+          0.5,
+          0.25,
+          0.1
+        ]
+      },
+      "success": true,
+      "score": 100,
+      "penalties": {
+        "path length": 0,
+        "reverse distance": 0,
+        "direction switches": 0,
+        "rotation angle": 0,
+        "rotation actions": 0,
+        "planning time": 0,
+        "expanded states": 0,
+        "total cost (report only; incomparable weights)": 0,
+        "average clearance (report only unless open-route preference)": 0,
+        "clearance": 0,
+        "reverse preference": 0,
+        "suspicious manoeuvres": 0
+      },
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "baselineComparison": {
+        "recordedSuccess": true,
+        "replaySuccess": true,
+        "recordedPlanFingerprint": "fnv1a32:bddc5959",
+        "replayPlanFingerprint": "fnv1a32:bddc5959",
+        "matches": true
+      }
+    },
+    {
+      "scenario": "Synthetic_2026-09-11T15-00-21-993Z_59fb7fd9-5260-4581-b44c-55048c5ccb86",
+      "profile": "BALANCED",
+      "provenance": "synthetic",
+      "mapRevision": "fnv1a32:842d19ba",
+      "footprintHash": "08791e4c",
+      "metrics": {
+        "success": true,
+        "planningDurationMs": 2.1030000000000086,
+        "expandedStates": 1,
+        "planFingerprint": "fnv1a32:bddc5959",
+        "totalPathLengthM": 1.9999999999999996,
+        "forwardPathLengthM": 1.9999999999999996,
+        "reversePathLengthM": 0,
+        "totalAbsoluteRotationRad": 0,
+        "totalAbsoluteRotationDeg": 0,
+        "rotationActionCount": 0,
+        "directionChangeCount": 0,
+        "minimumClearanceM": 8.485281374238571,
+        "averageClearanceM": 8.485281374238577,
+        "costs": {
+          "distance": 2.0000000000000004,
+          "rotation": 0,
+          "reverse": 0,
+          "directionSwitch": 0,
+          "wallClearance": 0,
+          "narrowPassage": 0,
+          "turnLocation": 0,
+          "terminalOrientation": 0,
+          "total": 2.0000000000000004
+        },
+        "actionSequence": [
+          "F:2.000m"
+        ],
+        "actionSequenceTruncated": false
+      },
+      "effectiveParameters": {
+        "schemaVersion": "stage-5a",
+        "weights": {
+          "translationCostPerM": 1,
+          "rotationCostPerRad": 0.25,
+          "reverseCostPerM": 0.5,
+          "directionSwitchCost": 1.2,
+          "wallClearanceCost": 3,
+          "narrowPassageCost": 1.5,
+          "turnLocationCost": 1,
+          "terminalOrientationCostPerRad": 0.15
+        },
+        "clearance": {
+          "preferredM": 0.35,
+          "hardMinimumM": 0.1
+        },
+        "passage": {
+          "maximumWidthM": 1.8
+        },
+        "sampling": {
+          "translationCollisionIntervalM": 0.03,
+          "rotationCollisionIntervalDeg": 5,
+          "rotationCollisionIntervalRad": 0.08726646259971647
+        },
+        "lattice": {
+          "headingBinCount": 16,
+          "headingStepRad": 0.39269908169872414,
+          "headingStepDeg": 22.5,
+          "translationStepSource": "GRID_RESOLUTION"
+        },
+        "permissions": {
+          "forward": true,
+          "reverse": true,
+          "rotateInPlace": true
+        },
+        "footprint": {
+          "lengthM": 0.2,
+          "widthM": 0.2,
+          "centerOffsetXM": 0,
+          "centerOffsetYM": 0,
+          "configuredSafetyMarginM": 0,
+          "planningSafetyMarginM": 0,
+          "localizationMarginM": 0,
+          "effectiveSafetyMarginM": 0
+        },
+        "unknownCellsBlocked": true,
+        "maximumPlanningTimeMs": 5000,
+        "directionCostSemantics": "local-manoeuvre-alignment-v1",
+        "translationTransitionStepM": 0.1,
+        "translationPrimitiveLengthsM": [
+          0.5,
+          0.25,
+          0.1
+        ]
+      },
+      "success": true,
+      "score": 100,
+      "penalties": {
+        "path length": 0,
+        "reverse distance": 0,
+        "direction switches": 0,
+        "rotation angle": 0,
+        "rotation actions": 0,
+        "planning time": 0,
+        "expanded states": 0,
+        "total cost (report only; incomparable weights)": 0,
+        "average clearance (report only unless open-route preference)": 0,
+        "clearance": 0,
+        "reverse preference": 0,
+        "suspicious manoeuvres": 0
+      },
+      "violations": [],
+      "suspiciousActionIndices": []
+    },
+    {
+      "scenario": "Synthetic_2026-09-11T15-00-21-993Z_59fb7fd9-5260-4581-b44c-55048c5ccb86",
+      "profile": "FORWARD_PREFERRED",
+      "provenance": "synthetic",
+      "mapRevision": "fnv1a32:842d19ba",
+      "footprintHash": "08791e4c",
+      "metrics": {
+        "success": true,
+        "planningDurationMs": 2.135300000000001,
+        "expandedStates": 1,
+        "planFingerprint": "fnv1a32:bddc5959",
+        "totalPathLengthM": 1.9999999999999996,
+        "forwardPathLengthM": 1.9999999999999996,
+        "reversePathLengthM": 0,
+        "totalAbsoluteRotationRad": 0,
+        "totalAbsoluteRotationDeg": 0,
+        "rotationActionCount": 0,
+        "directionChangeCount": 0,
+        "minimumClearanceM": 8.485281374238571,
+        "averageClearanceM": 8.485281374238577,
+        "costs": {
+          "distance": 2.0000000000000004,
+          "rotation": 0,
+          "reverse": 0,
+          "directionSwitch": 0,
+          "wallClearance": 0,
+          "narrowPassage": 0,
+          "turnLocation": 0,
+          "terminalOrientation": 0,
+          "total": 2.0000000000000004
+        },
+        "actionSequence": [
+          "F:2.000m"
+        ],
+        "actionSequenceTruncated": false
+      },
+      "effectiveParameters": {
+        "schemaVersion": "stage-5a",
+        "weights": {
+          "translationCostPerM": 1,
+          "rotationCostPerRad": 0.25,
+          "reverseCostPerM": 3,
+          "directionSwitchCost": 1,
+          "wallClearanceCost": 3,
+          "narrowPassageCost": 1.5,
+          "turnLocationCost": 1,
+          "terminalOrientationCostPerRad": 0.15
+        },
+        "clearance": {
+          "preferredM": 0.35,
+          "hardMinimumM": 0.1
+        },
+        "passage": {
+          "maximumWidthM": 1.8
+        },
+        "sampling": {
+          "translationCollisionIntervalM": 0.03,
+          "rotationCollisionIntervalDeg": 5,
+          "rotationCollisionIntervalRad": 0.08726646259971647
+        },
+        "lattice": {
+          "headingBinCount": 16,
+          "headingStepRad": 0.39269908169872414,
+          "headingStepDeg": 22.5,
+          "translationStepSource": "GRID_RESOLUTION"
+        },
+        "permissions": {
+          "forward": true,
+          "reverse": true,
+          "rotateInPlace": true
+        },
+        "footprint": {
+          "lengthM": 0.2,
+          "widthM": 0.2,
+          "centerOffsetXM": 0,
+          "centerOffsetYM": 0,
+          "configuredSafetyMarginM": 0,
+          "planningSafetyMarginM": 0,
+          "localizationMarginM": 0,
+          "effectiveSafetyMarginM": 0
+        },
+        "unknownCellsBlocked": true,
+        "maximumPlanningTimeMs": 5000,
+        "directionCostSemantics": "local-manoeuvre-alignment-v1",
+        "translationTransitionStepM": 0.1,
+        "translationPrimitiveLengthsM": [
+          0.5,
+          0.25,
+          0.1
+        ]
+      },
+      "success": true,
+      "score": 100,
+      "penalties": {
+        "path length": 0,
+        "reverse distance": 0,
+        "direction switches": 0,
+        "rotation angle": 0,
+        "rotation actions": 0,
+        "planning time": 0,
+        "expanded states": 0,
+        "total cost (report only; incomparable weights)": 0,
+        "average clearance (report only unless open-route preference)": 0,
+        "clearance": 0,
+        "reverse preference": 0,
+        "suspicious manoeuvres": 0
+      },
+      "violations": [],
+      "suspiciousActionIndices": []
+    },
+    {
+      "scenario": "Synthetic_2026-09-11T15-00-21-993Z_59fb7fd9-5260-4581-b44c-55048c5ccb86",
+      "profile": "CLEARANCE_PREFERRED",
+      "provenance": "synthetic",
+      "mapRevision": "fnv1a32:842d19ba",
+      "footprintHash": "08791e4c",
+      "metrics": {
+        "success": true,
+        "planningDurationMs": 1.5786999999999978,
+        "expandedStates": 1,
+        "planFingerprint": "fnv1a32:bddc5959",
+        "totalPathLengthM": 1.9999999999999996,
+        "forwardPathLengthM": 1.9999999999999996,
+        "reversePathLengthM": 0,
+        "totalAbsoluteRotationRad": 0,
+        "totalAbsoluteRotationDeg": 0,
+        "rotationActionCount": 0,
+        "directionChangeCount": 0,
+        "minimumClearanceM": 8.485281374238571,
+        "averageClearanceM": 8.485281374238577,
+        "costs": {
+          "distance": 2.0000000000000004,
+          "rotation": 0,
+          "reverse": 0,
+          "directionSwitch": 0,
+          "wallClearance": 0,
+          "narrowPassage": 0,
+          "turnLocation": 0,
+          "terminalOrientation": 0,
+          "total": 2.0000000000000004
+        },
+        "actionSequence": [
+          "F:2.000m"
+        ],
+        "actionSequenceTruncated": false
+      },
+      "effectiveParameters": {
+        "schemaVersion": "stage-5a",
+        "weights": {
+          "translationCostPerM": 1,
+          "rotationCostPerRad": 0.25,
+          "reverseCostPerM": 1.5,
+          "directionSwitchCost": 1.5,
+          "wallClearanceCost": 8,
+          "narrowPassageCost": 1.5,
+          "turnLocationCost": 1,
+          "terminalOrientationCostPerRad": 0.15
+        },
+        "clearance": {
+          "preferredM": 0.8,
+          "hardMinimumM": 0.1
+        },
+        "passage": {
+          "maximumWidthM": 1.8
+        },
+        "sampling": {
+          "translationCollisionIntervalM": 0.03,
+          "rotationCollisionIntervalDeg": 5,
+          "rotationCollisionIntervalRad": 0.08726646259971647
+        },
+        "lattice": {
+          "headingBinCount": 16,
+          "headingStepRad": 0.39269908169872414,
+          "headingStepDeg": 22.5,
+          "translationStepSource": "GRID_RESOLUTION"
+        },
+        "permissions": {
+          "forward": true,
+          "reverse": true,
+          "rotateInPlace": true
+        },
+        "footprint": {
+          "lengthM": 0.2,
+          "widthM": 0.2,
+          "centerOffsetXM": 0,
+          "centerOffsetYM": 0,
+          "configuredSafetyMarginM": 0,
+          "planningSafetyMarginM": 0,
+          "localizationMarginM": 0,
+          "effectiveSafetyMarginM": 0
+        },
+        "unknownCellsBlocked": true,
+        "maximumPlanningTimeMs": 5000,
+        "directionCostSemantics": "local-manoeuvre-alignment-v1",
+        "translationTransitionStepM": 0.1,
+        "translationPrimitiveLengthsM": [
+          0.5,
+          0.25,
+          0.1
+        ]
+      },
+      "success": true,
+      "score": 100,
+      "penalties": {
+        "path length": 0,
+        "reverse distance": 0,
+        "direction switches": 0,
+        "rotation angle": 0,
+        "rotation actions": 0,
+        "planning time": 0,
+        "expanded states": 0,
+        "total cost (report only; incomparable weights)": 0,
+        "average clearance (report only unless open-route preference)": 0,
+        "clearance": 0,
+        "reverse preference": 0,
+        "suspicious manoeuvres": 0
+      },
+      "violations": [],
+      "suspiciousActionIndices": []
+    },
+    {
+      "scenario": "Synthetic_2026-09-14T09-59-58-783Z_d72fb90c-c834-4cfa-b743-b3264cc783b1",
+      "profile": "CAPTURED_DEFAULT",
+      "provenance": "synthetic",
+      "mapRevision": "fnv1a32:842d19ba",
+      "footprintHash": "08791e4c",
+      "metrics": {
+        "success": true,
+        "planningDurationMs": 1.8523999999999887,
+        "expandedStates": 1,
+        "planFingerprint": "fnv1a32:bddc5959",
+        "totalPathLengthM": 1.9999999999999996,
+        "forwardPathLengthM": 1.9999999999999996,
+        "reversePathLengthM": 0,
+        "totalAbsoluteRotationRad": 0,
+        "totalAbsoluteRotationDeg": 0,
+        "rotationActionCount": 0,
+        "directionChangeCount": 0,
+        "minimumClearanceM": 8.485281374238571,
+        "averageClearanceM": 8.485281374238577,
+        "costs": {
+          "distance": 2.0000000000000004,
+          "rotation": 0,
+          "reverse": 0,
+          "directionSwitch": 0,
+          "wallClearance": 0,
+          "narrowPassage": 0,
+          "turnLocation": 0,
+          "terminalOrientation": 0,
+          "total": 2.0000000000000004
+        },
+        "actionSequence": [
+          "F:2.000m"
+        ],
+        "actionSequenceTruncated": false
+      },
+      "effectiveParameters": {
+        "schemaVersion": "stage-5a",
+        "weights": {
+          "translationCostPerM": 1,
+          "rotationCostPerRad": 0.15,
+          "reverseCostPerM": 2,
+          "directionSwitchCost": 1,
+          "wallClearanceCost": 2,
+          "narrowPassageCost": 1.5,
+          "turnLocationCost": 1,
+          "terminalOrientationCostPerRad": 0.15
+        },
+        "clearance": {
+          "preferredM": 0.3,
+          "hardMinimumM": 0.1
+        },
+        "passage": {
+          "maximumWidthM": 1.8
+        },
+        "sampling": {
+          "translationCollisionIntervalM": 0.03,
+          "rotationCollisionIntervalDeg": 5,
+          "rotationCollisionIntervalRad": 0.08726646259971647
+        },
+        "lattice": {
+          "headingBinCount": 16,
+          "headingStepRad": 0.39269908169872414,
+          "headingStepDeg": 22.5,
+          "translationStepSource": "GRID_RESOLUTION"
+        },
+        "permissions": {
+          "forward": true,
+          "reverse": true,
+          "rotateInPlace": true
+        },
+        "footprint": {
+          "lengthM": 0.2,
+          "widthM": 0.2,
+          "centerOffsetXM": 0,
+          "centerOffsetYM": 0,
+          "configuredSafetyMarginM": 0,
+          "planningSafetyMarginM": 0,
+          "localizationMarginM": 0,
+          "effectiveSafetyMarginM": 0
+        },
+        "unknownCellsBlocked": true,
+        "maximumPlanningTimeMs": 5000,
+        "directionCostSemantics": "local-manoeuvre-alignment-v1",
+        "translationTransitionStepM": 0.1,
+        "translationPrimitiveLengthsM": [
+          0.5,
+          0.25,
+          0.1
+        ]
+      },
+      "success": true,
+      "score": 100,
+      "penalties": {
+        "path length": 0,
+        "reverse distance": 0,
+        "direction switches": 0,
+        "rotation angle": 0,
+        "rotation actions": 0,
+        "planning time": 0,
+        "expanded states": 0,
+        "total cost (report only; incomparable weights)": 0,
+        "average clearance (report only unless open-route preference)": 0,
+        "clearance": 0,
+        "reverse preference": 0,
+        "suspicious manoeuvres": 0
+      },
+      "violations": [],
+      "suspiciousActionIndices": [],
+      "baselineComparison": {
+        "recordedSuccess": true,
+        "replaySuccess": true,
+        "recordedPlanFingerprint": "fnv1a32:bddc5959",
+        "replayPlanFingerprint": "fnv1a32:bddc5959",
+        "matches": true
+      }
+    },
+    {
+      "scenario": "Synthetic_2026-09-14T09-59-58-783Z_d72fb90c-c834-4cfa-b743-b3264cc783b1",
+      "profile": "BALANCED",
+      "provenance": "synthetic",
+      "mapRevision": "fnv1a32:842d19ba",
+      "footprintHash": "08791e4c",
+      "metrics": {
+        "success": true,
+        "planningDurationMs": 1.7264999999999873,
+        "expandedStates": 1,
+        "planFingerprint": "fnv1a32:bddc5959",
+        "totalPathLengthM": 1.9999999999999996,
+        "forwardPathLengthM": 1.9999999999999996,
+        "reversePathLengthM": 0,
+        "totalAbsoluteRotationRad": 0,
+        "totalAbsoluteRotationDeg": 0,
+        "rotationActionCount": 0,
+        "directionChangeCount": 0,
+        "minimumClearanceM": 8.485281374238571,
+        "averageClearanceM": 8.485281374238577,
+        "costs": {
+          "distance": 2.0000000000000004,
+          "rotation": 0,
+          "reverse": 0,
+          "directionSwitch": 0,
+          "wallClearance": 0,
+          "narrowPassage": 0,
+          "turnLocation": 0,
+          "terminalOrientation": 0,
+          "total": 2.0000000000000004
+        },
+        "actionSequence": [
+          "F:2.000m"
+        ],
+        "actionSequenceTruncated": false
+      },
+      "effectiveParameters": {
+        "schemaVersion": "stage-5a",
+        "weights": {
+          "translationCostPerM": 1,
+          "rotationCostPerRad": 0.25,
+          "reverseCostPerM": 0.5,
+          "directionSwitchCost": 1.2,
+          "wallClearanceCost": 3,
+          "narrowPassageCost": 1.5,
+          "turnLocationCost": 1,
+          "terminalOrientationCostPerRad": 0.15
+        },
+        "clearance": {
+          "preferredM": 0.35,
+          "hardMinimumM": 0.1
+        },
+        "passage": {
+          "maximumWidthM": 1.8
+        },
+        "sampling": {
+          "translationCollisionIntervalM": 0.03,
+          "rotationCollisionIntervalDeg": 5,
+          "rotationCollisionIntervalRad": 0.08726646259971647
+        },
+        "lattice": {
+          "headingBinCount": 16,
+          "headingStepRad": 0.39269908169872414,
+          "headingStepDeg": 22.5,
+          "translationStepSource": "GRID_RESOLUTION"
+        },
+        "permissions": {
+          "forward": true,
+          "reverse": true,
+          "rotateInPlace": true
+        },
+        "footprint": {
+          "lengthM": 0.2,
+          "widthM": 0.2,
+          "centerOffsetXM": 0,
+          "centerOffsetYM": 0,
+          "configuredSafetyMarginM": 0,
+          "planningSafetyMarginM": 0,
+          "localizationMarginM": 0,
+          "effectiveSafetyMarginM": 0
+        },
+        "unknownCellsBlocked": true,
+        "maximumPlanningTimeMs": 5000,
+        "directionCostSemantics": "local-manoeuvre-alignment-v1",
+        "translationTransitionStepM": 0.1,
+        "translationPrimitiveLengthsM": [
+          0.5,
+          0.25,
+          0.1
+        ]
+      },
+      "success": true,
+      "score": 100,
+      "penalties": {
+        "path length": 0,
+        "reverse distance": 0,
+        "direction switches": 0,
+        "rotation angle": 0,
+        "rotation actions": 0,
+        "planning time": 0,
+        "expanded states": 0,
+        "total cost (report only; incomparable weights)": 0,
+        "average clearance (report only unless open-route preference)": 0,
+        "clearance": 0,
+        "reverse preference": 0,
+        "suspicious manoeuvres": 0
+      },
+      "violations": [],
+      "suspiciousActionIndices": []
+    },
+    {
+      "scenario": "Synthetic_2026-09-14T09-59-58-783Z_d72fb90c-c834-4cfa-b743-b3264cc783b1",
+      "profile": "FORWARD_PREFERRED",
+      "provenance": "synthetic",
+      "mapRevision": "fnv1a32:842d19ba",
+      "footprintHash": "08791e4c",
+      "metrics": {
+        "success": true,
+        "planningDurationMs": 1.2538000000000125,
+        "expandedStates": 1,
+        "planFingerprint": "fnv1a32:bddc5959",
+        "totalPathLengthM": 1.9999999999999996,
+        "forwardPathLengthM": 1.9999999999999996,
+        "reversePathLengthM": 0,
+        "totalAbsoluteRotationRad": 0,
+        "totalAbsoluteRotationDeg": 0,
+        "rotationActionCount": 0,
+        "directionChangeCount": 0,
+        "minimumClearanceM": 8.485281374238571,
+        "averageClearanceM": 8.485281374238577,
+        "costs": {
+          "distance": 2.0000000000000004,
+          "rotation": 0,
+          "reverse": 0,
+          "directionSwitch": 0,
+          "wallClearance": 0,
+          "narrowPassage": 0,
+          "turnLocation": 0,
+          "terminalOrientation": 0,
+          "total": 2.0000000000000004
+        },
+        "actionSequence": [
+          "F:2.000m"
+        ],
+        "actionSequenceTruncated": false
+      },
+      "effectiveParameters": {
+        "schemaVersion": "stage-5a",
+        "weights": {
+          "translationCostPerM": 1,
+          "rotationCostPerRad": 0.25,
+          "reverseCostPerM": 3,
+          "directionSwitchCost": 1,
+          "wallClearanceCost": 3,
+          "narrowPassageCost": 1.5,
+          "turnLocationCost": 1,
+          "terminalOrientationCostPerRad": 0.15
+        },
+        "clearance": {
+          "preferredM": 0.35,
+          "hardMinimumM": 0.1
+        },
+        "passage": {
+          "maximumWidthM": 1.8
+        },
+        "sampling": {
+          "translationCollisionIntervalM": 0.03,
+          "rotationCollisionIntervalDeg": 5,
+          "rotationCollisionIntervalRad": 0.08726646259971647
+        },
+        "lattice": {
+          "headingBinCount": 16,
+          "headingStepRad": 0.39269908169872414,
+          "headingStepDeg": 22.5,
+          "translationStepSource": "GRID_RESOLUTION"
+        },
+        "permissions": {
+          "forward": true,
+          "reverse": true,
+          "rotateInPlace": true
+        },
+        "footprint": {
+          "lengthM": 0.2,
+          "widthM": 0.2,
+          "centerOffsetXM": 0,
+          "centerOffsetYM": 0,
+          "configuredSafetyMarginM": 0,
+          "planningSafetyMarginM": 0,
+          "localizationMarginM": 0,
+          "effectiveSafetyMarginM": 0
+        },
+        "unknownCellsBlocked": true,
+        "maximumPlanningTimeMs": 5000,
+        "directionCostSemantics": "local-manoeuvre-alignment-v1",
+        "translationTransitionStepM": 0.1,
+        "translationPrimitiveLengthsM": [
+          0.5,
+          0.25,
+          0.1
+        ]
+      },
+      "success": true,
+      "score": 100,
+      "penalties": {
+        "path length": 0,
+        "reverse distance": 0,
+        "direction switches": 0,
+        "rotation angle": 0,
+        "rotation actions": 0,
+        "planning time": 0,
+        "expanded states": 0,
+        "total cost (report only; incomparable weights)": 0,
+        "average clearance (report only unless open-route preference)": 0,
+        "clearance": 0,
+        "reverse preference": 0,
+        "suspicious manoeuvres": 0
+      },
+      "violations": [],
+      "suspiciousActionIndices": []
+    },
+    {
+      "scenario": "Synthetic_2026-09-14T09-59-58-783Z_d72fb90c-c834-4cfa-b743-b3264cc783b1",
+      "profile": "CLEARANCE_PREFERRED",
+      "provenance": "synthetic",
+      "mapRevision": "fnv1a32:842d19ba",
+      "footprintHash": "08791e4c",
+      "metrics": {
+        "success": true,
+        "planningDurationMs": 1.5146000000000015,
+        "expandedStates": 1,
+        "planFingerprint": "fnv1a32:bddc5959",
+        "totalPathLengthM": 1.9999999999999996,
+        "forwardPathLengthM": 1.9999999999999996,
+        "reversePathLengthM": 0,
+        "totalAbsoluteRotationRad": 0,
+        "totalAbsoluteRotationDeg": 0,
+        "rotationActionCount": 0,
+        "directionChangeCount": 0,
+        "minimumClearanceM": 8.485281374238571,
+        "averageClearanceM": 8.485281374238577,
+        "costs": {
+          "distance": 2.0000000000000004,
+          "rotation": 0,
+          "reverse": 0,
+          "directionSwitch": 0,
+          "wallClearance": 0,
+          "narrowPassage": 0,
+          "turnLocation": 0,
+          "terminalOrientation": 0,
+          "total": 2.0000000000000004
+        },
+        "actionSequence": [
+          "F:2.000m"
+        ],
+        "actionSequenceTruncated": false
+      },
+      "effectiveParameters": {
+        "schemaVersion": "stage-5a",
+        "weights": {
+          "translationCostPerM": 1,
+          "rotationCostPerRad": 0.25,
+          "reverseCostPerM": 1.5,
+          "directionSwitchCost": 1.5,
+          "wallClearanceCost": 8,
+          "narrowPassageCost": 1.5,
+          "turnLocationCost": 1,
+          "terminalOrientationCostPerRad": 0.15
+        },
+        "clearance": {
+          "preferredM": 0.8,
+          "hardMinimumM": 0.1
+        },
+        "passage": {
+          "maximumWidthM": 1.8
+        },
+        "sampling": {
+          "translationCollisionIntervalM": 0.03,
+          "rotationCollisionIntervalDeg": 5,
+          "rotationCollisionIntervalRad": 0.08726646259971647
+        },
+        "lattice": {
+          "headingBinCount": 16,
+          "headingStepRad": 0.39269908169872414,
+          "headingStepDeg": 22.5,
+          "translationStepSource": "GRID_RESOLUTION"
+        },
+        "permissions": {
+          "forward": true,
+          "reverse": true,
+          "rotateInPlace": true
+        },
+        "footprint": {
+          "lengthM": 0.2,
+          "widthM": 0.2,
+          "centerOffsetXM": 0,
+          "centerOffsetYM": 0,
+          "configuredSafetyMarginM": 0,
+          "planningSafetyMarginM": 0,
+          "localizationMarginM": 0,
+          "effectiveSafetyMarginM": 0
+        },
+        "unknownCellsBlocked": true,
+        "maximumPlanningTimeMs": 5000,
+        "directionCostSemantics": "local-manoeuvre-alignment-v1",
+        "translationTransitionStepM": 0.1,
+        "translationPrimitiveLengthsM": [
+          0.5,
+          0.25,
+          0.1
+        ]
+      },
+      "success": true,
+      "score": 100,
+      "penalties": {
+        "path length": 0,
+        "reverse distance": 0,
+        "direction switches": 0,
+        "rotation angle": 0,
+        "rotation actions": 0,
+        "planning time": 0,
+        "expanded states": 0,
+        "total cost (report only; incomparable weights)": 0,
+        "average clearance (report only unless open-route preference)": 0,
+        "clearance": 0,
+        "reverse preference": 0,
+        "suspicious manoeuvres": 0
+      },
+      "violations": [],
+      "suspiciousActionIndices": []
+    }
+  ],
+  "recommendation": {
+    "profile": null,
+    "reason": "No real-run artifacts evaluated. Profile selection pending."
+  }
+}

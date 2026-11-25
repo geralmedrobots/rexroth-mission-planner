@@ -20,10 +20,6 @@ export const CostModel = {
   motionStateReverseRisk(reverse: boolean, distanceM: number, costPerM: number): number {
     return reverse ? distanceM * costPerM : 0;
   },
-  motionStateDirectionSwitch(previous: string | undefined, next: string,
-    costPerSwitch: number): number {
-    return previous && previous !== next ? costPerSwitch : 0;
-  },
   motionStateWallProximity(clearanceM: number, preferredM: number,
     distanceM: number, weightPerM: number): number {
     return distanceM * weightPerM * Math.max(0, preferredM - clearanceM) ** 2 /

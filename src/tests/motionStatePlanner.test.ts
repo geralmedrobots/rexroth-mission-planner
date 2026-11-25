@@ -196,6 +196,18 @@ describe('MotionStatePlanner architecture', () => {
     expect(result.finalPath).toEqual([]);
     expect(result.motionPlan).toBeUndefined();
     expect(result.motionPlannerEvents?.some((event) => event.eventType === 'motionplanner.failed')).toBe(true);
+    expect(result.diagnostics?.physicalFailureCode).toBe('NO_PHYSICALLY_VALID_ROUTE');
+  });
+
+  it('reports search timeout separately from a proven infeasible route', () => {
+    const grid = makeGrid();
+    const start = cellPose(grid, 35, 20, 0);
+    const goal = cellPose(grid, 35, 50, 0);
+    const timedOut = plan(grid, start, goal, rectangle(.3, .2, false), {
+      ...options(), maxPlanningTimeMs: 0,
+    }, 0);
+    expect(timedOut.success).toBe(false);
+    expect(timedOut.diagnostics?.physicalFailureCode).toBe('MOTION_STATE_SEARCH_TIMEOUT');
   });
 
   it('K. direction-switch/reverse penalty changes the selected route', () => {
@@ -278,5 +290,48 @@ describe('MotionStatePlanner architecture', () => {
     expect(() => new VdaOrderBuilder().build(result.finalPath, {
       robotPose: start, activeMapId: grid.metadata.mapId, motionPlan: result.motionPlan,
     }, defaultOrderSettings)).toThrow(/validation requires the planning grid and footprint/i);
+  });
+
+  it('plans long normal open-space routes with production defaults inside the 3000 ms budget', () => {
+    const grid = makeGrid(.05, 220, 220);
+    const transform = new CoordinateTransformer(grid.metadata);
+    const column = Math.floor(grid.metadata.width / 2);
+    const start = { ...transform.gridToWorld(195, column), theta: 0,
+      mapId: grid.metadata.mapId, positionInitialized: true };
+    const goal = { ...transform.gridToWorld(20, column), theta: Math.PI / 2,
+      mapId: grid.metadata.mapId, positionInitialized: true };
+    const plannerOptions = structuredClone(defaultPlannerOptions);
+    plannerOptions.maxPlanningTimeMs = 3_000;
+
+    const result = plan(grid, start, goal, structuredClone(defaultFootprint),
+      plannerOptions, Math.PI / 2);
+
+    expect(result.success).toBe(true);
+    expect(result.error).toBeUndefined();
+    expect(result.statistics.durationMs).toBeLessThan(3_000);
+    expect(result.statistics.visitedCells).toBeLessThan(5_000);
+    expect(new MotionPlanValidator().validate(result.motionPlan!, grid,
+      structuredClone(defaultFootprint), plannerOptions.collisionSampleInterval,
+      plannerOptions.passageSafety.rotationCollisionSampleDeg * Math.PI / 180,
+      defaultFootprint.backwardAllowed === true, Math.PI / 2).valid).toBe(true);
+  });
+
+  it('plans a cluttered forward-only map fixture within the production budget', () => {
+    const grid = makeGrid(.1, 100, 100);
+    const start = cellPose(grid, 80, 12, 0);
+    const goal = cellPose(grid, 20, 88, 0);
+    for (let row = 28; row <= 88; row += 1) if (row < 48 || row > 55)
+      grid.data[row * grid.metadata.width + 48] = 100;
+    for (let row = 12; row <= 72; row += 1) if (row < 39 || row > 46)
+      grid.data[row * grid.metadata.width + 70] = 100;
+    const plannerOptions = { ...options(), maxPlanningTimeMs: 3_000 };
+    const result = plan(grid, start, goal, rectangle(.4, .2, false), plannerOptions, 0);
+    expect(result.success).toBe(true);
+    expect(result.statistics.durationMs).toBeLessThan(3_000);
+    expect(result.motionPlan!.states.some((state) => state.direction === 'REVERSE')).toBe(false);
+    expect(new MotionPlanValidator().validate(result.motionPlan!, grid, rectangle(.4, .2, false),
+      plannerOptions.collisionSampleInterval,
+      plannerOptions.passageSafety.rotationCollisionSampleDeg * Math.PI / 180,
+      false, 0).valid).toBe(true);
   });
 });

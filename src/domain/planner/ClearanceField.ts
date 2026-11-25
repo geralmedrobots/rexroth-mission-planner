@@ -77,6 +77,54 @@ const buildField=(grid:OccupancyGrid,roundingSafe:boolean):Float32Array=>{
 /** Existing legacy distance transform, retained byte-for-byte for compatibility. */
 export const buildClearanceField=(grid:OccupancyGrid):Float32Array=>buildField(grid,false);
 
-/** Correctly propagated field used only by the motion-state pipeline. */
-export const buildMotionStateClearanceField=(grid:OccupancyGrid):Float32Array=>
-  buildField(grid,true);
+interface CachedField { metadata: string; data: number[]; field: Float32Array }
+const motionFields: CachedField[] = [];
+
+/**
+ * Same nearest-obstacle octile metric as the eight-neighbour Dijkstra above.
+ * Distance propagation has no impassable cells, so two chamfer passes compute
+ * it in O(width * height), without a heap entry for every map cell. Float64
+ * working storage avoids cumulative Float32 rounding; the public field stays
+ * Float32. Unknown cells remain zero-distance obstacle sources.
+ *
+ * A bounded content cache is shared by search, optimiser, metrics and replay.
+ * Compare actual contents (including worker clones and in-place map updates),
+ * not object identity or a mapId that can stay unchanged across revisions.
+ */
+export const buildMotionStateClearanceField = (grid: OccupancyGrid): Float32Array => {
+  const metadata = JSON.stringify(grid.metadata);
+  const cached = motionFields.find((entry) => entry.metadata === metadata &&
+    entry.data.length === grid.data.length && grid.data.every((value, index) => value === entry.data[index]));
+  if (cached) return cached.field;
+  const { width, height, resolution, occupiedThreshold } = grid.metadata;
+  const distances = new Float64Array(width * height);
+  const diagonal = resolution * Math.SQRT2;
+  for (let index = 0; index < distances.length; index += 1)
+    distances[index] = isOccupiedValue(grid.data[index] ?? 100, occupiedThreshold) ? 0 : Infinity;
+  for (let row = 0; row < height; row += 1) for (let column = 0; column < width; column += 1) {
+    const i = row * width + column;
+    let value = distances[i]!;
+    if (column > 0) value = Math.min(value, distances[i - 1]! + resolution);
+    if (row > 0) {
+      value = Math.min(value, distances[i - width]! + resolution);
+      if (column > 0) value = Math.min(value, distances[i - width - 1]! + diagonal);
+      if (column + 1 < width) value = Math.min(value, distances[i - width + 1]! + diagonal);
+    }
+    distances[i] = value;
+  }
+  for (let row = height - 1; row >= 0; row -= 1) for (let column = width - 1; column >= 0; column -= 1) {
+    const i = row * width + column;
+    let value = distances[i]!;
+    if (column + 1 < width) value = Math.min(value, distances[i + 1]! + resolution);
+    if (row + 1 < height) {
+      value = Math.min(value, distances[i + width]! + resolution);
+      if (column > 0) value = Math.min(value, distances[i + width - 1]! + diagonal);
+      if (column + 1 < width) value = Math.min(value, distances[i + width + 1]! + diagonal);
+    }
+    distances[i] = value;
+  }
+  const field = Float32Array.from(distances);
+  motionFields.push({ metadata, data: grid.data.slice(), field });
+  if (motionFields.length > 2) motionFields.shift();
+  return field;
+};

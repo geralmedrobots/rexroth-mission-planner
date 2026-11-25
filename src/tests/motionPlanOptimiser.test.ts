@@ -153,11 +153,12 @@ describe('MotionPlanOptimiser feasibility-preserving architecture', () => {
   });
 
   it('F. merges redundant compatible consecutive translations safely', () => {
-    const plan = motionPlan([state(1, 2, 0), state(2, 2, 0), state(3, 2, 0)],
-      ['TRANSLATE_FORWARD', 'TRANSLATE_FORWARD']);
+    const plan = motionPlan(Array.from({ length: 9 }, (_, index) => state(1 + index, 2, 0)),
+      Array.from({ length: 8 }, () => 'TRANSLATE_FORWARD'));
     const result = optimise(plan);
     expect(result.plan.actions).toHaveLength(1);
-    expect(result.plan.actions[0]!.distanceM).toBeCloseTo(2);
+    expect(result.plan.actions[0]!.distanceM).toBeCloseTo(8);
+    expect(result.candidatesConsidered).toBe(1);
   });
 
   it('G. removes a redundant zero rotation without changing the translation', () => {
@@ -167,6 +168,67 @@ describe('MotionPlanOptimiser feasibility-preserving architecture', () => {
     const result = optimise(plan);
     expect(result.plan.actions.map((action) => action.type)).toEqual(['TRANSLATE_FORWARD']);
     expect(result.plan.states).toHaveLength(2);
+  });
+
+  it('M. coalesces open-space lattice rotations without changing total angle', () => {
+    const plan = motionPlan([
+      state(1, 2, 0), state(1, 2, Math.PI / 4),
+      state(1, 2, Math.PI / 2), state(1, 3, Math.PI / 2),
+    ], ['ROTATE_IN_PLACE', 'ROTATE_IN_PLACE', 'TRANSLATE_FORWARD']);
+    const before = measureMotionPlan(plan, grid(), .02);
+    const result = optimise(plan);
+    const after = measureMotionPlan(result.plan, grid(), .02);
+    expect(result.plan.actions.map((action) => action.type))
+      .toEqual(['ROTATE_IN_PLACE', 'TRANSLATE_FORWARD']);
+    expect(after.rotationActionCount).toBe(1);
+    expect(after.totalAbsoluteRotationRad).toBeCloseTo(before.totalAbsoluteRotationRad);
+    expect(result.plan.diagnostics?.retainedRotations).toEqual([
+      expect.objectContaining({ reason: 'required-before-translation-heading' }),
+    ]);
+  });
+
+  it('N. retains a necessary obstacle-clearance rotation at the selected pose', () => {
+    const map = grid();
+    occupy(map, 1.8, 2);
+    const plan = motionPlan([
+      state(1, 2, 0), state(1, 2, Math.PI / 4),
+      state(1, 2, Math.PI / 2), state(1, 2.1, Math.PI / 2),
+    ], ['ROTATE_IN_PLACE', 'ROTATE_IN_PLACE', 'TRANSLATE_FORWARD']);
+    const result = optimise(plan, map, footprint(.4, .5));
+    expect(result.plan.actions.filter((action) => action.type === 'ROTATE_IN_PLACE'))
+      .toHaveLength(1);
+    expect(new MotionPlanValidator().validate(result.plan, map, footprint(.4, .5), .02,
+      Math.PI / 36, true, Math.PI / 2).valid).toBe(true);
+  });
+
+  it('O. does not remove rotations around a short translation when both headings are geometric requirements', () => {
+    const plan = motionPlan([
+      state(1, 2, 0), state(1, 2, Math.PI / 2),
+      state(1, 2.1, Math.PI / 2), state(1, 2.1, Math.PI),
+    ], ['ROTATE_IN_PLACE', 'TRANSLATE_FORWARD', 'ROTATE_IN_PLACE']);
+    const result = optimise(plan);
+    expect(result.plan.actions.map((action) => action.type)).toEqual([
+      'ROTATE_IN_PLACE', 'TRANSLATE_FORWARD', 'ROTATE_IN_PLACE',
+    ]);
+    expect(result.plan.diagnostics?.retainedRotations).toEqual([
+      expect.objectContaining({ reason: 'required-before-translation-heading' }),
+      expect.objectContaining({ reason: 'required-after-translation-heading-change' }),
+    ]);
+  });
+
+  it('P. retains terminal connector and final-orientation rotations', () => {
+    const plan = motionPlan([
+      state(1, 2, 0), state(1, 2, Math.PI / 2),
+      state(1, 2.1, Math.PI / 2), state(1, 2.1, Math.PI),
+    ], ['ROTATE_IN_PLACE', 'TRANSLATE_FORWARD', 'ROTATE_IN_PLACE']);
+    plan.actions[0]!.metadata = { terminalConnector: true };
+    plan.actions[2]!.metadata = { finalOrientation: true };
+    const result = optimise(plan);
+    expect(result.metrics.rotationActionCount).toBe(2);
+    expect(result.plan.diagnostics?.retainedRotations).toEqual([
+      expect.objectContaining({ reason: 'required-terminal-orientation-or-connector' }),
+      expect.objectContaining({ reason: 'required-terminal-orientation-or-connector' }),
+    ]);
   });
 
   it('H. returns a plan accepted by MotionPlanValidator', () => {

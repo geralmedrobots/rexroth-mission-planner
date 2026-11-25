@@ -40,3 +40,12 @@ export const serverMapPointCloudResponseSchema = z.object({
   reflectors: z.array(pointClusterSchema).default([]),
   zones: z.array(z.unknown()).default([]),
 }).passthrough();
+
+/** No fallback fields: fail visibly if the live ServerMap 9 contract changes. */
+export const diagnosticPointCloudResponseSchema = z.object({
+  responseCode: z.literal(0),
+  pointCloud: containerSchema,
+  pointCloudSize: z.number().int().nonnegative(),
+  reflectors: z.array(pointClusterSchema),
+  zones: z.array(z.unknown()),
+}).passthrough();

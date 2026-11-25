@@ -1,4 +1,5 @@
 import { CoordinateTransformer } from '../../domain/geometry/CoordinateTransformer';
+import { createMotionPlannerScenarioArtifact, type MotionPlannerScenarioArtifact } from '../../domain/planning/MotionPlannerScenarioArtifact';
 import { PlannerService, type PlannerRequest } from '../../domain/planner/PlannerService';
 import { createPlanningConfigurationSnapshot, type PlanningConfigurationSnapshot } from '../../domain/planning/PlanningConfigurationSnapshot';
 import type { DiagnosticSink } from '../diagnostics/DiagnosticEvent';
@@ -17,15 +18,24 @@ export interface PlanningInputs {
   readonly goalThetaExplicit?: boolean;
   readonly sessionId: string;
   readonly missionId?: string;
+  readonly routeRevision?: number;
 }
 
 export interface PlanningCoordinatorDependencies {
+  readonly onRecordingStart?: (inputs: PlanningInputs, configuration: PlanningConfigurationSnapshot) => {
+    result: (result: PlannerResult) => void;
+    stop: (reason: string) => void;
+  };
   readonly planner?: Pick<PlannerService, 'plan'>;
   readonly diagnostics?: DiagnosticSink;
+  readonly onScenarioCaptured?: (artifact: MotionPlannerScenarioArtifact) => void;
 }
 
 export interface PreparedPlanningRequest extends PlannerRequest { readonly planningConfiguration: PlanningConfigurationSnapshot }
-export type CoordinatedPlanningResult = PlannerResult & { readonly planningConfiguration: PlanningConfigurationSnapshot };
+export type CoordinatedPlanningResult = PlannerResult & {
+  readonly planningConfiguration: PlanningConfigurationSnapshot;
+  readonly routeRevision?: number;
+};
 
 /** Application-level planning orchestration. Domain planners remain unchanged. */
 export class PlanningCoordinator {
@@ -75,6 +85,10 @@ export class PlanningCoordinator {
     const captured = structuredClone(inputs);
     const generation = ++this.generation;
     const requests = this.prepareRequests(captured);
+    let recording: ReturnType<NonNullable<PlanningCoordinatorDependencies['onRecordingStart']>> | undefined;
+    try {
+      if (captured.plannerMode === 'motion-state') recording = this.dependencies.onRecordingStart?.(captured, requests[0]!.planningConfiguration);
+    } catch { /* Recording must never affect planning. The recording adapter reports failures. */ }
     const planner = this.dependencies.planner ?? new PlannerService();
     let combined: CoordinatedPlanningResult | undefined;
     const raw: PathPoint[] = []; const simplified: PathPoint[] = []; const final: PathPoint[] = [];
@@ -82,8 +96,31 @@ export class PlanningCoordinator {
     let visitedCells = 0; let durationMs = 0;
     let diagnostics: PlannerResult['diagnostics'];
     for (const [index, request] of requests.entries()) {
-      const result = await planner.plan(request);
-      if (generation !== this.generation) return undefined;
+      let result: PlannerResult;
+      try { result = await planner.plan(request); }
+      catch (error) { try { recording?.stop(`Planning exception: ${String(error)}`); } catch { /* Observer isolation. */ } throw error; }
+      try { recording?.result(result); } catch { /* Observer isolation. */ }
+      if (generation !== this.generation) {
+        try { recording?.stop('Planning request superseded or invalidated'); } catch { /* Observer isolation. */ }
+        return undefined;
+      }
+      if (captured.plannerMode === 'motion-state') {
+        try {
+        this.dependencies.onScenarioCaptured?.(createMotionPlannerScenarioArtifact({
+          grid: captured.grid, footprint: captured.footprint,
+          startPose: captured.start, goalPose: captured.goal, goalTheta: request.goalTheta,
+          configuration: request.planningConfiguration, originalCalibration: result.motionPlannerCalibration,
+          capture: { plannerMode: captured.plannerMode, waypoints: captured.waypoints,
+            waypointsUsed: false, capturedAt: new Date().toISOString(), result },
+        }));
+        } catch (error) {
+          this.dependencies.diagnostics?.emit(createDiagnosticEvent({
+            sessionId: captured.sessionId, stage: 'motionplan', severity: 'warning',
+            eventType: 'motionplanner.scenario.export.failed',
+            message: `Scenario capture failed: ${String(error)}`,
+          }));
+        }
+      }
       // Worker-produced diagnostics cross the worker boundary as part of the
       // PlannerResult and are forwarded through the application sink here.
       result.diagnosticEvents?.forEach((event) => this.dependencies.diagnostics?.emit(event));
@@ -107,11 +144,12 @@ export class PlanningCoordinator {
           diagnostics.largestHeadingChangeDeg = Math.max(diagnostics.largestHeadingChangeDeg, result.diagnostics.largestHeadingChangeDeg);
         }
       }
-      if (!result.success) return { ...result, diagnostics, rawPath: raw, simplifiedPath: simplified, baselinePath: baseline, rejectedEnhancementPath: rejectedEnhancement, finalPath: baseline.length ? baseline : final, planningConfiguration: requests[0]!.planningConfiguration };
+      if (!result.success) return { ...result, diagnostics, rawPath: raw, simplifiedPath: simplified, baselinePath: baseline, rejectedEnhancementPath: rejectedEnhancement, finalPath: baseline.length ? baseline : final, planningConfiguration: requests[0]!.planningConfiguration, routeRevision:captured.routeRevision };
       combined = { ...result, rawPath: raw, simplifiedPath: simplified, finalPath: final,
         baselinePath: baseline, rejectedEnhancementPath: rejectedEnhancement,
         diagnostics,
-        statistics: { ...result.statistics, visitedCells, durationMs, rawPointCount: raw.length, simplifiedPointCount: simplified.length, finalPointCount: final.length }, planningConfiguration: requests[0]!.planningConfiguration };
+        statistics: { ...result.statistics, visitedCells, durationMs, rawPointCount: raw.length, simplifiedPointCount: simplified.length, finalPointCount: final.length }, planningConfiguration: requests[0]!.planningConfiguration,
+        routeRevision:captured.routeRevision };
     }
     if (!combined) return undefined;
     this.dependencies.diagnostics?.emit(createDiagnosticEvent({

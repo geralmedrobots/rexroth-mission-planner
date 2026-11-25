@@ -3,6 +3,7 @@ import { measureMotionPlan, type MotionPlanMetrics } from '../motion/MotionPlanM
 import type { MotionCostComponents, MotionPlan } from '../motion/planningModel';
 import type { OccupancyGrid, PathPoint, PlannerResult, RobotFootprint } from '../types';
 import type { EffectiveMotionStateConfiguration } from './MotionStateConfiguration';
+import { DIRECTION_PREFERENCE_SEMANTICS } from './DirectionPreference';
 
 export interface MotionPlannerCalibrationSnapshot {
   readonly schemaVersion: 'stage-5a';
@@ -26,7 +27,9 @@ export interface MotionPlannerCalibrationSnapshot {
     readonly reverseAllowed: boolean;
   };
   readonly effectiveParameters: EffectiveMotionStateConfiguration & {
+    readonly directionCostSemantics?: string;
     readonly translationTransitionStepM: number;
+    readonly translationPrimitiveLengthsM: readonly number[];
   };
   readonly result: {
     readonly success: boolean;
@@ -197,7 +200,9 @@ export const createMotionPlannerCalibrationSnapshot = (
       reverseAllowed: input.configuration.permissions.reverse,
     },
     effectiveParameters: { ...input.configuration,
-      translationTransitionStepM: input.grid.metadata.resolution },
+      directionCostSemantics: DIRECTION_PREFERENCE_SEMANTICS,
+      translationTransitionStepM: input.grid.metadata.resolution,
+      translationPrimitiveLengthsM: [.5, .25, input.grid.metadata.resolution] },
     result: {
       success: input.result.success, failureReason: input.result.error,
       planningDurationMs: input.result.statistics.durationMs,

@@ -10,6 +10,7 @@ import type { MotionPlan } from '../motion/planningModel';
 import { buildLegacyMotionPlan } from '../motion/LegacyMotionPlanBuilder';
 import { LogService } from '../../services/LogService';
 import { MotionPlanValidator, type MotionPlanValidationResult } from '../planner/MotionPlanValidator';
+import { motionEdgeDiagnostic } from './MotionExecutionDiagnostics';
 
 let headerId = 0;
 const uniqueId = (prefix: string): string => `${prefix}-${crypto.randomUUID()}`;
@@ -155,13 +156,17 @@ export class VdaOrderBuilder {
       if(corridorResult)context.corridorPlanning?.onDiagnostic?.({
         ...corridorResult.diagnostic,edgeId,
       });
-      return {
+      const edge: VdaEdge = {
         edgeId,
         sequenceId: index * 2 + 1,
         released: true,
         startNodeId: node.nodeId,
         endNodeId: nodes[index + 1]!.nodeId,
         maxSpeed: settings.missionMaximumSpeedMps,
+        // Node theta alone constrains arrival, not the direction along an edge.
+        // VDA 5050 2.0 tangential orientation explicitly carries body-vs-travel intent.
+        ...(motionAction?.type === 'TRANSLATE_REVERSE' ? { orientation: Math.PI } :
+          motionAction?.type === 'TRANSLATE_FORWARD' ? { orientation: 0 } : {}),
         rotationAllowed: motionAction?.type==='ROTATE_IN_PLACE'||motionAction?.type==='ROTATE'
           ?true:index === 0 ? true :
             (outputRoute[index]?.passageId||outputRoute[index+1]?.passageId)
@@ -169,6 +174,9 @@ export class VdaOrderBuilder {
         ...(corridorResult?.corridor?{corridor:corridorResult.corridor}:{}),
         actions: [],
       };
+      if (motionAction) LogService.write('planner', 'info',
+        `[motion-execution] ${JSON.stringify(motionEdgeDiagnostic(motionAction, edge, orderId))}`);
+      return edge;
     });
     nodes.forEach((node, index) => {
       LogService.write('planner','info',

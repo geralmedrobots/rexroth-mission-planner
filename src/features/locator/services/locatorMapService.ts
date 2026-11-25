@@ -8,6 +8,7 @@ import type {
 import { decodePngContainer } from './pngContainerDecoder';
 import { decodePointCloudMap } from './pointCloudMapConverter';
 import { locatorSessionService, type LocatorSessionService } from './locatorSessionService';
+import { diagnosticPointCloudResponseSchema } from '../schemas/serverMapSchemas';
 
 const MAX_IMAGE_DIMENSION = 20_000;
 
@@ -116,6 +117,25 @@ export class LocatorMapService implements LocatorMapProvider {
   public async getMapPointCloud(name: string, maxNonReflectorPoints?: number): Promise<LocatorPointCloudMap> {
     const response = await this.maps.getPointCloud(name);
     return decodePointCloudMap(name, response.pointCloud, response.pointCloudSize, response.reflectors, maxNonReflectorPoints);
+  }
+  /** Read-only diagnostic snapshot. ServerMap 9 verified against Locator 2.0.8.
+   * Keep the original response/container as well as every decoded point. */
+  public async getDiagnosticPointCloud(raster: LocatorRasterMap, grid: OccupancyGrid, expectedFingerprint: string) {
+    const compatibility = await this.sessions.test();
+    if (compatibility.componentType !== 2 || compatibility.serverMapModule?.majorVersion !== 9) {
+      throw new Error(`Diagnostic point-cloud format is verified for Locator Server / ServerMap 9 only; received ${compatibility.componentVersion}, ServerMap ${compatibility.serverMapModule?.majorVersion ?? 'missing'}.`);
+    }
+    if (grid.metadata.mapId !== raster.mapName) throw new Error('Loaded PNG and grid map IDs differ.');
+    const before = await this.getMapInfo(raster.mapName);
+    if (before.fingerprint !== expectedFingerprint) throw new Error('Server map changed since PNG download. Reload the PNG map first.');
+    const raw = diagnosticPointCloudResponseSchema.parse(await this.sessions.rpc.post<unknown>(
+      '/locator/map/serverMapGetMap', { serverMapName: raster.mapName },
+    ));
+    const cloud = decodePointCloudMap(raster.mapName, raw.pointCloud, raw.pointCloudSize, raw.reflectors);
+    if (cloud.points.length !== raw.pointCloudSize) throw new Error('Incomplete diagnostic point cloud.');
+    const after = await this.getMapInfo(raster.mapName);
+    if (after.fingerprint !== before.fingerprint) throw new Error('Server map changed during diagnostic download. Reload and retry.');
+    return { cloud, raw, compatibility, info: after };
   }
   public async toOccupancy(raster: LocatorRasterMap, settings: LocatorConnectionSettings): Promise<LoadedLocatorMap> {
     const grayscale = await pngToGrayscale(raster.pngBytes);

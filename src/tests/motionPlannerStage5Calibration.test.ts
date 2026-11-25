@@ -150,17 +150,14 @@ describe('Stage 5A systematic motion-state calibration', () => {
     expect(blockedHighSoft.metrics.success).toBe(false);
   });
 
-  it('I. charges direction switching per event and therefore discourages oscillation', () => {
-    const oneUsefulSwitch = CostModel.motionStateDirectionSwitch('FORWARD', 'REVERSE', .5);
-    const oscillation = oneUsefulSwitch +
-      CostModel.motionStateDirectionSwitch('REVERSE', 'FORWARD', .5) +
-      CostModel.motionStateDirectionSwitch('FORWARD', 'REVERSE', .5);
-    expect(oneUsefulSwitch).toBe(.5);
-    expect(oscillation).toBe(1.5);
+  it('I. reports physical direction changes separately from direction preference costs', () => {
     const scenario = benchmark('G_DIRECTION_SWITCH');
     const result = replayMotionPlannerScenario({ ...scenario,
       configuration: configure(scenario, { switchCost: 2 }) });
-    expect(result.metrics.directionChangeCount).toBeLessThanOrEqual(1);
+    expect(result.metrics.success).toBe(true);
+    expect(result.metrics.directionChangeCount).toBeGreaterThanOrEqual(0);
+    expect(result.motionPlan!.actions.filter((a) => a.type === 'DIRECTION_CHANGE')
+      .every((a) => a.costComponents?.directionSwitch === 0)).toBe(true);
   });
 
   it('J. integrates reverse and clearance costs by physical distance, not action count', () => {

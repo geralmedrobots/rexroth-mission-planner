@@ -158,6 +158,8 @@ export const analyzeSpeedLimits=(
 
 export const formatSpeedCycleDiagnostic=(value:SpeedCycleDiagnostic):string=>
   `[speed-cycle] commandVelocityX=${value.commandVelocityX??'<unavailable>'} `+
+  `commandLongitudinalSign=${value.commandVelocityX===null?'UNOBSERVED':Math.sign(value.commandVelocityX)} `+
+  `observedLongitudinalSign=${value.velocityX===null?'UNOBSERVED':Math.sign(value.velocityX)} `+
   `velocityX=${value.velocityX??'<unavailable>'} `+
   `allowedMaxLinearSpeed=${value.allowedMaxLinearSpeed??'<unavailable>'} `+
   `allowedMaxAngularSpeed=${value.allowedMaxAngularSpeed??'<unavailable>'} `+

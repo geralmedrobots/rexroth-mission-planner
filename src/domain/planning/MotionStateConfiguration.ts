@@ -9,6 +9,7 @@ export interface EffectiveMotionStateConfiguration {
     readonly translationCostPerM: number;
     readonly rotationCostPerRad: number;
     readonly reverseCostPerM: number;
+    /** Compatibility name: cost per non-preferred directional manoeuvre. */
     readonly directionSwitchCost: number;
     readonly wallClearanceCost: number;
     readonly narrowPassageCost: number;
@@ -78,7 +79,7 @@ export const MOTION_STATE_PARAMETER_SCHEMA: readonly MotionStateParameterDefinit
     consumer: 'CostModel.motionStateReverseRisk', units: 'cost/m', classification: 'soft-preference' },
   { key: 'directionSwitchWeight', source: 'passageSafety.motionStateDirectionSwitchWeight', defaultValue: 1,
     ui: 'Effective configuration only', normalizedField: 'weights.directionSwitchCost',
-    consumer: 'CostModel.motionStateDirectionSwitch', units: 'cost/switch', classification: 'soft-preference' },
+    consumer: 'DirectionPreference (once per non-preferred manoeuvre)', units: 'cost/non-preferred manoeuvre', classification: 'soft-preference' },
   { key: 'wallWeight', source: 'passageSafety.wallProximityWeight', defaultValue: 2,
     ui: 'Wall proximity weight (legacy mapping)', normalizedField: 'weights.wallClearanceCost',
     consumer: 'CostModel.motionStateWallProximity', units: 'cost/m', classification: 'soft-preference' },

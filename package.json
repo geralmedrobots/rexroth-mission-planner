@@ -7,6 +7,8 @@
   "type": "module",
   "main": "dist-electron/electron/main.js",
   "scripts": {
+    "stage5b": "tsx src/tools/stage5B.ts",
+    "stage5b:collect": "tsx src/tools/stage5BCollect.ts",
     "dev": "concurrently -k \"npm:server:dev\" \"npm:vite:dev\"",
     "vite:dev": "vite",
     "server:dev": "tsx watch server/index.ts",

@@ -29,12 +29,12 @@ export const parsePgm = (buffer: ArrayBuffer): { width: number; height: number; 
 
 export const pixelsToOccupancy = (
   pixels: Uint8Array, metadata: MapMetadata,
-): number[] => pixels.map((pixel) => {
+): number[] => Array.from(pixels, (pixel) => {
   const normalized = metadata.negate ? pixel / 255 : (255 - pixel) / 255;
   if (normalized >= metadata.occupiedThreshold) return 100;
   if (normalized <= metadata.freeThreshold) return 0;
   return -1;
-}) as unknown as number[];
+});
 
 export const metadataFromRosYaml = (text: string, width: number, height: number, fallbackMapId: string): MapMetadata => {
   const yaml = YAML.parse(text) as RosYaml;

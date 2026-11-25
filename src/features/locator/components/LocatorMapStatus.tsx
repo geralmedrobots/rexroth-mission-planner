@@ -1,6 +1,7 @@
 import { Alert, Paper, Stack, Typography } from '@mui/material';
 import { useLocatorStore } from '../stores/locatorStore';
 import { compareMapIds } from '../../../domain/robot/ActiveMapResolver';
+import { LocatorMapDiagnostics } from './LocatorMapDiagnostics';
 
 const Datum = ({ label, value }: { label: string; value: unknown }) =>
   <Stack direction="row" justifyContent="space-between" gap={1}>
@@ -27,6 +28,7 @@ export function LocatorMapStatus() {
       ? `${map.origin.x.toFixed(3)} / ${map.origin.y.toFixed(3)} / ${map.origin.yaw.toFixed(3)}` : undefined}/>
     <Datum label="Resolution" value={map ? `${map.pixelsPerMeter} px/m (${map.metersPerPixel} m/px)` : undefined}/>
     <Datum label="Last download" value={store.lastDownloadTime}/>
+    <LocatorMapDiagnostics/>
     {mismatch && <Alert severity="error" sx={{ mt: 1 }}>Active Navigator mapId and loaded Locator map differ. Order publication must remain disabled.</Alert>}
   </Paper>;
 }

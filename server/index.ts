@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import mqtt, { type MqttClient } from 'mqtt';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { registerLocatorProxy } from './locatorProxy.js';
+import { registerStage5BRecording } from './stage5BRecording.js';
 import { registerCtrlXDataLayerProxy } from './ctrlxDataLayerProxy.js';
 
 try { process.loadEnvFile?.(); } catch (error) {
@@ -22,6 +23,7 @@ app.use(cors({
 app.use(express.json({limit:'50mb'}));
 app.get('/health',(_request,response)=>response.json({ok:true,service:'ROKIT MQTT and Locator bridge'}));
 registerLocatorProxy(app);
+registerStage5BRecording(app);
 registerCtrlXDataLayerProxy(app);
 
 // In production the bridge also serves the compiled Vite application, so a

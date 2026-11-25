@@ -16,8 +16,20 @@ import {
 import { normalizeMapId } from '../domain/robot/ActiveMapResolver';
 import type { CorridorDiagnostic } from '../domain/planner/EdgeCorridorPlanner';
 import type { SpeedCycleDiagnostic } from '../domain/robot/SpeedLimitDiagnostics';
+import type { PlanningConfigurationSnapshot } from '../domain/planning/PlanningConfigurationSnapshot';
+
+export interface PlannedRouteCommit {
+  start: RobotPose;
+  rawPath: PathPoint[];
+  finalPath: PathPoint[];
+  plannerResult: PlannerResult;
+  planningConfiguration: PlanningConfigurationSnapshot;
+}
 
 export interface AppState {
+  stage5BRecordingStatus?: string;
+  stage5BPendingCount?: number;
+  lastPlanningScenario?: import('../domain/planning/MotionPlannerScenarioArtifact').MotionPlannerScenarioArtifact;
   mqttSettings: MqttSettings; orderSettings: OrderSettings; footprint: RobotFootprint;
   plannerOptions: PlannerOptions; plannerMode: PlannerMode; mqttConnected: boolean;
   connection?: VdaConnection; state?: VdaState; visualization?: VdaVisualization;
@@ -35,6 +47,9 @@ export interface AppState {
   grid?: OccupancyGrid; inflatedGrid?: OccupancyGrid; start?: RobotPose; goal?: RobotPose;
   goalThetaExplicit: boolean;
   rawPath: PathPoint[]; finalPath: PathPoint[]; waypoints: Waypoint[]; plannerResult?: PlannerResult;
+  /** Revision of the route inputs. All derived route data must match this value. */
+  routeRevision: number; plannedRouteRevision?: number; generatedOrderRouteRevision?: number;
+  planningConfiguration?: PlanningConfigurationSnapshot;
   generatedOrder?: VdaOrder; sentOrder?: VdaOrder; sentOrderPublishedAtMs?: number;
   corridorDiagnostics:CorridorDiagnostic[];
   publishingOrder: boolean;
@@ -43,6 +58,16 @@ export interface AppState {
   currentRokitErrors: VdaError[]; errorHistory: RokitErrorHistoryEntry[];
   selectedCell?: GridCell; planning: boolean; viewRotation: number; showGrid: boolean; showInflation: boolean;
   set: (patch: Partial<AppState>) => void; addLog: (entry: AppLog) => void;
+  /** Refreshes the live planning origin without changing destination identity. */
+  updateTelemetryStart: (pose: RobotPose | undefined) => void;
+  beginPlanning: (revision: number) => boolean;
+  finishPlanning: (revision: number) => void;
+  invalidateRoute: () => number;
+  commitPlannedRoute: (revision: number, route: PlannedRouteCommit) => boolean;
+  commitGeneratedOrder: (
+    revision: number, order: VdaOrder, validation: ValidationResult,
+    corridorDiagnostics: CorridorDiagnostic[],
+  ) => boolean;
   receiveRokitErrors: (errors: VdaError[], receivedAt: string, orderId: string) => void;
   recordNavigatorMapId: (
     value: unknown, source: 'state' | 'visualization', manufacturer: string, serialNumber: string,
@@ -57,10 +82,15 @@ const persistedDefaults = {
   mqttSettings: defaultMqttSettings, orderSettings: defaultOrderSettings, footprint: defaultFootprint,
   plannerOptions: defaultPlannerOptions, plannerMode: 'automatic' as PlannerMode,
 };
-export const useAppStore = create<AppState>()(persist((set) => ({
+const routeInputKeys: ReadonlySet<keyof AppState> = new Set([
+  'grid','inflatedGrid','start','goal','goalThetaExplicit','waypoints',
+  'plannerMode','plannerOptions','footprint',
+]);
+
+export const useAppStore = create<AppState>()(persist((set, get) => ({
   ...persistedDefaults, mqttConnected:false, rawPath:[],finalPath:[],waypoints:[],logs:[],
   currentRokitErrors:[],errorHistory:[],goalThetaExplicit:false,publishingOrder:false,
-  corridorDiagnostics:[],
+  corridorDiagnostics:[],routeRevision:0,
   mqttReceiveMetadata: {
     lastStateReceiveTime: null, lastVisualizationReceiveTime: null,
     statePayloadTimestamp: null, visualizationPayloadTimestamp: null,
@@ -70,7 +100,49 @@ export const useAppStore = create<AppState>()(persist((set) => ({
   confirmedMapBinding:null,mapBindingMismatchWarning:null,
   navigatorIdentityKey:`${defaultOrderSettings.manufacturer}::${defaultOrderSettings.serialNumber}`,
   planning:false,viewRotation:0,showGrid:true,showInflation:true,
-  set: (patch) => set(patch),
+  set: (patch) => set((state) => {
+    const routeInputChanged=Object.keys(patch).some((key) => {
+      const typed=key as keyof AppState;
+      return routeInputKeys.has(typed)&&patch[typed]!==state[typed];
+    });
+    if(!routeInputChanged)return patch;
+    return {
+      ...patch,routeRevision:state.routeRevision+1,plannedRouteRevision:undefined,
+      generatedOrderRouteRevision:undefined,planningConfiguration:undefined,
+      rawPath:[],finalPath:[],plannerResult:undefined,generatedOrder:undefined,
+      validation:undefined,corridorDiagnostics:[],planning:false,
+    };
+  }),
+  updateTelemetryStart: (pose) => set({start:pose}),
+  beginPlanning: (revision) => {
+    if(get().routeRevision!==revision)return false;
+    set({planning:true});
+    return true;
+  },
+  finishPlanning: (revision) => set((state) =>
+    state.routeRevision===revision&&state.planning?{planning:false}:{}),
+  invalidateRoute: () => {
+    const revision=get().routeRevision+1;
+    set({routeRevision:revision,plannedRouteRevision:undefined,
+      generatedOrderRouteRevision:undefined,planningConfiguration:undefined,
+      rawPath:[],finalPath:[],plannerResult:undefined,generatedOrder:undefined,
+      validation:undefined,corridorDiagnostics:[],planning:false});
+    return revision;
+  },
+  commitPlannedRoute: (revision, route) => {
+    if(get().routeRevision!==revision)return false;
+    set({
+      ...route,plannedRouteRevision:revision,generatedOrderRouteRevision:undefined,
+      generatedOrder:undefined,validation:undefined,corridorDiagnostics:[],planning:false,
+    });
+    return true;
+  },
+  commitGeneratedOrder: (revision, order, validation, corridorDiagnostics) => {
+    const state=get();
+    if(state.routeRevision!==revision||state.plannedRouteRevision!==revision)return false;
+    set({generatedOrder:order,generatedOrderRouteRevision:revision,validation,corridorDiagnostics});
+    return true;
+  },
   addLog: (entry) => set((state) => ({logs:[...state.logs.slice(-999),entry]})),
   receiveRokitErrors: (errors, receivedAt, orderId) => set((state) => {
     const currentRokitErrors=deduplicateRokitErrors(errors);
@@ -136,6 +208,10 @@ export const useAppStore = create<AppState>()(persist((set) => ({
       activeNavigatorMapId:null,activeNavigatorMapSource:'none' as const,
       confirmedMapBinding:null,mapBindingMismatchWarning:null,
       state:undefined,visualization:undefined,start:undefined,
+      routeRevision:state.routeRevision+1,plannedRouteRevision:undefined,
+      generatedOrderRouteRevision:undefined,planningConfiguration:undefined,
+      rawPath:[],finalPath:[],plannerResult:undefined,generatedOrder:undefined,
+      validation:undefined,corridorDiagnostics:[],planning:false,
       rawStatePayload:undefined,rawVisualizationPayload:undefined,
       speedCycleDiagnostic:undefined,
       stateReceivedAt:undefined,visualizationReceivedAt:undefined,mqttReceiveMetadata:{
@@ -145,7 +221,7 @@ export const useAppStore = create<AppState>()(persist((set) => ({
     };
   }),
   clearErrorHistory: () => set({errorHistory:[]}),
-  resetRobotSession: () => set({
+  resetRobotSession: () => set((state) => ({
     connection:undefined,state:undefined,visualization:undefined,stateReceivedAt:undefined,
     rawStatePayload:undefined,rawVisualizationPayload:undefined,
     speedCycleDiagnostic:undefined,
@@ -157,8 +233,12 @@ export const useAppStore = create<AppState>()(persist((set) => ({
     stateMapId:null,visualizationMapId:null,lastKnownValidNavigatorMapId:null,
     lastKnownValidNavigatorMapSource:null,activeNavigatorMapId:null,activeNavigatorMapSource:'none',
     currentRokitErrors:[],start:undefined,
-  }),
-  resetSettings: () => set({
+    routeRevision:state.routeRevision+1,plannedRouteRevision:undefined,
+    generatedOrderRouteRevision:undefined,planningConfiguration:undefined,
+    rawPath:[],finalPath:[],plannerResult:undefined,generatedOrder:undefined,
+    validation:undefined,corridorDiagnostics:[],planning:false,
+  })),
+  resetSettings: () => set((state) => ({
     ...persistedDefaults,
     navigatorIdentityKey:`${defaultOrderSettings.manufacturer}::${defaultOrderSettings.serialNumber}`,
     state:undefined,visualization:undefined,start:undefined,
@@ -167,12 +247,16 @@ export const useAppStore = create<AppState>()(persist((set) => ({
     lastKnownValidNavigatorMapId:null,lastKnownValidNavigatorMapSource:null,
     activeNavigatorMapId:null,activeNavigatorMapSource:'none',confirmedMapBinding:null,
     mapBindingMismatchWarning:null,
+    routeRevision:state.routeRevision+1,plannedRouteRevision:undefined,
+    generatedOrderRouteRevision:undefined,planningConfiguration:undefined,
+    rawPath:[],finalPath:[],plannerResult:undefined,generatedOrder:undefined,
+    validation:undefined,corridorDiagnostics:[],planning:false,
     mqttReceiveMetadata:{lastStateReceiveTime:null,lastVisualizationReceiveTime:null,
       statePayloadTimestamp:null,visualizationPayloadTimestamp:null},
-  }),
+  })),
 }), {
   name:'rokit-path-planner',
-  version:4,
+  version:5,
   migrate:(persisted,version)=>{
     const saved=persisted as Partial<AppState>&{
       orderSettings?:Partial<AppState['orderSettings']>&{
@@ -209,7 +293,7 @@ export const useAppStore = create<AppState>()(persist((set) => ({
   partialize: (state) => ({
     mqttSettings:{...state.mqttSettings,password:''}, orderSettings:state.orderSettings,
     footprint:state.footprint,plannerOptions:state.plannerOptions,plannerMode:state.plannerMode,
-    goal:state.goal,generatedOrder:state.generatedOrder,viewRotation:state.viewRotation,
+    goal:state.goal,viewRotation:state.viewRotation,
     showGrid:state.showGrid,showInflation:state.showInflation,
     confirmedMapBinding:state.confirmedMapBinding,
     mapMetadata:state.grid?.metadata,
@@ -242,6 +326,11 @@ export const useAppStore = create<AppState>()(persist((set) => ({
           ...saved.plannerOptions?.passageSafety,
         },
       },
+      // Plans and Orders are derived from live map/pose/configuration inputs.
+      // Never revive a previously persisted route without planning it again.
+      rawPath:[],finalPath:[],plannerResult:undefined,planningConfiguration:undefined,
+      plannedRouteRevision:undefined,generatedOrder:undefined,
+      generatedOrderRouteRevision:undefined,validation:undefined,corridorDiagnostics:[],
     };
   },
 }));

@@ -11,7 +11,7 @@ unless a caller explicitly applies a calibration profile.
 | translation | cost/m | translation distance |
 | rotation | cost/rad | absolute non-terminal rotation |
 | reverse | cost/m | reverse translation distance |
-| direction switch | cost/event | each FORWARD/REVERSE change |
+| direction preference (`directionSwitchCost` compatibility key) | cost/manoeuvre | first translation in a non-preferred directional run |
 | wall clearance | cost/m | distance integral of clearance deficit |
 | narrow passage | cost/m | distance integral of passage penalty |
 | turn location | cost*m/rad | angle divided by local clearance |
@@ -38,8 +38,8 @@ accepted optimized geometry. Legacy-planner cost methods were not changed.
 | turnLocationCost | 1 | 1 | 1 |
 | terminalOrientationCostPerRad | 0.15 | 0.15 | 0.15 |
 
-`BALANCED` permits a genuinely short reverse while its per-event switch cost
-discourages oscillation. `FORWARD_PREFERRED` prices sustained reverse more
+`BALANCED` permits short reverse travel and penalizes choices requiring more
+alignment than the other direction. `FORWARD_PREFERRED` prices sustained reverse more
 strongly. `CLEARANCE_PREFERRED` will accept longer routes for sustained open
 clearance and can expand more states. These profiles are explicitly applied
 through `applyMotionPlannerCalibrationProfile`; none changes application defaults.
@@ -50,17 +50,23 @@ through `applyMotionPlannerCalibrationProfile`; none changes application default
 `runMotionPlannerCalibrationBenchmarks()` and
 `formatMotionPlannerCalibrationReport()` for profile tables. Use
 `createMotionPlannerCalibrationSweeps()` to vary reverse, rotation, clearance,
-preferred clearance, direction switching, or terminal orientation independently.
+preferred clearance, direction preference, or terminal orientation independently.
 All runs call `replayMotionPlannerScenario()`, which uses the production planner
 dispatcher and `MotionStatePlanner`.
 
-The synthetic results show thresholds, not physical truth. In the controlled
+The following results are historical Stage 5A observations with the former
+per-physical-switch semantics; rerun sweeps for current thresholds. In the controlled
 immediately-behind fixture at rotation cost 0.25 and switch cost 1.0, reverse is
 selected at reverse cost 1.0 cost/m and forward rotation is selected at 1.5
 cost/m. In the controlled near-wall fixture with preferred clearance 0.6 m, the
 route changes from 3.00 m / 0.30 m minimum clearance to about 3.34 m / 0.50 m
 minimum clearance between wall weights 2 and 4 cost/m. In the direction-switch
 fixture, sufficiently large per-event costs remove a two-switch alternative.
+
+Current semantics are `local-manoeuvre-alignment-v1`: physical direction changes
+cost zero; `costs.directionSwitch` now records a once-per-manoeuvre alignment
+preference charge. Physical `directionChangeCount` still counts real actions.
+See `DIRECTION_PREFERENCE_SEMANTICS.md` for search, ties, and segment boundaries.
 
 Terminal-orientation sweeps keep the route geometry stable in the final-theta
 fixture. Once a normal lattice rotation is cheaper than the terminal connector,

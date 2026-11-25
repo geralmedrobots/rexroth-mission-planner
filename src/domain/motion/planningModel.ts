@@ -8,6 +8,8 @@ export interface MotionState extends Pose2D {
   thetaBin?: number;
   row?: number;
   column?: number;
+  /** Cost history for the pending manoeuvre; independent of physical direction. */
+  directionPreferenceContext?: { heading: number; direction: MotionDirection; translating: boolean };
 }
 
 export type MotionActionType =
@@ -30,6 +32,7 @@ export interface MotionCostComponents {
   distance: number;
   rotation: number;
   reverse: number;
+  /** Compatibility key: once-per-manoeuvre non-preferred direction cost. */
   directionSwitch: number;
   wallClearance: number;
   narrowPassage: number;

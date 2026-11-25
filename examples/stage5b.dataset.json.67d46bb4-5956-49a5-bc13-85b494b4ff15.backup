@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "motion-planner-dataset-v1",
+  "name": "Real-world validation — awaiting exported artifacts",
+  "scenarios": [
+    {
+      "id": "Mission 001",
+      "artifact": "mission-logs/first_mission.txt",
+      "provenance": "real-run",
+      "notes": "Observed outcome: assumed successful per operator; not independently verified from the log. Original JSON log array preserved byte-for-byte. This is log evidence, not a motion-planner-scenario-v1 replay artifact: full occupancy grid and validated configuration export are missing. Stage 5B artifact loading will reject this file; load failures are not mission outcomes.",
+      "expectations": {
+        "reverse": "either"
+      }
+    },
+    {
+      "id": "Mission 002",
+      "artifact": "mission-logs/second_mission.txt",
+      "provenance": "real-run",
+      "notes": "Observed outcome: assumed successful per operator; not independently verified from the log. Original JSON log array preserved byte-for-byte. This is log evidence, not a motion-planner-scenario-v1 replay artifact: full occupancy grid and validated configuration export are missing. Stage 5B artifact loading will reject this file; load failures are not mission outcomes.",
+      "expectations": {
+        "reverse": "either"
+      }
+    },
+    {
+      "id": "Mission 003",
+      "artifact": "mission-logs/third_mission.txt",
+      "provenance": "real-run",
+      "notes": "Observed outcome: assumed successful per operator; not independently verified from the log. Original JSON log array preserved byte-for-byte. This is log evidence, not a motion-planner-scenario-v1 replay artifact: full occupancy grid and validated configuration export are missing. Stage 5B artifact loading will reject this file; load failures are not mission outcomes.",
+      "expectations": {
+        "reverse": "either"
+      }
+    },
+    {
+      "id": "Mission 004",
+      "artifact": "mission-logs/fourth_mission.txt",
+      "provenance": "real-run",
+      "notes": "Observed outcome: assumed successful per operator; not independently verified from the log. Original JSON log array preserved byte-for-byte. This is log evidence, not a motion-planner-scenario-v1 replay artifact: full occupancy grid and validated configuration export are missing. Stage 5B artifact loading will reject this file; load failures are not mission outcomes.",
+      "expectations": {
+        "reverse": "either"
+      }
+    },
+    {
+      "id": "Mission 005",
+      "artifact": "mission-logs/fifth_mission.txt",
+      "provenance": "real-run",
+      "notes": "Observed outcome: assumed successful per operator; not independently verified from the log. Original JSON log array preserved byte-for-byte. This is log evidence, not a motion-planner-scenario-v1 replay artifact: full occupancy grid and validated configuration export are missing. Stage 5B artifact loading will reject this file; load failures are not mission outcomes.",
+      "expectations": {
+        "reverse": "either"
+      }
+    },
+    {
+      "id": "Mission 006",
+      "artifact": "mission-logs/sixth_mission.txt",
+      "provenance": "real-run",
+      "notes": "Observed outcome: FAILED (operator-confirmed; cause unclassified). Original JSON log array preserved byte-for-byte. This is log evidence, not a motion-planner-scenario-v1 replay artifact: full occupancy grid and validated configuration export are missing. Stage 5B artifact loading will reject this file; load failures are not mission outcomes.",
+      "expectations": {
+        "reverse": "either"
+      },
+      "failureAudit": {
+        "category": "unknown",
+        "evidence": "Operator explicitly identified sixth_mission.txt as a FAILED real mission. Execution failure cause is not established; planner completion does not prove mission success. Raw log is not replayable."
+      }
+    },
+    {
+      "id": "Mission 007",
+      "artifact": "mission-logs/seventh_mission.txt",
+      "provenance": "real-run",
+      "notes": "Observed outcome: assumed successful per operator; not independently verified from the log. Original JSON log array preserved byte-for-byte. This is log evidence, not a motion-planner-scenario-v1 replay artifact: full occupancy grid and validated configuration export are missing. Stage 5B artifact loading will reject this file; load failures are not mission outcomes.",
+      "expectations": {
+        "reverse": "either"
+      }
+    }
+  ]
+}
