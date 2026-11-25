@@ -1,5 +1,8 @@
-import { Box, Chip, FormControlLabel, Paper, Switch, Typography } from '@mui/material';
+import { Box, Chip, FormControlLabel, IconButton, Tooltip, Paper, Switch, Typography } from '@mui/material';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { LayersOutlined, RotateRight } from '@mui/icons-material';
+import { useDestinationStore, type SavedDestination } from '../features/destinations/destinationStore';
+import { normalizeAngle } from '../domain/geometry/angles';
 import { CoordinateTransformer } from '../domain/geometry/CoordinateTransformer';
 import type { GridCell, RobotPose } from '../domain/types';
 import { useLocatorStore } from '../features/locator/stores/locatorStore';
@@ -14,8 +17,8 @@ import {
 } from './mapRobotVisualization';
 
 export type ClickMode='goal'|'start'|'waypoint'|'obstacle'|'erase'|'inspect';
-interface Props { mode:ClickMode; onCell:(cell:GridCell)=>void; liveRobotPose?:RobotPose }
-export const MapCanvas=({mode,onCell,liveRobotPose}:Props)=>{
+interface Props { mode:ClickMode; onCell:(cell:GridCell)=>void; liveRobotPose?:RobotPose; focusedPoint?:SavedDestination }
+export const MapCanvas=({mode,onCell,liveRobotPose,focusedPoint}:Props)=>{
   const canvas=useRef<HTMLCanvasElement>(null); const container=useRef<HTMLDivElement>(null);
   const lastPoseMapDiagnostic=useRef<string|undefined>(undefined);
   const [mouse,setMouse]=useState<{cell?:GridCell;world?:{x:number;y:number}}>({});
@@ -33,6 +36,19 @@ export const MapCanvas=({mode,onCell,liveRobotPose}:Props)=>{
   const [locatorImage,setLocatorImage]=useState<HTMLImageElement>();
   const locatorRaster=useLocatorStore((state)=>state.loadedMap);
   const grid=useAppStore((s)=>s.grid); const inflated=useAppStore((s)=>s.inflatedGrid);
+  const destinations=useDestinationStore(state=>state.destinations);
+  const [showMarkers,setShowMarkers]=useState(true);
+  useEffect(()=>{
+    if(!focusedPoint||!grid||focusedPoint.mapId!==grid.metadata.mapId||!container.current)return;
+    const cell=new CoordinateTransformer(grid.metadata).worldToGrid(focusedPoint.x,focusedPoint.y);
+    if(!cell)return;
+    const {width,height}=container.current.getBoundingClientRect();
+    setView(current=>{
+      const scale=Math.min(width/grid.metadata.width,height/grid.metadata.height)*current.zoom;
+      return {...current,panX:(grid.metadata.width/2-cell.column-.5)*scale,
+        panY:(grid.metadata.height/2-cell.row-.5)*scale};
+    });
+  },[focusedPoint,grid]);
   const start=useAppStore((s)=>s.start); const goal=useAppStore((s)=>s.goal);
   const raw=useAppStore((s)=>s.rawPath); const final=useAppStore((s)=>s.finalPath);
   const footprint=useAppStore((s)=>s.footprint); const showInflation=useAppStore((s)=>s.showInflation);
@@ -247,9 +263,22 @@ export const MapCanvas=({mode,onCell,liveRobotPose}:Props)=>{
         ctx.fillText('A* START',q.x+10,q.y-8);
       }
     }
+    if(showMarkers){
+      for(const point of destinations){
+        if(point.mapId!==grid.metadata.mapId)continue;
+        const q=pixel(point.x,point.y);
+        if(!q)continue;
+        ctx.save();ctx.translate(q.x,q.y);ctx.rotate(-rotation);
+        ctx.fillStyle='#922341';ctx.strokeStyle='#fff';ctx.lineWidth=2;
+        ctx.beginPath();ctx.arc(0,0,5,0,Math.PI*2);ctx.fill();ctx.stroke();
+        ctx.font='600 12px "Segoe UI",sans-serif';ctx.lineWidth=3;
+        ctx.strokeText(point.displayName,9,-5);ctx.fillStyle='#262432';ctx.fillText(point.displayName,9,-5);
+        ctx.restore();
+      }
+    }
     if(start)drawFootprint(start,'#1565c0');
     ctx.restore();
-  },[grid,inflated,start,goal,raw,final,footprint,showInflation,showGrid,rotation,view,size,
+  },[grid,destinations,showMarkers,inflated,start,goal,raw,final,footprint,showInflation,showGrid,rotation,view,size,
     locatorImage,locatorRaster,layers,robotState,generatedOrder,replanOriginal,replanBlocked,
     replanNew,temporaryObstacleCells,inflatedTemporaryObstacleCells,
     replanExplored,startProjection,recoveryPath,plannerDiagnostics,optimizedPath,
@@ -265,7 +294,10 @@ export const MapCanvas=({mode,onCell,liveRobotPose}:Props)=>{
   };
   return <Box sx={{display:'flex',flexDirection:'column',flex:'1 0 auto',minWidth:0,bgcolor:'#f4f5f7'}}>
     <Paper role="group" aria-label="Map layers" className="mr-glass" sx={{px:1,flexShrink:0}}>
-      <Typography variant="overline">Layers</Typography>
+      <details className="mr-layers"><summary><LayersOutlined fontSize="small"/>Map layers</summary><div className="mr-layer-options">
+      <FormControlLabel control={<Switch size="small" checked={showGrid} onChange={e=>useAppStore.getState().set({showGrid:e.target.checked})}/>} label="Grid"/>
+      <FormControlLabel control={<Switch size="small" checked={showInflation} onChange={e=>useAppStore.getState().set({showInflation:e.target.checked})}/>} label="Inflated obstacles"/>
+      <FormControlLabel control={<Switch size="small" checked={showMarkers} onChange={e=>setShowMarkers(e.target.checked)}/>} label="Waypoint markers"/>
       <FormControlLabel control={<Switch size="small" checked={layers.raw}
         onChange={(event)=>setLayers((value)=>({...value,raw:event.target.checked}))}/>} label="Raw A*"/>
       <FormControlLabel control={<Switch size="small" checked={layers.baseline}
@@ -294,8 +326,10 @@ export const MapCanvas=({mode,onCell,liveRobotPose}:Props)=>{
       <FormControlLabel control={<Switch size="small" checked={layers.turnSafety}
         onChange={(event)=>setLayers((value)=>({...value,turnSafety:event.target.checked}))}/>}
         label="Swept / rejected turns"/>
+      </div></details>
     </Paper>
     <Box ref={container} sx={{position:'relative',flex:'1 0 180px',minHeight:180,overflow:'hidden'}}>
+    {!grid&&<Box className="mr-map-empty"><Typography variant="h2">No planning map</Typography><Typography variant="body2">Open Map to load from Locator, or import a file in Map setup.</Typography></Box>}
     <canvas ref={canvas} aria-label="Planning map" onClick={(e)=>{
       if(suppressClick.current){suppressClick.current=false;return;}
       const cell=cellFromEvent(e);if(cell)onCell(cell);
@@ -327,13 +361,16 @@ export const MapCanvas=({mode,onCell,liveRobotPose}:Props)=>{
       style={{display:'block',position:'absolute',inset:0,width:'100%',height:'100%',
         filter:'contrast(var(--mr-map-contrast, 1))',cursor:'crosshair'}}/>
     </Box>
-    <Box role="group" aria-label="Map position and zoom" sx={{display:'flex',flexWrap:'wrap',gap:1,p:.75}}>
+    <Box role="group" aria-label="Map position and zoom" className="mr-map-footer" sx={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:.5,p:.75}}>
       <Chip size="small" label={`Mode: ${mode}`} color="primary"/>
       <Chip size="small" label={robotVisualization.label}
         color={robotVisualization.status==='visible'?'success':
           robotVisualization.status==='outside-map'?'warning':'default'}/>
       <Chip size="small" label={mouse.cell?`Grid ${mouse.cell.column}, ${mouse.cell.row}`:'Grid —'}/>
       <Chip size="small" label={mouse.world?`World ${mouse.world.x.toFixed(3)}, ${mouse.world.y.toFixed(3)} m`:'World —'}/>
+      <Box sx={{flex:1}}/>
+      <Tooltip title="Rotate view"><IconButton size="small" aria-label="Rotate view"
+        onClick={()=>useAppStore.getState().set({viewRotation:normalizeAngle(rotation+Math.PI/2)})}><RotateRight fontSize="small"/></IconButton></Tooltip>
       <Chip size="small" clickable label="−" aria-label="Zoom out" onClick={()=>zoomBy(1/1.2)}/>
       <Chip size="small" label={`${Math.round(view.zoom*100)}%`}/>
       <Chip size="small" clickable label="+" aria-label="Zoom in" onClick={()=>zoomBy(1.2)}/>

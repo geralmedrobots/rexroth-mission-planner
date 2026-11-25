@@ -1,4 +1,6 @@
 :root {
+  --mr-gap: 8px;
+  --mr-line: #d5dce1;
   --mr-bg-primary: #f4f5f7;
   --mr-bg-secondary: #ffffff;
   --mr-panel: rgba(255, 255, 255, 0.94);
@@ -73,12 +75,22 @@ body:has(.mr-app-shell[data-reduce-motion='true']) *::after {
   .mr-workspace-mission .mr-workspace-nav { grid-row: 1 / 3; }
   .mr-workspace-mission-panel { grid-column: 2; }
 }
-.mr-glass {
-  background: linear-gradient(145deg, rgba(255,255,255,.98), rgba(250,246,247,.94)) !important;
-  border: 1px solid var(--mr-border);
-  box-shadow: var(--mr-shadow);
-  backdrop-filter: blur(18px);
-}
+.mr-glass { background: var(--mr-panel-strong); box-shadow: none !important; }
+.mr-nav-section { display: block; padding: 7px 12px 0; }
+.mr-workspace-nav .MuiListItemButton-root { min-height: 34px; }
+.mr-workspace-nav .Mui-selected { box-shadow: inset 3px 0 var(--mr-red); color: var(--mr-red-dark); }
+.mr-workspace-map > [aria-label="Map controls"] { border-bottom: 1px solid var(--mr-line); }
+.mr-workspace-map { background: var(--mr-bg-primary); }
+.mr-map-tool-slot { display: inline-flex; gap: var(--mr-gap); }
+.mr-map-tools summary,.mr-mission-details summary,.mr-layers summary { cursor: pointer; font-weight: 650; font-size: .85rem; padding: 8px 0; }
+.mr-layers summary svg { vertical-align: middle; margin: 0 6px 2px 2px; }
+.mr-layer-options { display: flex; flex-wrap: wrap; gap: 3px 10px; padding: 0 10px 8px; }
+.mr-map-footer { background: white; border-top: 1px solid var(--mr-line); font-variant-numeric: tabular-nums; }
+.mr-map-footer .MuiChip-root:not([role=button]) { background: transparent; color: var(--mr-text-primary); }
+.mr-map-empty { position:absolute; inset:0; display:grid; align-content:center; justify-items:center; text-align:center; gap:8px; color: #485961; background-color:#edf1f3; background-image:radial-gradient(#c8d0d6 1px,transparent 1px); background-size:16px 16px; }
+.mr-waypoint-row { border-top: 1px solid var(--mr-line); padding: 10px 0; }
+.mr-route-ready { border-bottom: 1px solid var(--mr-line); }
+.mr-workspace-mission-panel { scrollbar-gutter: stable; }
 .mr-status-pulse::before {
   content: "";
   width: 7px;

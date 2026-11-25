@@ -1,8 +1,8 @@
 import {
   AltRoute, Autorenew, BugReport, ChevronLeft, ChevronRight, Cloud,
-  Delete, Download, EditRoad, ExpandLess, ExpandMore, GridOn, Map,
-  Pause, PlayArrow, Refresh, RotateRight, Save, Settings, StopCircle,
-  Timeline, Upload,
+  Delete, Download, ExpandLess, ExpandMore, Map,
+  Pause, PlayArrow, Refresh, Save, Settings, StopCircle,
+  Upload, Place, ListAlt, MonitorHeart, Subject, AddLocationAlt, Sensors,
 } from '@mui/icons-material';
 import {
   Alert, AppBar, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
@@ -33,8 +33,9 @@ import type {
   ValidationResult, VdaInstantAction, VdaOrder, Waypoint,
 } from './domain/types';
 import { QuickDestinations } from './features/destinations/QuickDestinations';
-import type { DestinationCategory, SavedDestination } from './features/destinations/destinationStore';
-import { useDestinationStore } from './features/destinations/destinationStore';
+import { WaypointEditor, WaypointsPanel } from './features/destinations/WaypointsPanel';
+import { waypointPositionError, type WaypointDraft } from './features/destinations/waypointPosition';
+import type { SavedDestination } from './features/destinations/destinationStore';
 import { sanitizeDiagnostics } from './features/diagnostics/sanitize';
 import { CorridorCompatibilityPanel } from './features/corridorCompatibility/CorridorCompatibilityPanel';
 import {
@@ -80,7 +81,7 @@ import { buildLegacyMotionPlan } from './domain/motion/LegacyMotionPlanBuilder';
 import { MissionController } from './features/mission/MissionController';
 import { stage5BRecording } from './services/Stage5BRecordingService';
 
-const navExpandedWidth=224; const navCollapsedWidth=76; const rightWidth=360;
+const navExpandedWidth=184; const navCollapsedWidth=56; const rightWidth=328;
 const safety='This application is not a safety function. Vehicle safety must be provided by certified safety hardware and the machine safety system.';
 const publishWarning='Test only in a controlled area. Use a low maximum speed. Ensure emergency stop, drive enable, safety PLC, motor timeout, and braking are operational.';
 const operationalDiagnosticSink = new OperationalLogDiagnosticSink((category, level, message) =>
@@ -231,11 +232,12 @@ export default function App(){
   const mapImportToken=useRef(0);
   const yamlImportToken=useRef(0);
   const logViewport=useRef<HTMLDivElement>(null);
-  const [saveDestinationOpen,setSaveDestinationOpen]=useState(false);
-  const [destinationName,setDestinationName]=useState('');
-  const [destinationCategory,setDestinationCategory]=useState<DestinationCategory>('other');
+  const [waypointsOpen,setWaypointsOpen]=useState(false);
+  const [systemsOpen,setSystemsOpen]=useState(false);
+  const [draft,setDraft]=useState<WaypointDraft>();
+  const [placement,setPlacement]=useState<{mapId:string;item?:SavedDestination}>();
+  const [focusedPoint,setFocusedPoint]=useState<SavedDestination>();
   const operatorSettings=useOperatorSettingsStore((state)=>state.settings);
-  const addDestination=useDestinationStore((state)=>state.add);
   const globalReplanning=useGlobalReplanningStore();
   const locator=useLocatorStore();
   const evaluateCompatibilityTimeout=useCorridorCompatibilityStore(
@@ -342,6 +344,7 @@ export default function App(){
   },[setActiveMapResolution,setLocator,navigatorMapId,activeMapResolution.source]);
 
   const loadGrid=(grid:OccupancyGrid):void=>{
+    setPlacement(undefined);setDraft(undefined);setFocusedPoint(undefined);
     mapImportToken.current+=1;
     setMapImporting(false);
     const inflated=ObstacleInflation.byRadius(grid,
@@ -353,6 +356,13 @@ export default function App(){
   useStartupConnections(loadGrid);
   const setCell=(cell:{row:number;column:number}):void=>{
     if(!store.grid)return; const transform=new CoordinateTransformer(store.grid.metadata);const pose=transform.gridToWorld(cell.row,cell.column);
+    if(placement){
+      if(placement.mapId!==store.grid.metadata.mapId){setPlacement(undefined);return;}
+      const next={...pose,mapId:placement.mapId,item:placement.item,theta:placement.item?.thetaExplicit===false?undefined:placement.item?.theta};
+      const error=waypointPositionError(next,store.grid,store.inflatedGrid);
+      if(error){setToast({severity:'warning',message:error});return;}
+      setPlacement(undefined);setDraft(next);return;
+    }
     if(mode==='goal'){prepareDestinationCell(cell);return;}
     else if(mode==='start')store.set({start:{...pose,mapId:store.grid.metadata.mapId,positionInitialized:true},selectedCell:cell});
     else if(mode==='waypoint'){
@@ -695,7 +705,7 @@ export default function App(){
       if(token===dispatchToken.current)setDispatchCountdown(undefined);
     }
   };
-  const prepareDestination=async(goal:RobotPose,explicitTheta=false):Promise<void>=>{
+  const prepareDestination=async(goal:RobotPose,explicitTheta=false,allowDirectDispatch=true):Promise<void>=>{
     const live=useAppStore.getState();const grid=live.grid;
     const context=getLiveRouteContext(live);
     if(!grid||!context.poseSnapshot){setToast({severity:'error',message:'A loaded map and fresh robot pose are required.'});return;}
@@ -722,7 +732,7 @@ export default function App(){
       return;
     }
     setToast({severity:'success',message:'Route calculated and order validated.'});
-    if(useOperatorSettingsStore.getState().settings.directDispatchMode)void beginDirectDispatch(order,revision);
+    if(allowDirectDispatch&&useOperatorSettingsStore.getState().settings.directDispatchMode)void beginDirectDispatch(order,revision);
   };
   const prepareDestinationCell=(cell:{row:number;column:number}):void=>{
     const live=useAppStore.getState();if(!live.grid)return;
@@ -750,7 +760,8 @@ export default function App(){
     if(event.key!=='Escape'||event.defaultPrevented||event.target instanceof HTMLElement&&
       event.target.closest('input,textarea,select,[contenteditable],[role="combobox"],[role="dialog"],[role="menu"],[role="listbox"]'))return;
     if(confirmationResolver.current||settingsOpen||locatorOpen||corridorCompatibilityOpen||
-      globalReplanningOpen||saveDestinationOpen||!event.currentTarget.contains(event.target as Node))return;
+      globalReplanningOpen||draft||waypointsOpen||systemsOpen||!event.currentTarget.contains(event.target as Node))return;
+    if(placement){setPlacement(undefined);return;}
     if(useAppStore.getState().goal)void clearDestination();
   };
   useEffect(()=>{
@@ -823,7 +834,13 @@ export default function App(){
         return;
       }
       let grid:OccupancyGrid;
-      if(format==='json')grid=parseOccupancyJson(await file.text());
+      if(format==='json'){
+        const source=await file.text();
+        grid=parseOccupancyJson(source);
+        if(!JSON.parse(source).metadata?.mapId){
+          grid={...grid,metadata:{...grid.metadata,mapId:file.name,name:file.name}};
+        }
+      }
       else{
         const image=await imageFileToPixels(file);
         const mapId=file.name.replace(/\.[^.]+$/,'');
@@ -975,17 +992,22 @@ export default function App(){
       setToast({severity:'error',message:'Compatibility test publication failed.'});
     }
   };
-  const saveCurrentDestination=():void=>{
-    if(!store.goal||!navigatorMapId||!destinationName.trim())return;
-    addDestination({
-      displayName:destinationName.trim(),mapId:navigatorMapId,x:store.goal.x,y:store.goal.y,
-      theta:store.goal.theta,category:destinationCategory,icon:destinationCategory,enabled:true,
-    });
-    setSaveDestinationOpen(false);setDestinationName('');
-    setToast({severity:'success',message:'Destination saved for this map.'});
+  const planningMapId=store.grid?.metadata.mapId;
+  const startPlacement=(item?:SavedDestination)=>{
+    if(!planningMapId)return;
+    setWaypointsOpen(false);setPlacement({mapId:planningMapId,item});
   };
-  const selectSavedDestination=(destination:SavedDestination):void=>{
-    void prepareDestination({...destination,mapId:destination.mapId,positionInitialized:true},true);
+  const selectSavedDestination=(point:SavedDestination):void=>{
+    const error=waypointPositionError(point,store.grid,store.inflatedGrid);
+    setWaypointsOpen(false);
+    if(error){setToast({severity:'error',message:error});return;}
+    setFocusedPoint({...point});
+    if(point.mapId!==navigatorMapId||!poseSnapshot){
+      store.set({goal:{x:point.x,y:point.y,theta:point.theta,mapId:point.mapId,positionInitialized:true},goalThetaExplicit:point.thetaExplicit!==false});
+      setToast({severity:'info',message:'Destination selected. A matching Navigator map and fresh robot pose are required for route preparation.'});
+      return;
+    }
+    void prepareDestination({...point,positionInitialized:true},point.thetaExplicit!==false,false);
   };
   const diagnostics={
     mqtt:{
@@ -1031,8 +1053,13 @@ export default function App(){
     validation:store.validation??null,
     mission:{...mission,completedNodes:[...mission.completedNodes]},
   };
-  const nav=['MQTT','Map','Planner','Order','Robot State','Global Replanning',
-    'Logs','Diagnostics','Settings'];
+  const nav=[
+    ['Planner',<AltRoute/>],['Map',<Map/>],['Waypoints',<Place/>],['Order',<ListAlt/>],
+    ['Robot State',<MonitorHeart/>],['MQTT',<Cloud/>],['Global Replanning',<Autorenew/>],
+    ['Logs',<Subject/>],['Diagnostics',<BugReport/>],['Settings',<Settings/>],
+  ] as const;
+  const activeNav=settingsOpen?'Settings':locatorOpen?'Map':waypointsOpen?'Waypoints':globalReplanningOpen?'Global Replanning':
+    diagnosticsOpen?({0:'Logs',5:'Order',7:'MQTT'}[bottom]??'Diagnostics'):advancedMissionOpen?'Robot State':'Planner';
   return <Box className="mr-app-shell" onKeyDown={handleWorkspaceKey}
     data-compact={operatorSettings.compactMode} data-reduce-motion={operatorSettings.reduceMotion} sx={{
     bgcolor:'background.default','--mr-nav-width':`${drawerWidth}px`,'--mr-mission-width':`${rightWidth}px`,
@@ -1041,27 +1068,22 @@ export default function App(){
   }}>
     <StartupOverlay/>
     <AppBar position="static" elevation={0} sx={{
-      background:'linear-gradient(100deg,#ffffff,#faf4f5)',color:'text.primary',
-      borderBottom:'2px solid',borderColor:'primary.main',backdropFilter:'blur(18px)'}}>
-      <Toolbar sx={{gap:1.2,minHeight:'64px!important',px:2,py:.5,flexWrap:'wrap'}}>
+      background:'#fff',color:'text.primary',
+      borderBottom:'1px solid',borderColor:'divider'}}>
+      <Toolbar sx={{gap:1.2,minHeight:'56px!important',px:2,py:.5,flexWrap:'wrap'}}>
         <MedRobotsLogo compact={tablet}/>
-        <Box sx={{mr:1,minWidth:tablet?0:225}}>
-          <Typography variant="h3" noWrap>Med Robots Navigation Control</Typography>
-          {!tablet&&<Typography variant="caption" color="text.secondary">PharmaRobot Autonomous Navigation</Typography>}
+        <Box sx={{mr:1,minWidth:0}}>
+          <Typography variant="h3" noWrap>Mission Planner</Typography>
+          {!tablet&&<Typography variant="caption" color="text.secondary">PharmaRobot navigation control</Typography>}
         </Box>
-        <StatusPill label={store.mqttConnected?'Connected':'Disconnected'} tone={store.mqttConnected?'connected':'error'} pulse={store.mqttConnected}/>
-        <StatusPill label={`Locator ${locator.sessionState==='logged-in'?'Connected':locator.connectionState}`}
-          tone={locator.sessionState==='logged-in'?'connected':locator.connectionState==='error'?'error':'warning'}/>
-        <StatusPill label={robotConnectionLabel}
-          tone={store.mqttConnected&&connectionOnline&&!stale?'connected':'error'}/>
-        {!tablet&&<><StatusPill label={activeMapId==='—'?'No active map':activeMapId} tone={navigatorMapId?'info':'warning'}/>
-          <StatusPill label={displayedState?.operatingMode??'Unknown mode'}
-            tone={displayedState?.operatingMode==='AUTOMATIC'?'connected':'warning'}/></>}
+        <Box sx={{flex:1}}/>
+        <Button color={store.mqttConnected&&locator.sessionState==='logged-in'?'inherit':'warning'} startIcon={<Sensors/>} onClick={()=>setSystemsOpen(true)} aria-label="System connections">
+          {robotConnectionLabel}{locator.connectionState==='error'?' ? Locator error':''}
+        </Button>
         <StatusPill label={`E-stop ${displayedState?.safetyState?.eStop??'unknown'}`}
           tone={displayedState?.safetyState?.eStop==='NONE'?'connected':'error'}/>
         <StatusPill label={displayedState?`${store.currentRokitErrors.length} errors`:'Errors unavailable'}
           tone={displayedState&&store.currentRokitErrors.length?'error':'inactive'}/>
-        <Box sx={{flex:1}}/>
         {tablet&&<Tooltip title="Mission panel"><IconButton color="primary" aria-label="Mission panel"
           aria-expanded={missionPanelOpen} onClick={()=>setMissionPanelOpen(value=>!value)}><AltRoute/></IconButton></Tooltip>}
         <Tooltip title="Settings"><IconButton color="inherit" onClick={()=>setSettingsOpen(true)}><Settings/></IconButton></Tooltip>
@@ -1079,20 +1101,21 @@ export default function App(){
           {navCollapsed?<ChevronRight/>:<ChevronLeft/>}
         </IconButton>
       </Box>
-      <List dense>{nav.map((label,index)=><Tooltip key={label} title={navCollapsed?label:''} placement="right"><ListItemButton aria-label={label} selected={label==='Planner'} onClick={()=>{
+      <List dense>{nav.map(([label,icon],index)=><Box key={label}>
+        {(index===0||index===5)&&<Typography className="mr-nav-section" variant="overline">{navCollapsed?(index===0?'Ops':'Eng'):(index===0?'Operations':'Engineering')}</Typography>}
+        <Tooltip key={label} title={navCollapsed?label:''} placement="right"><ListItemButton aria-label={label} selected={label===activeNav} onClick={()=>{
         if(label==='Settings')setSettingsOpen(true);if(label==='Map')setLocatorOpen(true);
         if(label==='Global Replanning')setGlobalReplanningOpen(true);
         if(label==='Robot State'){setMissionPanelOpen(true);setAdvancedMissionOpen(true);}
-        if(label==='Planner')document.getElementById('planner-workspace')?.focus();
+        if(label==='Planner'){setDiagnosticsOpen(false);setAdvancedMissionOpen(false);document.getElementById('planner-workspace')?.focus();}
+        if(label==='Waypoints')setWaypointsOpen(true);
         const tab={MQTT:7,Order:5,Logs:0,Diagnostics:bottom}[label as 'MQTT'|'Order'|'Logs'|'Diagnostics'];
         if(tab!==undefined){setBottom(tab);setDiagnosticsOpen(true);}
-      }} sx={{mx:.75,my:.25,borderRadius:2,minHeight:44,justifyContent:navCollapsed?'center':'initial'}}>
-        <ListItemIcon sx={{minWidth:navCollapsed?0:44,justifyContent:'center'}}>{[
-          <Cloud/>,<Map/>,<AltRoute/>,<Timeline/>,<BugReport/>,<Autorenew/>,
-          <EditRoad/>,<BugReport/>,<Settings/>][index]}</ListItemIcon>
+      }} sx={{mx:.75,my:.25,borderRadius:2,minHeight:34,justifyContent:navCollapsed?'center':'initial'}}>
+        <ListItemIcon sx={{minWidth:navCollapsed?0:32,justifyContent:'center'}}>{icon}</ListItemIcon>
         {!navCollapsed&&<ListItemText primary={label}/>}
-      </ListItemButton></Tooltip>)}</List><Divider/>
-      {!navCollapsed&&<Box sx={{p:1.5}}><Typography variant="overline">Operator workflow</Typography>
+      </ListItemButton></Tooltip></Box>)}</List><Divider/>
+      {!navCollapsed&&<Box sx={{p:1.5}}><details className="mr-map-tools"><summary>Map setup</summary>
         <Alert severity="info" sx={{my:1}}>{!store.grid?'Load a map to get started.':
           !poseSnapshot?'A fresh robot pose is required to prepare a mission.':
             'Click a free point on the map to calculate and validate a mission.'}</Alert>
@@ -1114,17 +1137,20 @@ export default function App(){
           <input hidden aria-label="YAML file" ref={yamlInput} type="file" accept=".yaml,.yml" onChange={e=>void importMap(e,'yaml')}/>
           <input hidden aria-label="Map image file" ref={imageInput} type="file" accept=".pgm,.png,.jpg,.jpeg" onChange={e=>void importMap(e,'image')}/>
           <input hidden aria-label="Grid JSON file" ref={jsonInput} type="file" accept=".json" onChange={e=>void importMap(e,'json')}/>
-        </Stack>
+        </Stack></details>
       </Box>}
     </Drawer>
     <Box component="main" id="planner-workspace" tabIndex={-1} className="mr-workspace-map">
       <Paper role="group" aria-label="Map controls" className="mr-glass" square sx={{
         display:'flex',flexWrap:'wrap',alignItems:'center',px:1.5,py:.5,gap:1,borderRadius:0}}>
+        <Typography variant="subtitle2" sx={{mr:.5}}>{store.grid?.metadata.mapId??'Planning map'}</Typography>
         <Select size="small" value={store.plannerMode} inputProps={{'aria-label':'Planner mode'}}
           onChange={(e)=>store.set({plannerMode:e.target.value as typeof store.plannerMode})}>
           <MenuItem value="automatic">Automatic</MenuItem><MenuItem value="manual">Manual</MenuItem><MenuItem value="hybrid">Hybrid</MenuItem><MenuItem value="motion-state">Motion state (experimental)</MenuItem>
         </Select>
-        <Chip color={routeStatus.tone} label={routeStatus.label}/>
+        <Box className="mr-map-tool-slot" aria-label="Map editing tools">
+          <Button size="small" variant="outlined" startIcon={<AddLocationAlt/>} disabled={!planningMapId} onClick={()=>startPlacement()}>Create Waypoint</Button>
+        </Box>
         <Tooltip title={recalculateReason??'Calculate a route preview'}><span>
           <Button variant="outlined" startIcon={<AltRoute/>} disabled={store.planning||Boolean(recalculateReason)}
             onClick={()=>void plan()}>{store.planning?'Planning…':'Recalculate'}</Button>
@@ -1132,35 +1158,33 @@ export default function App(){
         <Button startIcon={<Refresh/>} onClick={()=>{
           planningCoordinator.invalidate();store.invalidateRoute();
         }}>Clear path</Button>
-        <Tooltip title="Grid"><IconButton aria-pressed={store.showGrid} color={store.showGrid?'primary':'default'} onClick={()=>store.set({showGrid:!store.showGrid})}><GridOn/></IconButton></Tooltip>
-        <Tooltip title="Inflated obstacles"><IconButton aria-pressed={store.showInflation} color={store.showInflation?'warning':'default'} onClick={()=>store.set({showInflation:!store.showInflation})}><BugReport/></IconButton></Tooltip>
-        <Tooltip title="Rotate view"><IconButton onClick={()=>store.set({viewRotation:normalizeAngle(store.viewRotation+Math.PI/2)})}><RotateRight/></IconButton></Tooltip>
         <Box sx={{flex:1}}/><Typography variant="caption">{store.grid?`${store.grid.metadata.width}×${store.grid.metadata.height} · ${store.grid.metadata.resolution} m/cell`:'No map loaded'}</Typography>
       </Paper>
       {(locator.downloading||mapImporting)&&<Alert severity="info" role="status">
         {locator.downloading?'Loading Locator map…':'Importing map…'}
       </Alert>}
-      <MapCanvas mode={mode} onCell={setCell} liveRobotPose={poseSnapshot?.pose}/>
+      {placement&&<Alert severity="info" action={<Button onClick={()=>setPlacement(undefined)}>Cancel</Button>}>
+        Select a free position for {placement.item?.displayName??'the new waypoint'}.
+      </Alert>}
+      <MapCanvas focusedPoint={focusedPoint} mode={mode} onCell={setCell} liveRobotPose={poseSnapshot?.pose}/>
     </Box>
     <Box component="aside" aria-label="Mission panel" className="mr-workspace-mission-panel"
       hidden={tablet&&!missionPanelOpen}
       sx={{p:1.5,bgcolor:'rgba(255,255,255,.98)',borderLeft:'1px solid',borderColor:'divider'}}>
       <Paper component="section" aria-label="Route preview" className="mr-glass mr-route-ready" sx={{p:1.5,mb:1.5}}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
+        <Stack alignItems="flex-start" gap={.5}>
           <Box><Typography variant="overline">Mission control</Typography>
             <Typography variant="h2" aria-live="polite">{routeStatus.label}</Typography></Box>
           <StatusPill label={!displayedState?'Telemetry unavailable':
             displayedState.driving?'Driving':displayedState.paused?'Paused':'Idle'}
             tone={displayedState?.driving?'connected':displayedState?.paused?'warning':'inactive'}/>
         </Stack>
-        <Alert severity={store.stage5BRecordingStatus?.includes('failed')?'warning':'info'} sx={{mt:1}}>
-          {store.stage5BRecordingStatus??'Stage 5B: automatic recording for motion-state runs.'}
-          {' '}Pending recordings: {store.stage5BPendingCount??0}
-        </Alert>
         <Divider sx={{my:1.2}}/>
         <Field label="Destination" value={store.goal?`${store.goal.x.toFixed(2)}, ${store.goal.y.toFixed(2)} m`:'Select on map'}/>
+        {store.sentOrder&&<Field label="Submitted mission" value={mission.status}/>}
         <Field label="Route distance" value={routeDistance?`${routeDistance.toFixed(2)} m`:'—'}/>
         <Field label="Time at maximum speed" value={estimatedDurationSeconds?`${Math.ceil(estimatedDurationSeconds)} s`:'—'}/>
+        <details className="mr-mission-details"><summary>Route and telemetry details</summary>
         <Field label="Order" value={store.generatedOrder?.orderId??'—'}/>
         <Field label="Battery" value={displayedState?.batteryState?.batteryCharge===undefined?'—':`${displayedState.batteryState.batteryCharge}%`}/>
         <Field label="Current speed" value={displayedState?.velocity&&
@@ -1176,6 +1200,11 @@ export default function App(){
           <Field label="Right width min / max" value={corridorSummary.minimumRight===undefined?'N/A':
             `${corridorSummary.minimumRight.toFixed(3)} / ${corridorSummary.maximumRight!.toFixed(3)} m`}/>
         </Paper>}
+        <Alert severity={store.stage5BRecordingStatus?.includes('failed')?'warning':'info'} sx={{mt:1}}>
+          {store.stage5BRecordingStatus??'Stage 5B: automatic recording for motion-state runs.'}
+          {' '}Pending recordings: {store.stage5BPendingCount??0}
+        </Alert>
+        </details>
         {store.generatedOrder&&store.plannerOptions.corridor.enableBoschRokitCorridorExtension&&
           corridorSummary.withCorridor===0&&<Alert severity="warning" sx={{mt:1}}>
             Corridor generation is enabled in Mission Planner. The generated Order contains no bypass corridor information.
@@ -1202,13 +1231,13 @@ export default function App(){
         <Stack direction="row" gap={1} mt={1}>
           <Button fullWidth variant="outlined" disabled={!store.goal&&!store.finalPath.length}
             onClick={()=>void clearDestination()}>Clear Destination</Button>
-          <Button fullWidth color="error" variant="outlined"
+          <Button fullWidth color="error" variant="text"
             disabled={!store.mqttConnected||(!store.sentOrder&&!activeNavigatorOrderId)}
             onClick={()=>void instant('cancelOrder')}>Cancel Mission</Button>
         </Stack>
       </Paper>
-      <QuickDestinations mapId={navigatorMapId} currentGoal={store.goal}
-        onSelect={selectSavedDestination} onSaveGoal={()=>setSaveDestinationOpen(true)}/>
+      <QuickDestinations onManage={()=>setWaypointsOpen(true)} mapId={planningMapId??null} currentGoal={store.goal?.mapId===planningMapId?store.goal:undefined}
+        onSelect={selectSavedDestination} onSaveGoal={()=>{if(store.goal&&planningMapId)setDraft({...store.goal,mapId:planningMapId,theta:store.goalThetaExplicit?store.goal.theta:undefined});}}/>
       <Button sx={{mt:1.5}} endIcon={advancedMissionOpen?<ExpandLess/>:<ExpandMore/>}
         onClick={()=>setAdvancedMissionOpen((value)=>!value)}>Advanced mission data</Button>
       <Box sx={{display:advancedMissionOpen?'block':'none'}}>
@@ -1580,22 +1609,22 @@ export default function App(){
         </Box>
       </>}
     </Paper>
-    <Dialog open={saveDestinationOpen} onClose={()=>setSaveDestinationOpen(false)} fullWidth maxWidth="xs">
-      <DialogTitle>Save hospital destination</DialogTitle>
-      <DialogContent><Stack gap={2} mt={1}>
-        <TextField autoFocus label="Display name" value={destinationName}
-          onChange={(event)=>setDestinationName(event.target.value)}/>
-        <Select value={destinationCategory}
-          onChange={(event)=>setDestinationCategory(event.target.value as DestinationCategory)}>
-          {['pharmacy','laboratory','reception','ward','charging','delivery','home','other']
-            .map((category)=><MenuItem key={category} value={category}>{category}</MenuItem>)}
-        </Select>
-        <Alert severity="info">This destination is stored only for map {navigatorMapId??'N/A'}.</Alert>
-      </Stack></DialogContent>
-      <DialogActions><Button onClick={()=>setSaveDestinationOpen(false)}>Cancel</Button>
-        <Button variant="contained" disabled={!destinationName.trim()||!store.goal||!navigatorMapId}
-          onClick={saveCurrentDestination}>Save destination</Button></DialogActions>
+    <Dialog open={systemsOpen} onClose={()=>setSystemsOpen(false)} aria-labelledby="systems-title">
+      <DialogTitle id="systems-title">System connections</DialogTitle><DialogContent><Stack gap={1} alignItems="flex-start">
+        <StatusPill label={store.mqttConnected?'MQTT connected':'MQTT disconnected'} tone={store.mqttConnected?'connected':'error'} pulse={store.mqttConnected}/>
+        <StatusPill label={`Locator ${locator.sessionState==='logged-in'?'Connected':locator.connectionState}`}
+          tone={locator.sessionState==='logged-in'?'connected':locator.connectionState==='error'?'error':'warning'}/>
+        <StatusPill label={robotConnectionLabel}
+          tone={store.mqttConnected&&connectionOnline&&!stale?'connected':'error'}/>
+        <StatusPill label={activeMapId==='—'?'No active map':activeMapId} tone={navigatorMapId?'info':'warning'}/>
+          <StatusPill label={displayedState?.operatingMode??'Unknown mode'}
+            tone={displayedState?.operatingMode==='AUTOMATIC'?'connected':'warning'}/>
+      </Stack></DialogContent><DialogActions><Button onClick={()=>setSystemsOpen(false)}>Close</Button></DialogActions>
     </Dialog>
+    {waypointsOpen&&<WaypointsPanel mapId={planningMapId} onClose={()=>setWaypointsOpen(false)} onCreate={()=>startPlacement()}
+      onReposition={startPlacement} onFocus={point=>{setFocusedPoint({...point});setWaypointsOpen(false);}}
+      onDestination={selectSavedDestination} onEdit={point=>{setWaypointsOpen(false);setDraft({...point,item:point,theta:point.thetaExplicit===false?undefined:point.theta});}}/>}
+    {draft&&<WaypointEditor draft={draft} grid={store.grid} inflated={store.inflatedGrid} onClose={()=>setDraft(undefined)}/>}
     <Dialog open={locatorOpen} onClose={()=>setLocatorOpen(false)} fullWidth maxWidth="md">
       <DialogTitle>ROKIT Locator Server Map</DialogTitle>
       <DialogContent><Stack gap={2} mt={1}>

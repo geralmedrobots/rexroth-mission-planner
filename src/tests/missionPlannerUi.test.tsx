@@ -6,6 +6,8 @@ import { createPlanningConfigurationSnapshot } from '../domain/planning/Planning
 import type { OccupancyGrid, PlannerResult, RobotPose, VdaState } from '../domain/types';
 import { VdaOrderBuilder } from '../domain/vda5050/VdaOrderBuilder';
 import { VdaOrderValidator } from '../domain/vda5050/VdaOrderValidator';
+import { useDestinationStore } from '../features/destinations/destinationStore';
+import { waypointPositionError } from '../features/destinations/waypointPosition';
 import { useLocatorStore } from '../features/locator/stores/locatorStore';
 import { PlanningCoordinator, type CoordinatedPlanningResult, type PlanningInputs } from '../features/planning/PlanningCoordinator';
 import { useGlobalReplanningStore } from '../features/replanning/globalReplanningStore';
@@ -67,6 +69,7 @@ const button=(name:string)=>screen.getByRole('button',{name});
 
 beforeEach(()=>{
   localStorage.clear();
+  useDestinationStore.setState({destinations:[]});
   useAppStore.setState(appDefaults,true);
   useLocatorStore.setState(useLocatorStore.getInitialState(),true);
   useGlobalReplanningStore.setState(useGlobalReplanningStore.getInitialState(),true);
@@ -81,6 +84,91 @@ afterEach(()=>{
   Reflect.deleteProperty(navigator,'clipboard');
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+});
+
+describe('named waypoints',()=>{
+  const pharmacy={displayName:'Pharmacy',mapId:'fixture',x:2.05,y:2.05,theta:0,category:'pharmacy' as const,enabled:true,icon:'pharmacy'};
+  it('persists the existing quick destination schema and enforces map-local names on add and rename',async()=>{
+    const store=useDestinationStore.getState();
+    const p=store.add(pharmacy);
+    expect(()=>store.add({...pharmacy,displayName:'  PHARMACY '})).toThrow(/already/);
+    const ward=store.add({...pharmacy,displayName:'Ward'});
+    expect(()=>store.update(ward.id,{displayName:'pharmacy'})).toThrow(/already/);
+    store.add({...pharmacy,mapId:'other'});
+    store.update(p.id,{description:'East wing',x:2.55,thetaExplicit:false});
+    await useDestinationStore.persist.rehydrate();
+    expect(useDestinationStore.getState().destinations.find(item=>item.id===p.id)).toMatchObject({description:'East wing',x:2.55,thetaExplicit:false});
+    expect(useDestinationStore.getState().destinations).toHaveLength(3);
+  });
+  it('checks current occupancy, clearance, world bounds, heading and map before saving',()=>{
+    const blocked={...grid,data:grid.data.map(()=>100)};
+    expect(waypointPositionError(pharmacy,grid)).toBeUndefined();
+    expect(waypointPositionError(pharmacy,grid,blocked)).toMatch(/occupied/);
+    expect(waypointPositionError({...pharmacy,x:-2},grid)).toMatch(/outside/);
+    expect(waypointPositionError({...pharmacy,theta:NaN},grid)).toMatch(/finite/);
+    expect(waypointPositionError({...pharmacy,mapId:'other'},grid)).toMatch(/matching/);
+  });
+  it('creates, finds, renames, repositions, selects and deletes a saved waypoint without publication',async()=>{
+    useAppStore.setState({grid});
+    vi.spyOn(HTMLElement.prototype,'getBoundingClientRect').mockReturnValue({x:0,y:0,left:0,top:0,width:400,height:400,right:400,bottom:400,toJSON:()=>({})});
+    vi.spyOn(HTMLCanvasElement.prototype,'getContext').mockReturnValue(null);
+    render(<App/>);
+    const map=screen.getByLabelText('Planning map');
+    fireEvent.click(button('Create Waypoint'));fireEvent.click(map,{clientX:205,clientY:205});
+    fireEvent.change(screen.getByLabelText(/Waypoint name/),{target:{value:'Ward A'}});
+    fireEvent.change(screen.getByLabelText('Description (optional)'),{target:{value:'East wing'}});
+    fireEvent.click(button('Save waypoint'));
+    expect(useAppStore.getState().goal).toBeUndefined();
+    fireEvent.click(button('Waypoints'));
+    fireEvent.change(screen.getByLabelText('Search waypoints'),{target:{value:'unknown'}});
+    expect(screen.getByText('No matching waypoints.')).toBeVisible();
+    fireEvent.change(screen.getByLabelText('Search waypoints'),{target:{value:'ward'}});
+    fireEvent.click(button('Edit'));fireEvent.change(screen.getByLabelText(/Waypoint name/),{target:{value:'Ward B'}});
+    fireEvent.click(button('Save waypoint'));fireEvent.click(button('Waypoints'));fireEvent.click(button('Reposition'));
+    fireEvent.click(map,{clientX:255,clientY:205});fireEvent.click(button('Save waypoint'));
+    expect(useDestinationStore.getState().destinations[0]?.x).toBeCloseTo(2.55);
+    expect(useDestinationStore.getState().destinations[0]).toMatchObject({displayName:'Ward B',thetaExplicit:false});
+    fireEvent.click(button('Waypoints'));fireEvent.click(button('Use as destination'));
+    expect(useAppStore.getState().goal?.x).toBeCloseTo(2.55);
+    expect(button('Start Mission')).toBeDisabled();
+    fireEvent.click(button('Waypoints'));fireEvent.click(button('Delete'));fireEvent.click(button('Confirm delete'));
+    expect(useDestinationStore.getState().destinations).toHaveLength(0);
+    expect(mqttService.publish).not.toHaveBeenCalled();
+  },15000);
+  it('centers a named point at the current zoom and toggles the named marker layer',()=>{
+    useAppStore.setState({grid});
+    const point=useDestinationStore.getState().add(pharmacy);
+    const other=useDestinationStore.getState().add({...pharmacy,mapId:'other',displayName:'Other map'});
+    vi.spyOn(HTMLElement.prototype,'getBoundingClientRect').mockReturnValue({x:0,y:0,left:0,top:0,width:400,height:400,right:400,bottom:400,toJSON:()=>({})});
+    const ctx={save:vi.fn(),restore:vi.fn(),scale:vi.fn(),translate:vi.fn(),rotate:vi.fn(),fillRect:vi.fn(),
+      beginPath:vi.fn(),moveTo:vi.fn(),lineTo:vi.fn(),stroke:vi.fn(),fill:vi.fn(),arc:vi.fn(),strokeText:vi.fn(),fillText:vi.fn()};
+    vi.spyOn(HTMLCanvasElement.prototype,'getContext').mockReturnValue(ctx as unknown as CanvasRenderingContext2D);
+    const onCell=vi.fn();
+    const view=render(<MapCanvas mode="inspect" onCell={onCell}/>);
+    expect(ctx.fillText).toHaveBeenCalledWith(point.displayName,9,-5);
+    expect(ctx.fillText).not.toHaveBeenCalledWith(other.displayName,9,-5);
+    fireEvent.click(screen.getByText('Map layers'));
+    ctx.fillText.mockClear();fireEvent.click(screen.getByRole('switch',{name:'Waypoint markers'}));
+    expect(ctx.fillText).not.toHaveBeenCalledWith(point.displayName,9,-5);
+    fireEvent.click(button('Zoom in'));fireEvent.click(button('Rotate view'));
+    expect(useAppStore.getState().viewRotation).toBeCloseTo(Math.PI/2);
+    view.rerender(<MapCanvas mode="inspect" onCell={onCell} focusedPoint={point}/>);
+    fireEvent.click(screen.getByLabelText('Planning map'),{clientX:200,clientY:200});
+    expect(onCell).toHaveBeenCalledWith({column:20,row:19});
+    expect(screen.getByText('120%')).toBeVisible();
+  });
+  it('requires explicit execution for a prepared quick destination even with direct dispatch enabled',async()=>{
+    seedTelemetry();
+    useDestinationStore.getState().add(pharmacy);
+    useOperatorSettingsStore.getState().update({directDispatchMode:true});
+    vi.spyOn(PlanningCoordinator.prototype,'plan').mockImplementation(async input=>({...planFixture,planningConfiguration:configuration,routeRevision:input.routeRevision}));
+    vi.spyOn(VdaOrderValidator.prototype,'validate').mockReturnValue(valid);
+    render(<App/>);
+    fireEvent.click(button('Pharmacy'));
+    await waitFor(()=>expect(button('Start Mission')).toBeEnabled());
+    expect(screen.queryByText(/Direct dispatch in/)).toBeNull();
+    expect(mqttService.publish).not.toHaveBeenCalled();
+  });
 });
 
 describe('workspace and feedback',()=>{
@@ -150,6 +238,7 @@ describe('workspace and feedback',()=>{
     };
     vi.spyOn(HTMLCanvasElement.prototype,'getContext').mockReturnValue(context as unknown as CanvasRenderingContext2D);
     render(<MapCanvas mode="goal" onCell={vi.fn()}/>);
+    fireEvent.click(screen.getByText('Map layers'));
     fireEvent.click(screen.getByRole('switch',{name:'VDA nodes'}));
     expect(context.fillText).toHaveBeenCalledWith('0',expect.any(Number),expect.any(Number));
     expect(context.fillText).toHaveBeenCalledWith('1',expect.any(Number),expect.any(Number));
@@ -160,6 +249,7 @@ describe('workspace and feedback',()=>{
     render(<App/>);
     expect(screen.getByText('Robot disconnected')).toBeVisible();
     expect(screen.getByText('Telemetry unavailable')).toBeVisible();
+    fireEvent.click(screen.getByText('Route and telemetry details'));
     expect(screen.getByText('Unavailable',{exact:true})).toBeVisible();
     expect(button('Recalculate')).toBeDisabled();
     expect(button('Save point')).toBeDisabled();
@@ -210,6 +300,7 @@ describe('workspace and feedback',()=>{
 
   it('shows staged YAML, permits clearing it, and reports invalid map files',async()=>{
     render(<App/>);
+    fireEvent.click(screen.getByText('Map setup'));
     const yaml=screen.getByLabelText('YAML file');
     fireEvent.change(yaml,{target:{files:[{name:'map.yaml',text:async()=> 'resolution: 0.05\norigin: [0, 0, 0]'}]}});
     expect(await screen.findByText('Staged metadata: map.yaml')).toBeVisible();
