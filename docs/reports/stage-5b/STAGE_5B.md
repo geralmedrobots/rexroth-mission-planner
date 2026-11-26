@@ -12,7 +12,7 @@ waypoint routes are not silently reinterpreted as motion-state evidence.
 For a folder containing only actual exported real-run artifacts, run:
 
 ```text
-npm run stage5b -- --real-exports real-scenarios PHASE_5_REAL_REPORT
+npm run stage5b -- --real-exports real-scenarios docs/reports/phase-5/PHASE_5_REAL_REPORT
 ```
 
 This creates a dataset manifest plus Markdown/JSON comparison reports. Review the
@@ -72,7 +72,7 @@ Never label search exhaustion physically infeasible without geometric evidence.
 Run from the workspace root:
 
 ```text
-npm run stage5b -- examples/stage5b.dataset.json STAGE_5B_REPORT
+npm run stage5b -- examples/stage5b.dataset.json docs/reports/stage-5b/STAGE_5B_REPORT
 ```
 
 The CLI generates JSON evidence and a Markdown report at a new prefix. Existing
