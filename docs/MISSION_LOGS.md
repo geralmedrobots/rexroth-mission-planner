@@ -1,10 +1,10 @@
 # Seven real mission logs
 
-These are byte-for-byte copies from `C:\Users\Avarynx\Desktop\Miguel`.
-The original files were not modified. SHA-256 hashes of each source and copy
-were compared and matched at import.
+These are byte-for-byte copies of the original operator-provided logs. The
+original files were not modified. SHA-256 hashes of each source and copy were
+compared and matched at import.
 
-The manifest is `examples/stage5b.dataset.json`. Its supported `artifact` paths
+The manifest is `../examples/stage5b.dataset.json`. Its supported `artifact` paths
 are relative to the manifest directory, for example `mission-logs/first_mission.txt`.
 The manifest inventories log evidence; it is **not yet a replayable dataset**.
 
@@ -43,7 +43,7 @@ No fields, maps, configurations, or outcomes were fabricated to pass validation.
 
 To obtain a replayable dataset, use the application's **Export last motion-state
 run (success or failure, includes map)** export for each corresponding mission,
-as documented in `STAGE_5B.md`, and reference those actual artifacts in the manifest.
+as documented in [STAGE_5B.md](STAGE_5B.md), and reference those actual artifacts in the manifest.
 Keep these original logs as supporting evidence. A later rerun is new evidence,
 not an exact reconstruction of a missing historical export.
 
@@ -61,10 +61,10 @@ failures: `Invalid input: expected object, received array`. There were **zero
 actual planner replays**. These are input failures, not seven failed missions.
 Recommendation: `No successful real-run replay; no evidence for profile selection.`
 
-Generated repository-root outputs:
+The historical report outputs are archived under `docs/reports/`:
 
-- `PROFILE_SELECTION_TEST_REPORT.json`
-- `PROFILE_SELECTION_TEST_REPORT.md`
+- `reports/PROFILE_SELECTION_TEST_REPORT.json`
+- `reports/PROFILE_SELECTION_TEST_REPORT.md`
 
 The CLI catches artifact-load errors and still exits successfully, so the exit
 code alone does not indicate a usable baseline. No schema/path-only correction

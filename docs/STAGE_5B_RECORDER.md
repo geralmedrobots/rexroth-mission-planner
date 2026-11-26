@@ -157,7 +157,8 @@ Integration: `src/domain/planning/MotionPlannerScenarioArtifact.ts`,
 Tests: `src/tests/stage5BRecorder.test.ts`,
 `src/tests/stage5BRecordingService.test.ts`, `server/stage5BRecording.test.ts`.
 Evidence: `examples/stage5b.dataset.json`, its backup, synthetic artifact(s),
-`PROFILE_SELECTION_TEST_REPORT.json` and `.md`, and their `.log-import.backup` files.
+`reports/PROFILE_SELECTION_TEST_REPORT.json` and the archived reports and
+backups in `reports/`.
 
 ## Validation result (2026-09-14)
 

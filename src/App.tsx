@@ -1,7 +1,7 @@
 import {
-  AccountCircle, AltRoute, Autorenew, BugReport, ChevronLeft, ChevronRight, Cloud,
+  AccountCircle, AltRoute, Autorenew, Brightness4, Brightness7, BugReport, ChevronLeft, ChevronRight, Cloud,
   Delete, Download, EditRoad, ExpandLess, ExpandMore, GridOn, Map,
-  Pause, PlayArrow, Refresh, RotateRight, Save, Settings, StopCircle,
+  Notifications, Pause, PlayArrow, Refresh, RotateRight, Save, Settings, StopCircle,
   Timeline, Upload,
 } from '@mui/icons-material';
 import {
@@ -152,6 +152,7 @@ export default function App(){
     store.orderSettings.missionMaximumSpeedMps,store.speedCycleDiagnostic);
   const [settingsOpen,setSettingsOpen]=useState(false); const [locatorOpen,setLocatorOpen]=useState(false); const [yamlText,setYamlText]=useState<string>();
   const tablet=useMediaQuery('(max-width:1100px)');
+  const phone=useMediaQuery('(max-width:720px)');
   const [navCollapsed,setNavCollapsed]=useState(false);
   const [missionPanelOpen,setMissionPanelOpen]=useState(false);
   const [corridorCompatibilityOpen,setCorridorCompatibilityOpen]=useState(false);
@@ -173,6 +174,7 @@ export default function App(){
   const [destinationName,setDestinationName]=useState('');
   const [destinationCategory,setDestinationCategory]=useState<DestinationCategory>('other');
   const operatorSettings=useOperatorSettingsStore((state)=>state.settings);
+  const updateOperatorSettings=useOperatorSettingsStore((state)=>state.update);
   const addDestination=useDestinationStore((state)=>state.add);
   const globalReplanning=useGlobalReplanningStore();
   const locator=useLocatorStore();
@@ -183,8 +185,8 @@ export default function App(){
   const imageInput=useRef<HTMLInputElement>(null); const jsonInput=useRef<HTMLInputElement>(null); const yamlInput=useRef<HTMLInputElement>(null);
   const [now,setNow]=useState(Date.now());
   const drawerWidth=navCollapsed?navCollapsedWidth:navExpandedWidth;
-  const diagnosticsHeight=diagnosticsOpen?310:48;
-  useEffect(()=>{document.title='Med Robots Navigation Control';},[]);
+  const diagnosticsHeight=diagnosticsOpen?350:88;
+  useEffect(()=>{document.title='ROKIT Mission Planner';},[]);
   useEffect(()=>{
     const listener=(event:Event):void=>{
       const detail=(event as CustomEvent<{
@@ -889,45 +891,62 @@ export default function App(){
   };
   const nav=['MQTT','Map','Planner','Order','Robot State','Global Replanning',
     'Logs','Diagnostics','Settings'];
-  return <Box sx={{display:'flex',height:'100vh',bgcolor:'background.default',overflow:'hidden'}}>
+  return <Box data-theme={operatorSettings.themeMode}
+    sx={{display:'flex',height:'100vh',bgcolor:'background.default',overflow:'hidden'}}>
     <StartupOverlay/>
     <AppBar position="fixed" elevation={0} sx={{zIndex:(t)=>t.zIndex.drawer+1,
-      background:'linear-gradient(100deg,#ffffff,#faf4f5)',color:'text.primary',
-      borderBottom:'2px solid',borderColor:'primary.main',backdropFilter:'blur(18px)'}}>
-      <Toolbar sx={{gap:1.2,minHeight:'64px!important',px:2}}>
+      background:'linear-gradient(100deg,var(--mr-bg-secondary),var(--mr-panel-strong))',color:'text.primary',
+      borderBottom:'1px solid',borderColor:'divider',backdropFilter:'blur(18px)'}}>
+      <Toolbar sx={{gap:phone?0.6:1.2,minHeight:'64px!important',px:phone?1:2}}>
         <MedRobotsLogo compact={tablet}/>
-        <Box sx={{mr:1,minWidth:tablet?0:225}}>
-          <Typography variant="h3" noWrap>Med Robots Navigation Control</Typography>
-          {!tablet&&<Typography variant="caption" color="text.secondary">PharmaRobot Autonomous Navigation</Typography>}
-        </Box>
-        <StatusPill label={store.mqttConnected?'Connected':'Disconnected'} tone={store.mqttConnected?'connected':'error'} pulse={store.mqttConnected}/>
-        <StatusPill label={`Locator ${locator.sessionState==='logged-in'?'Connected':locator.connectionState}`}
+        {!phone&&<Box sx={{mr:1,minWidth:0,maxWidth:tablet?150:260}}>
+          <Typography variant="h3" noWrap sx={{fontSize:tablet?'.86rem':undefined}}>
+            ROKIT Mission Planner
+          </Typography>
+          {!tablet&&<Typography variant="caption" color="text.secondary">Mission &amp; Navigation Management</Typography>}
+        </Box>}
+        <StatusPill label={phone?(store.mqttConnected?'MQTT':'MQTT offline'):
+          store.mqttConnected?'Connected':'Disconnected'}
+          tone={store.mqttConnected?'connected':'error'} pulse={store.mqttConnected}/>
+        {!tablet&&<StatusPill label={`Locator ${locator.sessionState==='logged-in'?'Connected':locator.connectionState}`}
           tone={locator.sessionState==='logged-in'?'connected':locator.connectionState==='error'?'error':'warning'}/>
-        <StatusPill label={connectionOnline?'Robot online':'Robot offline'} tone={connectionOnline?'connected':'error'}/>
+        }
+        {!tablet&&<StatusPill label={connectionOnline?'Robot online':'Robot offline'} tone={connectionOnline?'connected':'error'}/>}
         {!tablet&&<><StatusPill label={activeMapId==='—'?'No active map':activeMapId} tone={navigatorMapId?'info':'warning'}/>
-          <StatusPill label={store.state?.operatingMode??'Unknown mode'}
-            tone={store.state?.operatingMode==='AUTOMATIC'?'connected':'warning'}/></>}
-        <StatusPill label={`E-stop ${store.state?.safetyState?.eStop??'unknown'}`}
-          tone={store.state?.safetyState?.eStop==='NONE'?'connected':'error'}/>
+          <StatusPill label={stateFresh?store.state?.operatingMode??'Unknown mode':'Stale state'}
+            tone={stateFresh&&store.state?.operatingMode==='AUTOMATIC'?'connected':'warning'}/></>}
+        <StatusPill label={phone
+          ?stateFresh&&store.state?.safetyState?.eStop==='NONE'?'E-stop OK':'E-stop unknown'
+          :`E-stop ${stateFresh?store.state?.safetyState?.eStop??'unknown':'stale / unknown'}`}
+          tone={stateFresh&&store.state?.safetyState?.eStop==='NONE'?'connected':
+            stateFresh?'error':'warning'}/>
         <StatusPill label={`${store.currentRokitErrors.length} errors`}
           tone={store.currentRokitErrors.length?'error':'inactive'}/>
         <Box sx={{flex:1}}/>
         {tablet&&<Tooltip title="Mission panel"><IconButton color="primary" onClick={()=>setMissionPanelOpen(true)}><AltRoute/></IconButton></Tooltip>}
-        <Tooltip title="Med Robots operator session"><IconButton color="inherit"><AccountCircle/></IconButton></Tooltip>
+        <Tooltip title="Open diagnostics and notifications"><IconButton color="inherit"
+          onClick={()=>setDiagnosticsOpen(true)}><Notifications/></IconButton></Tooltip>
+        <Tooltip title={operatorSettings.themeMode==='dark'?'Switch to light theme':'Switch to dark theme'}>
+          <IconButton color="inherit" aria-label="Toggle theme" onClick={()=>
+            updateOperatorSettings({themeMode:operatorSettings.themeMode==='dark'?'light':'dark'})}>
+            {operatorSettings.themeMode==='dark'?<Brightness7/>:<Brightness4/>}
+          </IconButton>
+        </Tooltip>
+        {!phone&&<Tooltip title="Med Robots operator session"><IconButton color="inherit"><AccountCircle/></IconButton></Tooltip>}
         <Tooltip title="Settings"><IconButton color="inherit" onClick={()=>setSettingsOpen(true)}><Settings/></IconButton></Tooltip>
       </Toolbar>
-      <Alert severity="error" icon={<StopCircle/>} sx={{py:0,minHeight:30,borderRadius:0,fontWeight:700,
+      <Alert severity="warning" icon={<StopCircle/>} sx={{py:0,minHeight:30,borderRadius:0,fontWeight:700,
         '& .MuiAlert-message':{py:.25}}}>{safety}</Alert>
     </AppBar>
     <Drawer variant="permanent" sx={{width:drawerWidth,flexShrink:0,transition:'width .22s ease',
       '& .MuiDrawer-paper':{width:drawerWidth,mt:'94px',mb:`${diagnosticsHeight}px`,boxSizing:'border-box',
-        bgcolor:'rgba(255,255,255,.98)',borderRight:'1px solid',borderColor:'divider',transition:'width .22s ease'}}}>
+        bgcolor:'var(--mr-bg-secondary)',borderRight:'1px solid',borderColor:'divider',transition:'width .22s ease'}}}>
       <Box sx={{display:'flex',justifyContent:navCollapsed?'center':'flex-end',p:.5}}>
         <IconButton size="small" onClick={()=>setNavCollapsed((value)=>!value)}>
           {navCollapsed?<ChevronRight/>:<ChevronLeft/>}
         </IconButton>
       </Box>
-      <List dense>{nav.map((label,index)=><Tooltip key={label} title={navCollapsed?label:''} placement="right"><ListItemButton selected={label==='Planner'} onClick={()=>{
+      <List dense>{nav.map((label,index)=><Tooltip key={label} title={navCollapsed?label:''} placement="right"><ListItemButton selected={label==='Settings'?settingsOpen:label==='Planner'&&!settingsOpen} onClick={()=>{
         if(label==='Settings')setSettingsOpen(true);if(label==='Map')setLocatorOpen(true);
         if(label==='Global Replanning')setGlobalReplanningOpen(true);
         if(label==='Diagnostics')setDiagnosticsOpen(true);
@@ -938,7 +957,25 @@ export default function App(){
         {!navCollapsed&&<ListItemText primary={label}/>}
       </ListItemButton></Tooltip>)}</List><Divider/>
       {!navCollapsed&&<Box sx={{p:1.5}}><Typography variant="overline">Operator workflow</Typography>
-        <Alert severity="info" sx={{my:1}}>Click a free point on the map to calculate and validate a mission automatically.</Alert>
+        <Stack gap={.45} my={1}>
+          {['Define destination','Calculate route','Validate mission','Execute mission','Monitor execution']
+            .map((step,index)=>{
+              const activeIndex=store.sentOrder?4:!store.goal?0:store.planning?1:
+                !store.generatedOrder?1:routePhase==='Ready to start'?3:2;
+              const complete=store.sentOrder?index<4:index<activeIndex;
+              const active=index===activeIndex;
+              return <Box key={step} sx={{display:'flex',alignItems:'center',gap:1,px:1,py:.65,
+                borderRadius:1,bgcolor:active?'rgba(0,123,255,.14)':'transparent',
+                color:complete?'success.main':active?'primary.light':'text.secondary'}}>
+                <Box sx={{width:22,height:22,borderRadius:'50%',display:'grid',placeItems:'center',
+                  border:'1px solid currentColor',fontSize:11,fontWeight:700}}>
+                  {complete?'✓':index+1}
+                </Box>
+                <Typography variant="caption" sx={{fontWeight:active?700:500}}>{step}</Typography>
+              </Box>;
+            })}
+        </Stack>
+        <Alert severity="info" sx={{my:1}}>Select a destination on the live map to plan and validate a route.</Alert>
         <Typography variant="overline">Advanced click mode</Typography>
         <Select fullWidth size="small" value={mode} onChange={(e)=>setMode(e.target.value as ClickMode)}>
           {['goal','start','waypoint','obstacle','erase','inspect'].map((m)=><MenuItem value={m} key={m}>{m}</MenuItem>)}
@@ -973,16 +1010,34 @@ export default function App(){
         <Box sx={{flex:1}}/><Typography variant="caption">{store.grid?`${store.grid.metadata.width}×${store.grid.metadata.height} · ${store.grid.metadata.resolution} m/cell`:'No map loaded'}</Typography>
       </Paper>
       <MapCanvas mode={mode} onCell={setCell} liveRobotPose={poseSnapshot?.pose}/>
+      {!store.grid&&!locator.downloading&&<Box sx={{position:'absolute',inset:'54px 0 0',zIndex:3,
+        display:'grid',placeItems:'center',p:3,
+        bgcolor:operatorSettings.themeMode==='dark'?'rgba(5,13,24,.82)':'rgba(242,247,250,.88)',
+        backdropFilter:'blur(5px)'}}>
+        <Paper className="mr-glass" sx={{maxWidth:500,p:3,textAlign:'center'}}>
+          <Map sx={{fontSize:42,color:'secondary.main',mb:1}}/>
+          <Typography variant="h2">No navigation map loaded</Typography>
+          <Typography color="text.secondary" sx={{my:1.5}}>
+            Connect to ROKIT Locator or import a supported map to begin. The live occupancy grid will appear here.
+          </Typography>
+          <Stack direction="row" gap={1} justifyContent="center" flexWrap="wrap">
+            <Button variant="contained" startIcon={<Map/>} onClick={()=>setLocatorOpen(true)}>Locator Server</Button>
+            <Button variant="outlined" startIcon={<Upload/>} onClick={()=>yamlInput.current?.click()}>Import YAML</Button>
+            <Button variant="outlined" startIcon={<Upload/>} onClick={()=>imageInput.current?.click()}>Import image</Button>
+          </Stack>
+        </Paper>
+      </Box>}
       {locator.downloading&&<Box className="mr-map-loading" sx={{position:'absolute',inset:'54px 0 0',
-        display:'grid',placeItems:'center',bgcolor:'rgba(255,255,255,.82)',zIndex:4}}>
-        <Typography variant="h2">Loading hospital map…</Typography>
+        display:'grid',placeItems:'center',
+        bgcolor:operatorSettings.themeMode==='dark'?'rgba(5,13,24,.82)':'rgba(242,247,250,.88)',zIndex:4}}>
+        <Typography variant="h2">Loading map data…</Typography>
       </Box>}
     </Box>
     <Drawer anchor="right" variant={tablet?'temporary':'permanent'} open={!tablet||missionPanelOpen}
       onClose={()=>setMissionPanelOpen(false)}
       sx={{width:rightWidth,'& .MuiDrawer-paper':{width:rightWidth,mt:tablet?0:'94px',
         mb:tablet?0:`${diagnosticsHeight}px`,p:1.5,overflowY:'auto',
-        bgcolor:'rgba(255,255,255,.98)',borderLeft:'1px solid',borderColor:'divider'}}}>
+        bgcolor:'var(--mr-bg-secondary)',borderLeft:'1px solid',borderColor:'divider'}}}>
       <Paper className="mr-glass mr-route-ready" sx={{p:1.5,mb:1.5}}>
         <Stack direction="row" justifyContent="space-between" alignItems="center">
           <Box><Typography variant="overline">Mission control</Typography>
@@ -999,9 +1054,11 @@ export default function App(){
         <Field label="Route distance" value={routeDistance?`${routeDistance.toFixed(2)} m`:'—'}/>
         <Field label="Estimated duration" value={estimatedDurationSeconds?`${Math.ceil(estimatedDurationSeconds)} s`:'—'}/>
         <Field label="Order" value={store.generatedOrder?.orderId??'—'}/>
-        <Field label="Battery" value={store.state?.batteryState?.batteryCharge===undefined?'—':`${store.state.batteryState.batteryCharge}%`}/>
-        <Field label="Current speed" value={`${Math.hypot(store.state?.velocity?.vx??0,store.state?.velocity?.vy??0).toFixed(2)} m/s`}/>
-        <Field label="Emergency state" value={store.state?.safetyState?.eStop??'unknown'}/>
+        <Field label="Battery" value={!stateFresh||store.state?.batteryState?.batteryCharge===undefined
+          ?'—':`${store.state.batteryState.batteryCharge}%`}/>
+        <Field label="Current speed" value={!stateFresh||!store.state?.velocity?'—':
+          `${Math.hypot(store.state.velocity.vx??0,store.state.velocity.vy??0).toFixed(2)} m/s`}/>
+        <Field label="Emergency state" value={stateFresh?store.state?.safetyState?.eStop??'unknown':'stale / unknown'}/>
         {store.generatedOrder&&<Paper variant="outlined" sx={{p:1,mt:1}}>
           <Typography variant="overline">Obstacle bypass corridor</Typography>
           <Field label="Edges with corridor" value={corridorSummary.withCorridor}/>
@@ -1282,15 +1339,47 @@ export default function App(){
         <Field label="Enabled" value={globalReplanning.settings.enabled}/>
         <Field label="Status" value={globalReplanning.runtime.status}/>
         <Field label="Blocked duration" value={`${(globalReplanning.runtime.blockedDurationMs/1000).toFixed(1)} s`}/>
+        <Field label="Attempts" value={`${globalReplanning.runtime.attempt} / ${globalReplanning.settings.maximumPlanningAttempts}`}/>
         <Field label="Reason" value={globalReplanning.runtime.reason}/>
+        <Field label="Latest result" value={globalReplanning.runtime.lastError??
+          (globalReplanning.runtime.newPathLengthM===undefined?'No completed result':
+            `Validated path · ${globalReplanning.runtime.newPathLengthM.toFixed(2)} m`)}/>
         <Button size="small" startIcon={<Autorenew/>}
           onClick={()=>setGlobalReplanningOpen(true)}>Open replanning</Button>
       </Paper>
     </Drawer>
-    <Paper className="mr-glass" square sx={{position:'fixed',bottom:0,left:drawerWidth,right:0,
+    <Paper className="mr-glass" square sx={{position:'fixed',bottom:0,left:drawerWidth,right:tablet?0:`${rightWidth}px`,
       height:diagnosticsHeight,zIndex:1201,borderTop:'1px solid',borderColor:'divider',
       transition:'height .22s ease,left .22s ease'}}>
-      <Stack direction="row" alignItems="center" sx={{height:48,px:1}}>
+      <Stack direction="row" alignItems="center" gap={1} sx={{height:40,px:1,overflowX:'auto',
+        borderBottom:diagnosticsOpen?'1px solid':'none',borderColor:'divider',whiteSpace:'nowrap'}}>
+        <StatusPill label={store.mqttConnected?'MQTT connected':'MQTT offline'}
+          tone={store.mqttConnected?'connected':'error'}/>
+        <StatusPill label={connectionOnline?'Robot online':'Robot offline'}
+          tone={connectionOnline?'connected':'error'}/>
+        <StatusPill label={navigatorMapId??'No active map'} tone={navigatorMapId?'info':'warning'}/>
+        <StatusPill label={poseSnapshot?.pose.positionInitialized?'Localized':'Localization unavailable'}
+          tone={poseSnapshot?.pose.positionInitialized?'connected':'warning'}/>
+        <Typography variant="caption" sx={{fontFamily:'monospace'}}>
+          Battery {store.state?.batteryState?.batteryCharge===undefined?'—':`${store.state.batteryState.batteryCharge}%`}
+        </Typography>
+        <Typography variant="caption" sx={{fontFamily:'monospace'}}>
+          v {stateFresh&&store.state?.velocity
+            ?`${Math.hypot(store.state.velocity.vx??0,store.state.velocity.vy??0).toFixed(2)} m/s`:'—'}
+        </Typography>
+        <Typography variant="caption" sx={{fontFamily:'monospace'}}>
+          ω {stateFresh&&store.state?.velocity?.omega!==undefined
+            ?`${store.state.velocity.omega.toFixed(2)} rad/s`:'—'}
+        </Typography>
+        <Typography variant="caption">Mode {stateFresh?store.state?.operatingMode??'unknown':'stale'}</Typography>
+        <Typography variant="caption" sx={{fontFamily:'monospace'}}>
+          State {Number.isFinite(stateAge)?`${(stateAge/1000).toFixed(1)}s old`:'unavailable'}
+        </Typography>
+        <Typography variant="caption" sx={{fontFamily:'monospace'}}>
+          {new Date(now).toLocaleTimeString()}
+        </Typography>
+      </Stack>
+      <Stack direction="row" alignItems="center" sx={{height:47,px:1}}>
         <IconButton onClick={()=>setDiagnosticsOpen((value)=>!value)}>
           {diagnosticsOpen?<ExpandMore/>:<ExpandLess/>}
         </IconButton>
@@ -1480,6 +1569,8 @@ function SettingsDialog({open,onClose}:{open:boolean;onClose:()=>void}){
   const replanning=useGlobalReplanningStore();
   const importInput=useRef<HTMLInputElement>(null);
   const vehicleConfigInput=useRef<HTMLInputElement>(null);
+  const [section,setSection]=useState<'connection'|'planner'|'robot'|'appearance'|'advanced'>('connection');
+  const compactScreen=useMediaQuery('(max-width:720px)');
   const connect=():void=>mqttService.connect(store.mqttSettings);
   const updateIdentity=(patch:Partial<Pick<typeof order,'manufacturer'|'serialNumber'>>):void=>{
     const next={...order,...patch};
@@ -1494,17 +1585,51 @@ function SettingsDialog({open,onClose}:{open:boolean;onClose:()=>void}){
       passageSafety:{...store.plannerOptions.passageSafety,...patch}}});
   const showReverseControls = Boolean(fp.allowReverse || fp.backwardAllowed);
   const exportSettings=():void=>downloadJson('rokit-planner-settings.json',{mqttSettings:{...mqtt,password:''},orderSettings:order,footprint:fp,plannerOptions:store.plannerOptions});
-  return <Dialog open={open} onClose={onClose} fullWidth maxWidth="lg"><DialogTitle>Med Robots Navigation Settings</DialogTitle>
-    <DialogContent><Stack gap={2} mt={1}>
+  return <Dialog open={open} onClose={onClose} fullWidth maxWidth="lg" fullScreen={compactScreen}>
+    <DialogTitle sx={{pb:1}}>
+      <Stack direction="row" alignItems="center" gap={2}>
+        <MedRobotsLogo/>
+        <Box>
+          <Typography variant="h2">Application settings</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Choose a section to configure connections, planning, and the operator experience.
+          </Typography>
+        </Box>
+      </Stack>
+    </DialogTitle>
+    <DialogContent sx={{pt:1.5}}>
+      <Tabs value={section} onChange={(_,value:string)=>setSection(value as typeof section)}
+        variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile
+        aria-label="Settings sections" className="mr-settings-tabs">
+        <Tab id="settings-tab-connection" aria-controls="settings-panel-connection"
+          label="Connections" value="connection"/>
+        <Tab id="settings-tab-planner" aria-controls="settings-panel-planner"
+          label="Planner" value="planner"/>
+        <Tab id="settings-tab-robot" aria-controls="settings-panel-robot"
+          label="Robot & mission" value="robot"/>
+        <Tab id="settings-tab-appearance" aria-controls="settings-panel-appearance"
+          label="Appearance" value="appearance"/>
+        <Tab id="settings-tab-advanced" aria-controls="settings-panel-advanced"
+          label="Advanced" value="advanced"/>
+      </Tabs>
+      <Divider/>
+      <Box role="tabpanel" id="settings-panel-connection"
+        aria-labelledby="settings-tab-connection" hidden={section!=='connection'}>
+      <Stack gap={2} className="mr-settings-section">
       <Typography variant="h2">Connection</Typography>
+      <Alert severity={store.mqttConnected?'success':'info'}>
+        {store.mqttConnected
+          ? 'The MQTT broker is connected. Changes to broker details take effect on the next connection.'
+          : 'Configure the broker below, then select Connect MQTT to start a session.'}
+      </Alert>
       <Paper variant="outlined" sx={{p:1.5}}><Stack gap={1.2}>
       <FormControlLabel control={<Switch checked={mqtt.automaticConnection}
         onChange={(event)=>store.set({mqttSettings:{...mqtt,automaticConnection:event.target.checked}})}/>}
         label="Connect MQTT automatically"/>
-      <Stack direction="row" gap={1}><TextField fullWidth label="Broker host" value={mqtt.host} onChange={(e)=>store.set({mqttSettings:{...mqtt,host:e.target.value}})}/>
+      <Stack direction="row" gap={1} className="mr-settings-row"><TextField fullWidth label="Broker host" value={mqtt.host} onChange={(e)=>store.set({mqttSettings:{...mqtt,host:e.target.value}})}/>
         <TextField label="Port" type="number" value={mqtt.port} onChange={(e)=>store.set({mqttSettings:{...mqtt,port:Number(e.target.value)}})}/>
         <Select value={mqtt.transport} onChange={(e)=>store.set({mqttSettings:{...mqtt,transport:e.target.value as 'tcp'|'ws'}})}><MenuItem value="tcp">TCP bridge</MenuItem><MenuItem value="ws">WebSocket</MenuItem></Select></Stack>
-      <Stack direction="row" gap={1}><TextField fullWidth label="Username" value={mqtt.username} onChange={(e)=>store.set({mqttSettings:{...mqtt,username:e.target.value}})}/>
+      <Stack direction="row" gap={1} className="mr-settings-row"><TextField fullWidth label="Username" value={mqtt.username} onChange={(e)=>store.set({mqttSettings:{...mqtt,username:e.target.value}})}/>
         <TextField fullWidth label="Password (not persisted)" type="password" value={mqtt.password} onChange={(e)=>store.set({mqttSettings:{...mqtt,password:e.target.value}})}/>
         <FormControlLabel control={<Switch checked={mqtt.tls} onChange={(e)=>store.set({mqttSettings:{...mqtt,tls:e.target.checked}})}/>} label="TLS"/></Stack>
       <Divider/>
@@ -1514,7 +1639,7 @@ function SettingsDialog({open,onClose}:{open:boolean;onClose:()=>void}){
       <FormControlLabel control={<Switch checked={locator.settings.automaticLogin}
         onChange={(event)=>locator.updateSettings({automaticLogin:event.target.checked})}/>}
         label="Automatic Locator login using the local secure environment"/>
-      <Stack direction="row" gap={1}>
+      <Stack direction="row" gap={1} className="mr-settings-row">
         <TextField label="Locator host" value={locator.settings.host}
           onChange={(event)=>locator.updateSettings({host:event.target.value})}/>
         <TextField label="RPC port" type="number" value={locator.settings.port}
@@ -1530,11 +1655,15 @@ function SettingsDialog({open,onClose}:{open:boolean;onClose:()=>void}){
         Forget saved Locator credentials
       </Button>
       </Stack></Paper>
+      </Stack></Box>
+      <Box role="tabpanel" id="settings-panel-planner"
+        aria-labelledby="settings-tab-planner" hidden={section!=='planner'}>
+      <Stack gap={2} className="mr-settings-section">
       <Typography variant="h2">Navigation</Typography>
       {store.plannerMode==='motion-state'&&
         <EffectiveMotionStateConfigurationPanel plannerOptions={store.plannerOptions}
           footprint={store.footprint}/>}
-      <Paper variant="outlined" sx={{p:1.5}}><Stack direction="row" gap={1} flexWrap="wrap">
+      <Paper variant="outlined" sx={{p:1.5}}><Stack direction="row" gap={1} flexWrap="wrap" className="mr-settings-row">
         {store.plannerMode!=='motion-state'&&<>
         <TextField label="Wall cost" type="number" value={store.plannerOptions.passageSafety.wallProximityWeight}
           onChange={(event)=>store.set({plannerOptions:syncPlannerWeights({
@@ -1580,7 +1709,7 @@ function SettingsDialog({open,onClose}:{open:boolean;onClose:()=>void}){
           the diagnostics needed for temporary-obstacle global replanning; replanning
           remains separately armed by the operator.
         </Alert>
-        <Stack direction="row" gap={2} flexWrap="wrap">
+        <Stack direction="row" gap={2} flexWrap="wrap" className="mr-settings-row">
           <FormControlLabel control={<Switch
             checked={store.plannerOptions.reliableBaselineMode}
             onChange={(event)=>store.set({plannerOptions:{
@@ -1611,7 +1740,7 @@ function SettingsDialog({open,onClose}:{open:boolean;onClose:()=>void}){
             onChange={(event)=>replanning.updateSettings({enabled:event.target.checked})}/>}
             label="Enable optional live-obstacle replanning"/>
         </Stack>
-        <Stack direction="row" gap={1} flexWrap="wrap">
+        <Stack direction="row" gap={1} flexWrap="wrap" className="mr-settings-row">
           {([
             ['Preferred waypoint spacing m','preferredWaypointSpacingM'],
             ['Maximum waypoint spacing m','maximumWaypointSpacingM'],
@@ -1661,7 +1790,7 @@ function SettingsDialog({open,onClose}:{open:boolean;onClose:()=>void}){
           checked={store.plannerOptions.corridor.enableBoschRokitCorridorExtension}
           onChange={(event)=>updateCorridor({enableBoschRokitCorridorExtension:event.target.checked})}/>}
           label="Enable Bosch ROKIT corridor extension"/>
-        <Stack direction="row" gap={1} flexWrap="wrap">
+        <Stack direction="row" gap={1} flexWrap="wrap" className="mr-settings-row">
           <TextField label="Robot width m" type="number" value={fp.width}
             onChange={(event)=>{const footprint={...fp,width:Number(event.target.value)};
               store.set({footprint,inflatedGrid:store.grid?ObstacleInflation.byRadius(
@@ -1699,12 +1828,16 @@ function SettingsDialog({open,onClose}:{open:boolean;onClose:()=>void}){
           onChange={(event)=>updateCorridor({unknownCellsBlocked:event.target.checked})}/>}
           label="Treat unknown cells as blocked"/>
       </Stack></Paper>
+      </Stack></Box>
+      <Box role="tabpanel" id="settings-panel-robot"
+        aria-labelledby="settings-tab-robot" hidden={section!=='robot'}>
+      <Stack gap={2} className="mr-settings-section">
       <Typography variant="h2">Mission</Typography>
       <Typography variant="overline">VDA identity and limits</Typography>
-      <Stack direction="row" gap={1}><TextField label="Manufacturer" value={order.manufacturer} onChange={(e)=>updateIdentity({manufacturer:e.target.value})}/>
+      <Stack direction="row" gap={1} className="mr-settings-row"><TextField label="Manufacturer" value={order.manufacturer} onChange={(e)=>updateIdentity({manufacturer:e.target.value})}/>
         <TextField label="Serial number" value={order.serialNumber} onChange={(e)=>updateIdentity({serialNumber:e.target.value})}/>
         <TextField label="Command timeout ms" type="number" value={order.commandTimeoutMs} onChange={(e)=>store.set({orderSettings:{...order,commandTimeoutMs:Number(e.target.value)}})}/></Stack>
-      <Stack direction="row" gap={1}>
+      <Stack direction="row" gap={1} className="mr-settings-row">
         <TextField label="State stale timeout ms" type="number" inputProps={{min:2000,max:60000}}
           value={order.stateStaleTimeoutMs}
           onChange={(e)=>store.set({orderSettings:{...order,stateStaleTimeoutMs:
@@ -1724,7 +1857,7 @@ function SettingsDialog({open,onClose}:{open:boolean;onClose:()=>void}){
           ?`ClientMotion.vehicle.footprint (${fp.polygon?.length??0} VEHICLE-frame vertices)`
           :'application fallback rectangle — import the installed Bosch ClientMotion configuration'}
       </Alert>
-      <Stack direction="row" gap={1} flexWrap="wrap">{([
+      <Stack direction="row" gap={1} flexWrap="wrap" className="mr-settings-row">{([
         'length','width','height','centerOffsetX','centerOffsetY','safetyMargin',
         'inflationRadius',
       ] as const).map((key)=><TextField key={key} label={key} type="number" value={fp[key]}
@@ -1734,7 +1867,7 @@ function SettingsDialog({open,onClose}:{open:boolean;onClose:()=>void}){
             store.grid,store.plannerOptions.passageSafety.planningSafetyMarginM+
             store.plannerOptions.passageSafety.localizationMarginM):undefined,
         });}}/>)}</Stack>
-      <Stack direction="row" gap={2} flexWrap="wrap">
+      <Stack direction="row" gap={2} flexWrap="wrap" className="mr-settings-row">
         <FormControlLabel control={<Switch checked={fp.kinematicCentreConfirmed===true}
           onChange={(event)=>store.set({footprint:{
             ...fp,kinematicCentreConfirmed:event.target.checked}})}/>}
@@ -1748,8 +1881,15 @@ function SettingsDialog({open,onClose}:{open:boolean;onClose:()=>void}){
         <FormControlLabel control={<Switch checked={operator.settings.autoClearCompletedMission}
           onChange={(event)=>operator.update({autoClearCompletedMission:event.target.checked})}/>} label="Auto-clear completed mission"/>
       </Stack>
+      </Stack></Box>
+      <Box role="tabpanel" id="settings-panel-appearance"
+        aria-labelledby="settings-tab-appearance" hidden={section!=='appearance'}>
+      <Stack gap={2} className="mr-settings-section">
       <Typography variant="h2">Appearance</Typography>
-      <Stack direction="row" gap={2} flexWrap="wrap">
+      <Stack direction="row" gap={2} flexWrap="wrap" className="mr-settings-row">
+        <FormControlLabel control={<Switch checked={operator.settings.themeMode==='dark'}
+          onChange={(event)=>operator.update({themeMode:event.target.checked?'dark':'light'})}/>}
+          label={operator.settings.themeMode==='dark'?'Dark industrial theme':'Light theme'}/>
         <FormControlLabel control={<Switch checked={operator.settings.compactMode}
           onChange={(event)=>operator.update({compactMode:event.target.checked})}/>} label="Compact mode"/>
         <FormControlLabel control={<Switch checked={operator.settings.reduceMotion}
@@ -1760,12 +1900,17 @@ function SettingsDialog({open,onClose}:{open:boolean;onClose:()=>void}){
           <MenuItem value="en">English</MenuItem><MenuItem value="pt">Português</MenuItem>
         </Select>
       </Stack>
+      </Stack></Box>
+      <Box role="tabpanel" id="settings-panel-advanced"
+        aria-labelledby="settings-tab-advanced" hidden={section!=='advanced'}>
+      <Stack gap={2} className="mr-settings-section">
       <Typography variant="h2">Advanced</Typography>
       <Typography variant="overline">Raw MQTT topics</Typography>
       {Object.entries(mqtt.topics).map(([key,value])=><TextField key={key} fullWidth size="small" label={key} value={value}
         onChange={(e)=>store.set({mqttSettings:{...mqtt,topics:{...mqtt.topics,[key]:e.target.value}}})}/>)}
       <Alert severity="warning">{publishWarning}</Alert>
-    </Stack></DialogContent><DialogActions>
+      </Stack></Box>
+    </DialogContent><DialogActions sx={{px:3,py:2,flexWrap:'wrap',gap:1}}>
       <input hidden ref={vehicleConfigInput} type="file" accept=".json" onChange={(event)=>{
         const file=event.target.files?.[0];if(!file)return;
         void file.text().then((text)=>{
@@ -1810,7 +1955,10 @@ function SettingsDialog({open,onClose}:{open:boolean;onClose:()=>void}){
         Import Bosch ClientMotion
       </Button>
       <Button onClick={()=>importInput.current?.click()}>Import settings</Button>
-      <Button onClick={exportSettings}>Export</Button>
-      <Button color="error" onClick={()=>{mqttService.disconnect();store.resetRobotSession();}}>Disconnect & reset</Button><Button variant="contained" onClick={connect}>Connect</Button><Button onClick={onClose}>Close</Button></DialogActions>
+      <Button onClick={exportSettings}>Export settings</Button>
+      <Box sx={{flex:1}}/>
+      <Button color="error" onClick={()=>{mqttService.disconnect();store.resetRobotSession();}}>Disconnect & reset</Button>
+      <Button variant="contained" onClick={connect}>Connect MQTT</Button>
+      <Button onClick={onClose}>Done</Button></DialogActions>
   </Dialog>;
 }

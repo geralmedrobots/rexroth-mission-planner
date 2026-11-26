@@ -13,11 +13,13 @@ export interface OperatorSettings {
   mapContrast:number;
   reduceMotion:boolean;
   language:'en'|'pt';
+  themeMode:'dark'|'light';
 }
 const defaults:OperatorSettings={
   directDispatchMode:false,dispatchCountdownSeconds:3,previewBeforeDispatch:true,
   autoClearCompletedMission:false,maximumVdaNodeCount:120,destinationValidationRadius:.2,
   compactMode:false,animationLevel:'full',mapContrast:1,reduceMotion:false,language:'en',
+  themeMode:'dark',
 };
 interface OperatorSettingsState {
   settings:OperatorSettings;

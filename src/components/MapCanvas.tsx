@@ -1,8 +1,15 @@
-import { Box, Chip, FormControlLabel, Paper, Switch, Typography } from '@mui/material';
+import {
+  Box, Button, Chip, FormControlLabel, IconButton, Paper, Stack, Switch, Tooltip, Typography,
+  useTheme,
+} from '@mui/material';
+import {
+  CenterFocusStrong, Fullscreen, Layers, ZoomIn, ZoomOut,
+} from '@mui/icons-material';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CoordinateTransformer } from '../domain/geometry/CoordinateTransformer';
 import type { GridCell, RobotPose } from '../domain/types';
 import { useLocatorStore } from '../features/locator/stores/locatorStore';
+import { useDestinationStore } from '../features/destinations/destinationStore';
 import { useGlobalReplanningStore } from '../features/replanning/globalReplanningStore';
 import { useRecoveryStore } from '../features/recovery/recoveryStore';
 import { LogService } from '../services/LogService';
@@ -16,10 +23,15 @@ import {
 export type ClickMode='goal'|'start'|'waypoint'|'obstacle'|'erase'|'inspect';
 interface Props { mode:ClickMode; onCell:(cell:GridCell)=>void; liveRobotPose?:RobotPose }
 export const MapCanvas=({mode,onCell,liveRobotPose}:Props)=>{
+  const theme=useTheme();
+  const isDark=theme.palette.mode==='dark';
   const canvas=useRef<HTMLCanvasElement>(null); const container=useRef<HTMLDivElement>(null);
   const lastPoseMapDiagnostic=useRef<string|undefined>(undefined);
   const [mouse,setMouse]=useState<{cell?:GridCell;world?:{x:number;y:number}}>({});
   const [view,setView]=useState({zoom:1,panX:0,panY:0});
+  const [resizeVersion,setResizeVersion]=useState(0);
+  const [showLayers,setShowLayers]=useState(false);
+  const [fullscreenError,setFullscreenError]=useState<string>();
   const [layers,setLayers]=useState({
     raw:true,baseline:true,rejected:true,optimized:false,nodes:false,corridors:true,
     explored:true,passages:true,footprints:false,turnSafety:true,
@@ -34,11 +46,19 @@ export const MapCanvas=({mode,onCell,liveRobotPose}:Props)=>{
   const footprint=useAppStore((s)=>s.footprint); const showInflation=useAppStore((s)=>s.showInflation);
   const showGrid=useAppStore((s)=>s.showGrid); const rotation=useAppStore((s)=>s.viewRotation);
   const robotState=useAppStore((s)=>s.state);
+  const savedDestinations=useDestinationStore((state)=>state.destinations);
   const generatedOrder=useAppStore((s)=>s.generatedOrder);
   const robotVisualization=useMemo(
     ()=>getLiveRobotVisualization(grid,liveRobotPose),
     [grid,liveRobotPose],
   );
+  useEffect(()=>{
+    const host=container.current;
+    if(!host)return;
+    const observer=new ResizeObserver(()=>setResizeVersion((version)=>version+1));
+    observer.observe(host);
+    return()=>observer.disconnect();
+  },[]);
   useEffect(()=>{
     const message = formatLivePoseMapCheck(analyzeLiveRobotMapConversion(grid, liveRobotPose));
     if (message === lastPoseMapDiagnostic.current) return;
@@ -50,6 +70,8 @@ export const MapCanvas=({mode,onCell,liveRobotPose}:Props)=>{
   const optimizedPath=plannerResult?.simplifiedPath;
   const baselinePath=plannerResult?.baselinePath;
   const rejectedEnhancementPath=plannerResult?.rejectedEnhancementPath;
+  const visibleDestinations=savedDestinations.filter((destination)=>
+    destination.enabled&&destination.mapId===grid?.metadata.mapId);
   const replanOriginal=useGlobalReplanningStore((state)=>state.runtime.originalPath);
   const replanBlocked=useGlobalReplanningStore((state)=>state.runtime.blockedPath);
   const replanNew=useGlobalReplanningStore((state)=>state.runtime.newPath);
@@ -69,7 +91,8 @@ export const MapCanvas=({mode,onCell,liveRobotPose}:Props)=>{
     const element=canvas.current; const host=container.current;if(!element||!host||!grid)return;
     const rect=host.getBoundingClientRect(); const dpr=devicePixelRatio; element.width=rect.width*dpr;element.height=rect.height*dpr;
     element.style.width=`${rect.width}px`;element.style.height=`${rect.height}px`;
-    const ctx=element.getContext('2d');if(!ctx)return;ctx.scale(dpr,dpr);ctx.fillStyle='#f4f5f7';ctx.fillRect(0,0,rect.width,rect.height);
+    const ctx=element.getContext('2d');if(!ctx)return;ctx.scale(dpr,dpr);
+    ctx.fillStyle=isDark?'#050D18':'#f4f5f7';ctx.fillRect(0,0,rect.width,rect.height);
     const base=Math.min(rect.width/grid.metadata.width,rect.height/grid.metadata.height)*view.zoom;
     const ox=(rect.width-grid.metadata.width*base)/2+view.panX; const oy=(rect.height-grid.metadata.height*base)/2+view.panY;
     ctx.save();ctx.translate(rect.width/2,rect.height/2);ctx.rotate(rotation);ctx.translate(-rect.width/2,-rect.height/2);
@@ -81,11 +104,12 @@ export const MapCanvas=({mode,onCell,liveRobotPose}:Props)=>{
       const inflatedOnly=showInflation&&(inflated?.data[i]??0)>=65&&!occupied;
       if(!useLocatorImage||inflatedOnly||unknown){
         ctx.fillStyle=inflatedOnly?'rgba(255,152,0,.42)':
-          unknown?'rgba(117,117,117,.72)':occupied?'#172638':'#e8edf1';
+          unknown?(isDark?'rgba(71,85,105,.78)':'rgba(117,117,117,.72)'):
+            occupied?(isDark?'#dbe7f0':'#172638'):(isDark?'#10263A':'#e8edf1');
         ctx.fillRect(ox+col*base,oy+row*base,Math.ceil(base),Math.ceil(base));
       }
     }
-    if(showGrid&&base>8){ctx.strokeStyle='rgba(4,24,38,.18)';ctx.lineWidth=0.5;
+    if(showGrid&&base>8){ctx.strokeStyle=isDark?'rgba(148,163,184,.16)':'rgba(4,24,38,.18)';ctx.lineWidth=0.5;
       for(let c=0;c<=grid.metadata.width;c+=1){ctx.beginPath();ctx.moveTo(ox+c*base,oy);ctx.lineTo(ox+c*base,oy+grid.metadata.height*base);ctx.stroke();}
       for(let r=0;r<=grid.metadata.height;r+=1){ctx.beginPath();ctx.moveTo(ox,oy+r*base);ctx.lineTo(ox+grid.metadata.width*base,oy+r*base);ctx.stroke();}}
     if(inflatedTemporaryObstacleCells.length){
@@ -142,7 +166,7 @@ export const MapCanvas=({mode,onCell,liveRobotPose}:Props)=>{
       ctx.fillStyle='#00838f';ctx.beginPath();ctx.arc(centre.x,centre.y,5,0,Math.PI*2);ctx.fill();
       if(entry){ctx.fillStyle='#7b1fa2';ctx.beginPath();ctx.arc(entry.x,entry.y,5,0,Math.PI*2);ctx.fill();}
       if(exit){ctx.fillStyle='#2e7d32';ctx.beginPath();ctx.arc(exit.x,exit.y,5,0,Math.PI*2);ctx.fill();}
-      ctx.fillStyle='#071a2b';ctx.font='10px sans-serif';
+      ctx.fillStyle=isDark?'#F1F5F9':'#071a2b';ctx.font='10px sans-serif';
       ctx.fillText(`${passage.widthM.toFixed(2)} m / req ${(
         footprint.width+2*(useAppStore.getState().plannerOptions.passageSafety
           .planningSafetyMarginM+useAppStore.getState().plannerOptions.passageSafety
@@ -168,18 +192,18 @@ export const MapCanvas=({mode,onCell,liveRobotPose}:Props)=>{
       valid.forEach((point,pointIndex)=>pointIndex?ctx.lineTo(point.x,point.y):ctx.moveTo(point.x,point.y));
       ctx.closePath();ctx.fill();ctx.stroke();ctx.setLineDash([]);
     });
-    if(layers.raw)drawPath(raw,'rgba(200,16,46,.30)',2);
+    if(layers.raw)drawPath(raw,isDark?'rgba(148,163,184,.42)':'rgba(200,16,46,.30)',2);
     if(layers.baseline&&baselinePath)drawPath(baselinePath,'#16875f',4);
     if(layers.rejected&&rejectedEnhancementPath?.length){
       ctx.setLineDash([8,5]);
       drawPath(rejectedEnhancementPath,'#ef6c00',3);
       ctx.setLineDash([]);
     }
-    if(layers.optimized&&optimizedPath)drawPath(optimizedPath,'#1565c0',3);
+    if(layers.optimized&&optimizedPath)drawPath(optimizedPath,isDark?'#007BFF':'#1565c0',3);
     if(replanOriginal.length)drawPath(replanOriginal,'rgba(95,105,115,.75)',4);
     if(replanBlocked.length)drawPath(replanBlocked,'#d32f2f',5);
     if(replanNew.length)drawPath(replanNew,'#1b8f4d',5);
-    else drawPath(final,'#c8102e',5);
+    else drawPath(final,isDark?'#00B8F0':'#c8102e',5);
     if(recoveryPath.length)drawPath(recoveryPath,'#7b1fa2',6);
     for(let i=0;i<final.length-1;i+=1){const a=pixel(final[i]!.x,final[i]!.y);const b=pixel(final[i+1]!.x,final[i+1]!.y);
       if(!a||!b)continue;const angle=Math.atan2(b.y-a.y,b.x-a.x);const x=(a.x+b.x)/2,y=(a.y+b.y)/2;
@@ -188,7 +212,7 @@ export const MapCanvas=({mode,onCell,liveRobotPose}:Props)=>{
     if(layers.nodes)final.forEach((p,i)=>{const q=pixel(p.x,p.y);if(!q)return;ctx.fillStyle='#fff';ctx.strokeStyle='#c8102e';ctx.lineWidth=2;
       ctx.beginPath();ctx.arc(q.x,q.y,5,0,Math.PI*2);ctx.fill();ctx.stroke();
       ctx.beginPath();ctx.moveTo(q.x,q.y);ctx.lineTo(q.x+Math.cos(p.theta)*14,q.y-Math.sin(p.theta)*14);ctx.stroke();
-      ctx.fillStyle='#071a2b';ctx.font='10px sans-serif';ctx.fillText(String(i),q.x+7,q.y-7);});
+      ctx.fillStyle=isDark?'#F1F5F9':'#071a2b';ctx.font='10px sans-serif';ctx.fillText(String(i),q.x+7,q.y-7);});
     if(layers.footprints)final.forEach((point)=>
       drawFootprint(point,'rgba(21,101,192,.55)'));
     if(layers.turnSafety)plannerDiagnostics?.rejectedTurnLocations.forEach((point)=>{
@@ -200,11 +224,23 @@ export const MapCanvas=({mode,onCell,liveRobotPose}:Props)=>{
       ctx.beginPath();ctx.moveTo(q.x-7,q.y-7);ctx.lineTo(q.x+7,q.y+7);
       ctx.moveTo(q.x+7,q.y-7);ctx.lineTo(q.x-7,q.y+7);ctx.stroke();
     });
-    if(goal){const q=pixel(goal.x,goal.y);if(q){ctx.strokeStyle='#c8102e';ctx.lineWidth=3;
+    if(goal){const q=pixel(goal.x,goal.y);if(q){ctx.strokeStyle=isDark?'#00B8F0':'#c8102e';ctx.lineWidth=3;
       ctx.beginPath();ctx.arc(q.x,q.y,13,0,Math.PI*2);ctx.stroke();ctx.fillStyle='rgba(0,191,234,.25)';
       ctx.beginPath();ctx.arc(q.x,q.y,8,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.font='bold 11px sans-serif';ctx.fillText('DESTINATION',q.x+18,q.y-12);}}
+    visibleDestinations.forEach((destination)=>{
+      const q=pixel(destination.x,destination.y);if(!q)return;
+      ctx.save();ctx.translate(q.x,q.y);ctx.rotate(Math.PI/4);
+      ctx.fillStyle=isDark?'#007BFF':'#1565c0';ctx.strokeStyle='#F1F5F9';ctx.lineWidth=1.5;
+      ctx.fillRect(-6,-6,12,12);ctx.strokeRect(-6,-6,12,12);ctx.restore();
+      ctx.font='bold 10px sans-serif';
+      const textWidth=ctx.measureText(destination.displayName).width;
+      ctx.fillStyle=isDark?'rgba(5,13,24,.9)':'rgba(255,255,255,.92)';
+      ctx.fillRect(q.x+9,q.y-17,textWidth+8,15);
+      ctx.fillStyle=isDark?'#F1F5F9':'#14283b';
+      ctx.fillText(destination.displayName,q.x+13,q.y-6);
+    });
     if(robotVisualization.status==='visible'&&liveRobotPose){const q=pixel(liveRobotPose.x,liveRobotPose.y);if(q){const warning=robotState?.safetyState?.eStop!=='NONE'||(robotState?.errors?.length??0)>0;
-      const color=warning?'#8f0b22':robotState?.driving?'#16875f':'#c8102e';ctx.save();ctx.translate(q.x,q.y);ctx.rotate(-liveRobotPose.theta);
+      const color=warning?'#EF4444':robotState?.driving?'#22C55E':isDark?'#007BFF':'#c8102e';ctx.save();ctx.translate(q.x,q.y);ctx.rotate(-liveRobotPose.theta);
       ctx.fillStyle=color;ctx.strokeStyle='#f4fafc';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(-11,-8,22,16,5);ctx.fill();ctx.stroke();
       ctx.fillStyle='#f4fafc';ctx.beginPath();ctx.moveTo(14,0);ctx.lineTo(6,-5);ctx.lineTo(6,5);ctx.closePath();ctx.fill();ctx.restore();
       ctx.strokeStyle=liveRobotPose.positionInitialized?'rgba(56,217,150,.8)':'rgba(244,185,66,.8)';ctx.lineWidth=2;
@@ -214,18 +250,18 @@ export const MapCanvas=({mode,onCell,liveRobotPose}:Props)=>{
       if(q){
         ctx.fillStyle='#7b1fa2';ctx.strokeStyle='#fff';ctx.lineWidth=2;
         ctx.beginPath();ctx.arc(q.x,q.y,7,0,Math.PI*2);ctx.fill();ctx.stroke();
-        ctx.fillStyle='#071a2b';ctx.font='bold 10px sans-serif';
+        ctx.fillStyle=isDark?'#F1F5F9':'#071a2b';ctx.font='bold 10px sans-serif';
         ctx.fillText('A* START',q.x+10,q.y-8);
       }
     }
     if(start)drawFootprint(start,'#1565c0');
     ctx.restore();
-  },[grid,inflated,start,goal,raw,final,footprint,showInflation,showGrid,rotation,view,
+  },[grid,inflated,start,goal,raw,final,footprint,showInflation,showGrid,rotation,view,isDark,resizeVersion,
     locatorImage,locatorRaster,layers,robotState,generatedOrder,replanOriginal,replanBlocked,
     replanNew,temporaryObstacleCells,inflatedTemporaryObstacleCells,
-    replanExplored,startProjection,recoveryPath,plannerDiagnostics,optimizedPath,
+    replanExplored,startProjection,recoveryPath,plannerDiagnostics,optimizedPath,visibleDestinations,
     baselinePath,rejectedEnhancementPath,liveRobotPose,robotVisualization]);
-  const cellFromEvent=(event:React.MouseEvent<HTMLCanvasElement>):GridCell|null=>{
+  const cellFromEvent=(event:React.MouseEvent<HTMLCanvasElement>|React.PointerEvent<HTMLCanvasElement>):GridCell|null=>{
     if(!grid||!canvas.current)return null;const rect=canvas.current.getBoundingClientRect();
     const base=Math.min(rect.width/grid.metadata.width,rect.height/grid.metadata.height)*view.zoom;
     const ox=(rect.width-grid.metadata.width*base)/2+view.panX;const oy=(rect.height-grid.metadata.height*base)/2+view.panY;
@@ -234,18 +270,67 @@ export const MapCanvas=({mode,onCell,liveRobotPose}:Props)=>{
     const cell={column:Math.floor((sx-ox)/base),row:Math.floor((sy-oy)/base)};
     return cell.row>=0&&cell.column>=0&&cell.row<grid.metadata.height&&cell.column<grid.metadata.width?cell:null;
   };
-  return <Box ref={container} sx={{position:'relative',width:'100%',height:'100%',overflow:'hidden',bgcolor:'#f4f5f7'}}>
+  const centerRobot=():void=>{
+    const host=container.current;
+    if(!grid||!liveRobotPose||!host)return;
+    const {width,height}=host.getBoundingClientRect();
+    const base=Math.min(width/grid.metadata.width,height/grid.metadata.height)*view.zoom;
+    const cell=new CoordinateTransformer(grid.metadata).worldToGrid(liveRobotPose.x,liveRobotPose.y);
+    if(!cell)return;
+    const dx=(width-grid.metadata.width*base)/2+(cell.column+.5)*base-width/2;
+    const dy=(height-grid.metadata.height*base)/2+(cell.row+.5)*base-height/2;
+    const cosine=Math.cos(rotation);const sine=Math.sin(rotation);
+    setView((current)=>({...current,panX:-cosine*dx-sine*dy,panY:sine*dx-cosine*dy}));
+  };
+  const toggleFullscreen=():void=>{
+    const reportError=(error:unknown):void=>{
+      const message=error instanceof Error?error.message:String(error);
+      setFullscreenError(`Fullscreen unavailable: ${message}`);
+      LogService.write('system','warning',`Map fullscreen request failed: ${message}`);
+    };
+    try{
+      const action=document.fullscreenElement
+        ?document.exitFullscreen()
+        :container.current?.requestFullscreen();
+      if(!action)throw new Error('Fullscreen is not supported by this browser.');
+      void action.then(()=>setFullscreenError(undefined)).catch(reportError);
+    }catch(error){reportError(error);}
+  };
+  const layerOptions=[
+    {key:'raw',label:'Raw A*',description:'Raw grid-search route before smoothing.',color:'#94A3B8'},
+    {key:'baseline',label:'Valid baseline',description:'Collision-checked baseline path.',color:'#22C55E'},
+    {key:'rejected',label:'Rejected enhancement',description:'Candidate path rejected by route validation.',color:'#F59E0B'},
+    {key:'optimized',label:'Optimized path',description:'Validated optimized route geometry.',color:'#007BFF'},
+    {key:'nodes',label:'VDA nodes',description:'Order nodes and their headings.',color:'#F1F5F9'},
+    {key:'corridors',label:'Bypass corridors',description:'VDA bypass corridor geometry.',color:'#EF4444'},
+    {key:'explored',label:'A* explored cells',description:'Cells explored by global replanning.',color:'#00B8F0'},
+    {key:'passages',label:'Doors and alignment',description:'Detected passages and alignment points.',color:'#8B5CF6'},
+    {key:'footprints',label:'Bosch footprint at nodes',description:'Robot footprint at each planned node.',color:'#007BFF'},
+    {key:'turnSafety',label:'Swept / rejected turns',description:'Footprint sweep and turn-safety rejections.',color:'#EF4444'},
+  ] as const;
+  const renderLayer=(key:keyof typeof layers,label:string,description:string,color:string)=>
+    <Tooltip key={key} title={description} placement="left">
+      <FormControlLabel sx={{display:'flex',m:0,minHeight:32,fontSize:12}}
+        control={<Switch size="small" checked={layers[key]}
+          onChange={(event)=>setLayers((value)=>({...value,[key]:event.target.checked}))}/>}
+        label={<Stack direction="row" gap={.7} alignItems="center">
+          <Box sx={{width:7,height:7,borderRadius:'50%',bgcolor:color,flexShrink:0}}/>
+          <Typography variant="caption">{label}</Typography>
+        </Stack>}/>
+    </Tooltip>;
+  return <Box ref={container} sx={{position:'relative',width:'100%',height:'100%',overflow:'hidden',bgcolor:'var(--mr-bg-primary)'}}>
     <canvas ref={canvas} onClick={(e)=>{
       if(suppressClick.current){suppressClick.current=false;return;}
       const cell=cellFromEvent(e);if(cell)onCell(cell);
     }}
-      onMouseDown={(event)=>{
+      onPointerDown={(event)=>{
         suppressClick.current=false;
         dragging.current={x:event.clientX,y:event.clientY,panX:view.panX,panY:view.panY};
+        event.currentTarget.setPointerCapture(event.pointerId);
       }}
-      onMouseUp={()=>{dragging.current=null;}}
-      onMouseLeave={()=>{dragging.current=null;}}
-      onMouseMove={(e)=>{
+      onPointerUp={()=>{dragging.current=null;}}
+      onPointerCancel={()=>{dragging.current=null;}}
+      onPointerMove={(e)=>{
         const drag=dragging.current;
         if(drag){
           const deltaX=e.clientX-drag.x;const deltaY=e.clientY-drag.y;
@@ -260,38 +345,36 @@ export const MapCanvas=({mode,onCell,liveRobotPose}:Props)=>{
       }}
       onWheel={(e)=>{e.preventDefault();setView(v=>({...v,zoom:Math.max(.35,Math.min(8,v.zoom*(e.deltaY<0?1.15:.87)))}));}}
       onContextMenu={(event)=>{event.preventDefault();const cell=cellFromEvent(event);if(cell)setMouse((value)=>({...value,cell}));}}
-      style={{display:'block',cursor:mode==='inspect'?'crosshair':'crosshair'}}/>
-    <Paper className="mr-glass" sx={{position:'absolute',top:14,right:14,p:1}}>
-      <Typography variant="overline">Layers</Typography>
-      <FormControlLabel control={<Switch size="small" checked={layers.raw}
-        onChange={(event)=>setLayers((value)=>({...value,raw:event.target.checked}))}/>} label="Raw A*"/>
-      <FormControlLabel control={<Switch size="small" checked={layers.baseline}
-        onChange={(event)=>setLayers((value)=>({...value,baseline:event.target.checked}))}/>}
-        label="Valid baseline"/>
-      <FormControlLabel control={<Switch size="small" checked={layers.rejected}
-        onChange={(event)=>setLayers((value)=>({...value,rejected:event.target.checked}))}/>}
-        label="Rejected enhancement"/>
-      <FormControlLabel control={<Switch size="small" checked={layers.optimized}
-        onChange={(event)=>setLayers((value)=>({...value,optimized:event.target.checked}))}/>}
-        label="Optimized path"/>
-      <FormControlLabel control={<Switch size="small" checked={layers.nodes}
-        onChange={(event)=>setLayers((value)=>({...value,nodes:event.target.checked}))}/>} label="VDA nodes"/>
-      <FormControlLabel control={<Switch size="small" checked={layers.corridors}
-        onChange={(event)=>setLayers((value)=>({...value,corridors:event.target.checked}))}/>}
-        label="Bypass corridors"/>
-      <FormControlLabel control={<Switch size="small" checked={layers.explored}
-        onChange={(event)=>setLayers((value)=>({...value,explored:event.target.checked}))}/>}
-        label="A* explored cells"/>
-      <FormControlLabel control={<Switch size="small" checked={layers.passages}
-        onChange={(event)=>setLayers((value)=>({...value,passages:event.target.checked}))}/>}
-        label="Doors and alignment"/>
-      <FormControlLabel control={<Switch size="small" checked={layers.footprints}
-        onChange={(event)=>setLayers((value)=>({...value,footprints:event.target.checked}))}/>}
-        label="Bosch footprint at nodes"/>
-      <FormControlLabel control={<Switch size="small" checked={layers.turnSafety}
-        onChange={(event)=>setLayers((value)=>({...value,turnSafety:event.target.checked}))}/>}
-        label="Swept / rejected turns"/>
-    </Paper>
+      style={{display:'block',cursor:'crosshair',touchAction:'none'}}/>
+    <Box sx={{position:'absolute',top:12,right:12,display:'flex',gap:.5,zIndex:2}}>
+      <Tooltip title="Map layers"><IconButton aria-label="Map layers" onClick={()=>setShowLayers((value)=>!value)}
+        sx={{bgcolor:'background.paper','&:hover':{bgcolor:'action.hover'}}}><Layers/></IconButton></Tooltip>
+      <Tooltip title="Centre on robot"><span><IconButton aria-label="Centre on robot"
+        disabled={!grid||!liveRobotPose} onClick={centerRobot}
+        sx={{bgcolor:'background.paper','&:hover':{bgcolor:'action.hover'}}}><CenterFocusStrong/></IconButton></span></Tooltip>
+      <Tooltip title="Toggle fullscreen"><IconButton aria-label="Toggle fullscreen" onClick={toggleFullscreen}
+        sx={{bgcolor:'background.paper','&:hover':{bgcolor:'action.hover'}}}><Fullscreen/></IconButton></Tooltip>
+    </Box>
+    {showLayers&&<Paper className="mr-glass" sx={{position:'absolute',top:62,right:12,p:1.25,
+      width:230,maxHeight:'calc(100% - 130px)',overflowY:'auto',zIndex:2}}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between">
+        <Typography variant="overline">Map layers</Typography>
+        <Button size="small" onClick={()=>setShowLayers(false)}>Done</Button>
+      </Stack>
+      <Stack gap={.2}>{layerOptions.slice(0,6).map(({key,label,description,color})=>
+        renderLayer(key,label,description,color))}</Stack>
+      <Box component="details" sx={{mt:1,borderTop:'1px solid',borderColor:'divider',pt:.7}}>
+        <Typography component="summary" variant="caption" sx={{cursor:'pointer',fontWeight:700}}>
+          Advanced engineering layers
+        </Typography>
+        <Stack gap={.2} mt={.5}>{layerOptions.slice(6).map(({key,label,description,color})=>
+          renderLayer(key,label,description,color))}</Stack>
+      </Box>
+    </Paper>}
+    {fullscreenError&&<Paper role="status" sx={{position:'absolute',top:62,right:250,p:1,zIndex:3,
+      maxWidth:300,bgcolor:'error.dark',color:'common.white'}}>
+      <Typography variant="caption">{fullscreenError}</Typography>
+    </Paper>}
     <Box sx={{position:'absolute',left:12,bottom:12,display:'flex',gap:1}}>
       <Chip size="small" label={`Mode: ${mode}`} color="primary"/>
       <Chip size="small" label={robotVisualization.label}
@@ -299,12 +382,15 @@ export const MapCanvas=({mode,onCell,liveRobotPose}:Props)=>{
           robotVisualization.status==='outside-map'?'warning':'default'}/>
       <Chip size="small" label={mouse.cell?`Grid ${mouse.cell.column}, ${mouse.cell.row}`:'Grid —'}/>
       <Chip size="small" label={mouse.world?`World ${mouse.world.x.toFixed(3)}, ${mouse.world.y.toFixed(3)} m`:'World —'}/>
+      {grid&&<Chip size="small" label={`Scale ${(grid.metadata.resolution/view.zoom).toFixed(3)} m/cell`}/>}
     </Box>
     <Box sx={{position:'absolute',right:12,bottom:12,display:'flex',gap:1}}>
-      <Chip size="small" clickable label="−" onClick={()=>setView(v=>({...v,zoom:v.zoom/1.2}))}/>
+      <Tooltip title="Zoom out"><span><IconButton size="small" disabled={view.zoom<=.35}
+        onClick={()=>setView((value)=>({...value,zoom:Math.max(.35,value.zoom/1.2)}))}><ZoomOut/></IconButton></span></Tooltip>
       <Chip size="small" label={`${Math.round(view.zoom*100)}%`}/>
-      <Chip size="small" clickable label="+" onClick={()=>setView(v=>({...v,zoom:v.zoom*1.2}))}/>
-      <Chip size="small" clickable label="Fit" onClick={()=>setView({zoom:1,panX:0,panY:0})}/>
+      <Tooltip title="Zoom in"><span><IconButton size="small" disabled={view.zoom>=8}
+        onClick={()=>setView((value)=>({...value,zoom:Math.min(8,value.zoom*1.2)}))}><ZoomIn/></IconButton></span></Tooltip>
+      <Button size="small" onClick={()=>setView({zoom:1,panX:0,panY:0})}>Fit</Button>
     </Box>
   </Box>;
 };

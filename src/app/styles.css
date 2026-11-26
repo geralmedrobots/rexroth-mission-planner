@@ -1,28 +1,41 @@
 :root {
-  --mr-bg-primary: #f4f5f7;
+  --mr-bg-primary: #050d18;
+  --mr-bg-secondary: #081524;
+  --mr-panel: rgba(13, 28, 45, 0.96);
+  --mr-panel-strong: #0d1c2d;
+  --mr-navy: #f1f5f9;
+  --mr-teal: #00b8f0;
+  --mr-text-primary: #f1f5f9;
+  --mr-text-secondary: #94a3b8;
+  --mr-success: #22c55e;
+  --mr-warning: #f59e0b;
+  --mr-danger: #ef4444;
+  --mr-border: #203d55;
+  --mr-shadow: 0 18px 45px rgba(0, 0, 0, 0.28);
+}
+[data-theme="light"] {
+  --mr-bg-primary: #f2f7fa;
   --mr-bg-secondary: #ffffff;
   --mr-panel: rgba(255, 255, 255, 0.94);
   --mr-panel-strong: #ffffff;
-  --mr-red: #c8102e;
-  --mr-red-dark: #8f0b22;
-  --mr-text-primary: #24282d;
-  --mr-text-secondary: #687078;
+  --mr-navy: #07345f;
+  --mr-teal: #079da5;
+  --mr-text-primary: #14283b;
+  --mr-text-secondary: #607181;
   --mr-success: #16875f;
   --mr-warning: #b56a00;
-  --mr-danger: #c8102e;
-  --mr-border: rgba(143, 11, 34, 0.16);
-  --mr-shadow: 0 18px 45px rgba(72, 18, 29, 0.10);
+  --mr-danger: #c43a43;
+  --mr-border: rgba(7, 52, 95, 0.14);
+  --mr-shadow: 0 18px 45px rgba(7, 52, 95, 0.09);
 }
 
 html, body, #root { width: 100%; height: 100%; margin: 0; }
 body {
   overflow: hidden;
-  background:
-    radial-gradient(circle at 12% -12%, rgba(200, 16, 46, .10), transparent 36%),
-    linear-gradient(145deg, #ffffff, var(--mr-bg-primary));
+  background: var(--mr-bg-primary);
 }
 .mr-glass {
-  background: linear-gradient(145deg, rgba(255,255,255,.98), rgba(250,246,247,.94)) !important;
+  background: linear-gradient(145deg, var(--mr-panel), var(--mr-bg-secondary)) !important;
   border: 1px solid var(--mr-border);
   box-shadow: var(--mr-shadow);
   backdrop-filter: blur(18px);
@@ -38,13 +51,61 @@ body {
 }
 .mr-route-ready { animation: mr-route-in .45s ease-out both; }
 .mr-map-loading {
-  background: linear-gradient(90deg, transparent, rgba(200,16,46,.08), transparent);
+  background: linear-gradient(90deg, transparent, rgba(0,184,240,.12), transparent);
   background-size: 220% 100%;
   animation: mr-shimmer 1.6s linear infinite;
 }
 @keyframes mr-pulse { 65% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
 @keyframes mr-route-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 @keyframes mr-shimmer { to { background-position: -220% 0; } }
+.mr-settings-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--mr-panel-strong);
+  border-bottom: 1px solid var(--mr-border);
+}
+.mr-settings-tabs .MuiTab-root {
+  min-height: 52px;
+  font-weight: 700;
+}
+.mr-settings-tabs .MuiTabs-indicator {
+  height: 3px;
+  border-radius: 3px;
+  background: var(--mr-teal);
+}
+.mr-settings-section {
+  padding-top: 16px;
+}
+.mr-settings-section > .MuiTypography-h2 {
+  color: var(--mr-text-primary);
+}
+.mr-settings-section .MuiPaper-outlined {
+  border-color: var(--mr-border);
+  border-radius: 14px;
+  background: var(--mr-panel);
+}
+.mr-settings-section .MuiStack-root {
+  min-width: 0;
+}
+.mr-settings-row {
+  flex-wrap: wrap;
+}
+.mr-settings-row > .MuiFormControl-root,
+.mr-settings-row > .MuiInputBase-root {
+  flex: 1 1 190px;
+  min-width: min(100%, 190px);
+}
+.mr-settings-section .MuiFormControlLabel-root {
+  margin-right: 12px;
+}
+@media (max-width: 720px) {
+  .mr-settings-section { padding-top: 12px; }
+  .mr-settings-row > .MuiFormControl-root,
+  .mr-settings-row > .MuiInputBase-root {
+    min-width: 100%;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
 }

@@ -9,8 +9,9 @@ All four comparison configurations are implemented: captured/default, BALANCED,
 FORWARD_PREFERRED, CLEARANCE_PREFERRED. Real success rates, timing, path length/cost,
 clearance, reverse distance, switch count, rotation count/angle and suspicious
 manoeuvre counts are **N/A**, not zero. No profile recommendation is justified.
-Retain production defaults. Generated numerical status is in PHASE_5_COMPARISON.md
-and PHASE_5_COMPARISON.json.
+Retain production defaults. Generated numerical status is in
+[PHASE_5_COMPARISON.md](reports/PHASE_5_COMPARISON.md) and
+[PHASE_5_COMPARISON.json](reports/PHASE_5_COMPARISON.json).
 
 The operator-reported failures in tighter/complex geometry remain known examples
 without replayable evidence. Classification: **unknown**. Do not infer physical
@@ -28,7 +29,7 @@ To close Phase 5, supply actual exports for at least these representative cases:
 - At least one difficult/failed tight-geometry route, retaining its failure result.
 
 Use the application export action after each run, put those JSON files inside the
-workspace and use the folder command documented in STAGE_5B.md. Review qualitative
+workspace and use the folder command documented in [STAGE_5B.md](STAGE_5B.md). Review qualitative
 expectations with the operator before using scores to recommend a profile. Keep
 failed routes in the dataset; they do not block infrastructure completion and do
 not authorize a planner redesign. An offline recommendation remains provisional
