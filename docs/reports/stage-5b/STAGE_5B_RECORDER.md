@@ -104,7 +104,7 @@ in `failureAudit` with category `unknown`, without inventing a failure cause.
 
 ```text
 npm run stage5b:collect -- artifacts/stage5b/missions examples/stage5b.dataset.json
-npm run stage5b -- examples/stage5b.dataset.json PROFILE_SELECTION_TEST_REPORT
+npm run stage5b -- examples/stage5b.dataset.json docs/reports/profile-selection/PROFILE_SELECTION_TEST_REPORT
 ```
 
 Collection validates every artifact before replacing the manifest, requires explicit

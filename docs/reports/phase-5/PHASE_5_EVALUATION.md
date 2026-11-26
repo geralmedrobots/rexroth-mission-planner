@@ -28,7 +28,7 @@ To close Phase 5, supply actual exports for at least these representative cases:
 - At least one difficult/failed tight-geometry route, retaining its failure result.
 
 Use the application export action after each run, put those JSON files inside the
-workspace and use the folder command documented in STAGE_5B.md. Review qualitative
+workspace and use the folder command documented in [STAGE_5B.md](../stage-5b/STAGE_5B.md). Review qualitative
 expectations with the operator before using scores to recommend a profile. Keep
 failed routes in the dataset; they do not block infrastructure completion and do
 not authorize a planner redesign. An offline recommendation remains provisional

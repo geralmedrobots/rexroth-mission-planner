@@ -30,11 +30,11 @@ Production-oriented React/TypeScript desktop and browser application that downlo
 - VDA 5050 2.0 nodes/edges, alternating sequence IDs, unique identifiers, validation, explicit publication, instant actions, and mission progress.
 - Raw MQTT/state/order views, structured logs, diagnostics export, stale-state and safety warnings.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for module boundaries and the planning data flow.
+See [ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) for module boundaries and the planning data flow.
 
 ## Docker
 
-For a clean Docker deployment, see [INSTRUCOES_DOCKER.md](INSTRUCOES_DOCKER.md).
+For a clean Docker deployment, see [INSTRUCOES_DOCKER.md](docs/deployment/INSTRUCOES_DOCKER.md).
 On Windows, after extracting the project, `executar-docker.bat` builds the
 container and opens the complete application at `http://localhost:8787`.
 

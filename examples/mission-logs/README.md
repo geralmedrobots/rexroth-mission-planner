@@ -43,7 +43,7 @@ No fields, maps, configurations, or outcomes were fabricated to pass validation.
 
 To obtain a replayable dataset, use the application's **Export last motion-state
 run (success or failure, includes map)** export for each corresponding mission,
-as documented in `STAGE_5B.md`, and reference those actual artifacts in the manifest.
+as documented in [STAGE_5B.md](../../docs/reports/stage-5b/STAGE_5B.md), and reference those actual artifacts in the manifest.
 Keep these original logs as supporting evidence. A later rerun is new evidence,
 not an exact reconstruction of a missing historical export.
 
@@ -52,7 +52,7 @@ not an exact reconstruction of a missing historical export.
 Executed from the repository root:
 
 ```text
-npm run stage5b -- examples/stage5b.dataset.json PROFILE_SELECTION_TEST_REPORT
+npm run stage5b -- examples/stage5b.dataset.json docs/reports/profile-selection/PROFILE_SELECTION_TEST_REPORT
 ```
 
 Exit code: 0. Output: `Stage 5B: 28 runs; recommendation: pending`.
