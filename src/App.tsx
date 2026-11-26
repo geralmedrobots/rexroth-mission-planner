@@ -32,6 +32,9 @@ import type {
   OccupancyGrid, PathPoint, PlannerOptions, PlannerResult, RobotFootprint, RobotPose,
   ValidationResult, VdaInstantAction, VdaOrder, Waypoint,
 } from './domain/types';
+import { MissionsPanel } from './features/mission/MissionsPanel';
+import { useMissionWorkspace } from './features/mission/useMissionWorkspace';
+import { newMission, observeRun, inFlight, useMissionLibrary, type MissionRun } from './features/mission/missionLibrary';
 import { QuickDestinations } from './features/destinations/QuickDestinations';
 import { WaypointEditor, WaypointsPanel } from './features/destinations/WaypointsPanel';
 import { waypointPositionError, type WaypointDraft } from './features/destinations/waypointPosition';
@@ -237,6 +240,7 @@ export default function App(){
   const [draft,setDraft]=useState<WaypointDraft>();
   const [placement,setPlacement]=useState<{mapId:string;item?:SavedDestination}>();
   const [focusedPoint,setFocusedPoint]=useState<SavedDestination>();
+  const workspace=useMissionWorkspace(getLiveRouteContext);
   const operatorSettings=useOperatorSettingsStore((state)=>state.settings);
   const globalReplanning=useGlobalReplanningStore();
   const locator=useLocatorStore();
@@ -344,7 +348,8 @@ export default function App(){
   },[setActiveMapResolution,setLocator,navigatorMapId,activeMapResolution.source]);
 
   const loadGrid=(grid:OccupancyGrid):void=>{
-    setPlacement(undefined);setDraft(undefined);setFocusedPoint(undefined);
+    if(!workspace.draft.mapId)workspace.edit(newMission(grid.metadata.mapId));
+    workspace.setPick(false);setPlacement(undefined);setDraft(undefined);setFocusedPoint(undefined);
     mapImportToken.current+=1;
     setMapImporting(false);
     const inflated=ObstacleInflation.byRadius(grid,
@@ -356,6 +361,13 @@ export default function App(){
   useStartupConnections(loadGrid);
   const setCell=(cell:{row:number;column:number}):void=>{
     if(!store.grid)return; const transform=new CoordinateTransformer(store.grid.metadata);const pose=transform.gridToWorld(cell.row,cell.column);
+    if(workspace.pick){
+      if(workspace.draft.mapId!==store.grid.metadata.mapId){workspace.setPick(false);return;}
+      const check=waypointPositionError({...pose,mapId:workspace.draft.mapId},store.grid,store.inflatedGrid);
+      if(check){setToast({severity:'warning',message:check});return;}
+      workspace.edit({...workspace.draft,stops:[...workspace.draft.stops,{id:crypto.randomUUID(),x:pose.x,y:pose.y,
+        label:`Map point (${pose.x.toFixed(2)}, ${pose.y.toFixed(2)})`}]});return;
+    }
     if(placement){
       if(placement.mapId!==store.grid.metadata.mapId){setPlacement(undefined);return;}
       const next={...pose,mapId:placement.mapId,item:placement.item,theta:placement.item?.thetaExplicit===false?undefined:placement.item?.theta};
@@ -363,6 +375,7 @@ export default function App(){
       if(error){setToast({severity:'warning',message:error});return;}
       setPlacement(undefined);setDraft(next);return;
     }
+    if(workspace.open)return;
     if(mode==='goal'){prepareDestinationCell(cell);return;}
     else if(mode==='start')store.set({start:{...pose,mapId:store.grid.metadata.mapId,positionInitialized:true},selectedCell:cell});
     else if(mode==='waypoint'){
@@ -606,7 +619,7 @@ export default function App(){
     if(result)buildOrder(result.path,undefined,result.revision);
   };
   const publish=async(orderOverride?:VdaOrder,skipConfirmation=false,
-    expectedRevision?:number):Promise<void>=>{
+    expectedRevision?:number,namedRun?:MissionRun):Promise<void>=>{
     const live=useAppStore.getState();
     const order=orderOverride??live.generatedOrder;
     if(!order)return;
@@ -674,12 +687,19 @@ export default function App(){
     const current=live;
     current.set({publishingOrder:true});
     try{await mqttService.publish(current.mqttSettings.topics.order,JSON.stringify(order),current.mqttSettings.qos,false);
-      current.set({sentOrder:order,sentOrderPublishedAtMs:Date.now(),publishingOrder:false});
+      const handedAt=Date.now();
+      const last=order.nodes[order.nodes.length-1]!.nodePosition;
+      const quick={id:order.orderId,mapId:last.mapId,description:'',name:'Quick mission',
+        stops:[{id:order.orderId,x:last.x,y:last.y,label:`Destination (${last.x.toFixed(2)}, ${last.y.toFixed(2)})`}]};
+      current.set({sentOrder:order,sentOrderPublishedAtMs:handedAt,publishingOrder:false});
+      useMissionLibrary.getState().record(namedRun?{...namedRun,started:namedRun.index===0?handedAt:namedRun.started}:
+        {id:order.orderId,template:quick,orderId:order.orderId,started:handedAt,index:0,completed:0,status:'Awaiting acceptance',progress:0,errors:[]});
       stage5BRecording.order(order,revision,true);
       missionController.markPublished(appSessionId);
       setToast({severity:'info',message:'Order handed to MQTT. Waiting for Navigator acceptance.'});
       LogService.write('mqtt','info',`Published Order ${order.orderId}; awaiting Navigator acceptance.`);
-    }catch(error){current.set({publishingOrder:false});
+     }catch(error){current.set({publishingOrder:false});
+      if(namedRun)useMissionLibrary.getState().record({...namedRun,started:namedRun.index===0?undefined:namedRun.started,status:'Outcome unknown',errors:[...namedRun.errors,`MQTT handoff failed: ${String(error)}. Verify the outcome before retrying.`]});
       stage5BRecording.observe(order.orderId,'failed',`Order publication failed: ${String(error)}`,
         context.poseSnapshot?.pose ? { agvPosition: context.poseSnapshot.pose } : undefined);
       setToast({severity:'error',message:`Unable to dispatch the mission: ${String(error)}`});LogService.write('mqtt','error',String(error));}
@@ -761,6 +781,7 @@ export default function App(){
       event.target.closest('input,textarea,select,[contenteditable],[role="combobox"],[role="dialog"],[role="menu"],[role="listbox"]'))return;
     if(confirmationResolver.current||settingsOpen||locatorOpen||corridorCompatibilityOpen||
       globalReplanningOpen||draft||waypointsOpen||systemsOpen||!event.currentTarget.contains(event.target as Node))return;
+    if(workspace.open){workspace.setPick(false);return;}
     if(placement){setPlacement(undefined);return;}
     if(useAppStore.getState().goal)void clearDestination();
   };
@@ -789,11 +810,17 @@ export default function App(){
       current.set({goal:undefined,selectedCell:undefined});
     }
   },[operatorSettings.autoClearCompletedMission,mission.status,displayedState,store.generatedOrder,store.sentOrder]);
-  const instant=async(action:VdaInstantAction):Promise<void>=>{
+  const instant=async(action:VdaInstantAction,expectedOrder?:string):Promise<void>=>{
     if(!isInstantActionSupported(action)){LogService.write('mqtt','warning',`${action} is disabled because the current ROKIT configuration rejected its blocking type.`);return;}
     if(!useAppStore.getState().mqttConnected){
       setToast({severity:'error',message:'MQTT is disconnected. The action was not sent.'});return;
     }
+    const cancelTarget=useAppStore.getState().sentOrder?.orderId;
+    const matchesTarget=()=>{
+      const app=useAppStore.getState(),active=getActiveNavigatorOrderId(app.state);
+      return !expectedOrder||(app.sentOrder?.orderId===expectedOrder&&(!active||active===expectedOrder));
+    };
+    if(!matchesTarget()){setToast({severity:'warning',message:'Navigator is tracking a different order. Review the active mission.'});return;}
     if(!await requestConfirmation({
       title:action==='cancelOrder'?'Cancel active mission?':'Send instant action?',
       message:action==='cancelOrder'
@@ -805,12 +832,22 @@ export default function App(){
     if(!live.mqttConnected){
       setToast({severity:'error',message:'MQTT disconnected before the action could be sent.'});return;
     }
+    if(action==='cancelOrder'&&(live.sentOrder?.orderId!==cancelTarget||!matchesTarget())){setToast({severity:'warning',message:'Submitted order changed. Review cancellation again.'});return;}
     const message=new InstantActionBuilder().build(action,live.orderSettings);
     try{await mqttService.publish(live.mqttSettings.topics.instantActions,JSON.stringify(message),live.mqttSettings.qos,false);
+      if(action==='cancelOrder'){
+        const lib=useMissionLibrary.getState();
+        const tracked=lib.history.find(r=>!r.ended&&r.orderId===cancelTarget);
+        if(tracked)lib.record({...tracked,cancelActionId:message.actions[0]!.actionId,cancelReason:'Operator requested cancellation.',status:'Cancellation requested'});
+      }
       if(action==='cancelOrder')stage5BRecording.cancelRequested(message.actions[0]!.actionId,live.sentOrder?.orderId);
       setToast({severity:'info',message:'Action handed to MQTT. Check Navigator state for the outcome.'});
       LogService.write('mqtt','warning',`Published ${action} (${message.actions[0]!.actionId})`);
     }catch(error){
+      if(action==='cancelOrder'){
+        const lib=useMissionLibrary.getState(),tracked=lib.history.find(r=>!r.ended&&r.orderId===cancelTarget);
+        if(tracked)lib.record({...tracked,errors:[...new Set([...tracked.errors,`Cancellation handoff failed: ${String(error)}`])]});
+      }
       setToast({severity:'error',message:`Unable to send the action: ${String(error)}`});
       LogService.write('mqtt','error',String(error));
     }
@@ -903,6 +940,55 @@ export default function App(){
   const countdown=dispatchCountdown?.revision===store.routeRevision&&
     dispatchCountdown.orderId===store.generatedOrder?.orderId&&store.validation?.valid
     ?dispatchCountdown.seconds:undefined;
+  const missionBlockers=()=>{
+    const app=useAppStore.getState(),ctx=getLiveRouteContext(app);
+    const issues=getDispatchIssues({mqttConnected:app.mqttConnected,robotOnline:ctx.connectionOnline,stateFresh:ctx.stateFresh,
+      poseValid:!!ctx.poseSnapshot,mapMatches:ctx.mapComparison.matches,state:app.state,hasActiveDifferentOrder:!!getActiveNavigatorOrderId(app.state),
+      validation:{valid:true,errors:[],warnings:[]}}).map(e=>e.message);
+    for(const issue of getOrderGenerationIssues(ctx.prerequisites)){
+      if(issue.severity==='error'&&!issues.includes(issue.message))issues.push(issue.message);
+    }
+    const tracked=workspace.blocked();if(tracked)issues.push(tracked);
+    if(app.publishingOrder)issues.push('An order handoff is in progress.');
+    if(app.grid&&app.grid.metadata.mapId!==ctx.navigatorMapId)issues.push('Planning and Navigator map IDs must match.');
+    return issues;
+  };
+  const executeDestination=async()=>{
+    const preview=workspace.preview;
+    if(!preview||!workspace.isCurrent()||missionBlockers().length)return;
+    const app=useAppStore.getState(),stop=preview.stops[0]!,leg=preview.legs[0]!;
+    if(!await requestConfirmation({title:'Start mission?',confirmLabel:'Send Mission',
+      message:`${preview.template.name} · destination ${preview.index+1} of ${preview.template.stops.length}: ${stop.stop.label}\n${publishWarning}\nTopic: ${app.mqttSettings.topics.order}\nMaximum speed: ${app.orderSettings.missionMaximumSpeedMps} m/s`}))return;
+    if(!workspace.isCurrent()||missionBlockers().length){workspace.reset();workspace.setMessage('Mission or robot state changed. Validate again.');return;}
+    dispatchToken.current++;setDispatchCountdown(undefined);routePreparationGuard.current.cancel();
+    app.set({goal:stop.pose,goalThetaExplicit:stop.stop.theta!==undefined,waypoints:[]});
+    const revision=useAppStore.getState().routeRevision;
+    app.commitPlannedRoute(revision,{start:preview.start,rawPath:leg.rawPath,finalPath:leg.finalPath,
+      plannerResult:leg,planningConfiguration:leg.planningConfiguration});
+    missionController.createMission(appSessionId,crypto.randomUUID());
+    const order=buildOrder(leg.finalPath,stop.stop.theta,revision);
+    if(!order||!useAppStore.getState().validation?.valid){workspace.reset();workspace.setMessage('Current order failed validation. Review diagnostics.');app.invalidateRoute();return;}
+    const previous=workspace.run;
+    const template={...preview.template,stops:[...preview.template.stops.slice(0,preview.index),...preview.stops.map(s=>s.stop)]};
+    const run:MissionRun={id:previous?.id??crypto.randomUUID(),template,index:preview.index,completed:preview.index,
+      orderId:order.orderId,started:previous?.started,drivingObserved:previous?.drivingObserved,status:'Awaiting acceptance',progress:0,errors:previous?.errors??[]};
+    await publish(order,true,revision,run);
+    if(useAppStore.getState().sentOrder?.orderId!==order.orderId&&useAppStore.getState().routeRevision===revision)app.invalidateRoute();
+    workspace.release();
+  };
+  useEffect(()=>{
+    const lib=useMissionLibrary.getState();
+    for(const r of lib.history){
+      if(!inFlight(r)||r.status==='Outcome unknown'||r.status==='Timed out')continue;
+      let next=r;
+      if(!store.mqttConnected||!stateFresh||!connectionOnline||store.sentOrder?.orderId!==r.orderId){
+        next={...r,status:'Outcome unknown',errors:[...r.errors,'Lost live tracking of this order. Verify its outcome in Navigator.']};
+      }else if(!store.publishingOrder){
+        next=observeRun(r,mission,store.state?.actionStates??[],now);
+      }
+      if(next!==r)lib.record(next);
+    }
+  },[store.mqttConnected,stateFresh,connectionOnline,store.sentOrder,store.publishingOrder,store.state,mission,now]);
   const recalculateReason=!store.grid?'Load a map to recalculate.':
     !store.start?'Select a planning start or connect to the robot.':
       !store.goal?'Select a destination to recalculate.':undefined;
@@ -995,7 +1081,7 @@ export default function App(){
   const planningMapId=store.grid?.metadata.mapId;
   const startPlacement=(item?:SavedDestination)=>{
     if(!planningMapId)return;
-    setWaypointsOpen(false);setPlacement({mapId:planningMapId,item});
+    workspace.setPick(false);setWaypointsOpen(false);setPlacement({mapId:planningMapId,item});
   };
   const selectSavedDestination=(point:SavedDestination):void=>{
     const error=waypointPositionError(point,store.grid,store.inflatedGrid);
@@ -1054,12 +1140,12 @@ export default function App(){
     mission:{...mission,completedNodes:[...mission.completedNodes]},
   };
   const nav=[
-    ['Planner',<AltRoute/>],['Map',<Map/>],['Waypoints',<Place/>],['Order',<ListAlt/>],
+    ['Planner',<AltRoute/>],['Missions',<ListAlt/>],['Map',<Map/>],['Waypoints',<Place/>],['Order',<ListAlt/>],
     ['Robot State',<MonitorHeart/>],['MQTT',<Cloud/>],['Global Replanning',<Autorenew/>],
     ['Logs',<Subject/>],['Diagnostics',<BugReport/>],['Settings',<Settings/>],
   ] as const;
   const activeNav=settingsOpen?'Settings':locatorOpen?'Map':waypointsOpen?'Waypoints':globalReplanningOpen?'Global Replanning':
-    diagnosticsOpen?({0:'Logs',5:'Order',7:'MQTT'}[bottom]??'Diagnostics'):advancedMissionOpen?'Robot State':'Planner';
+    diagnosticsOpen?({0:'Logs',5:'Order',7:'MQTT'}[bottom]??'Diagnostics'):advancedMissionOpen?'Robot State':workspace.open?'Missions':'Planner';
   return <Box className="mr-app-shell" onKeyDown={handleWorkspaceKey}
     data-compact={operatorSettings.compactMode} data-reduce-motion={operatorSettings.reduceMotion} sx={{
     bgcolor:'background.default','--mr-nav-width':`${drawerWidth}px`,'--mr-mission-width':`${rightWidth}px`,
@@ -1102,12 +1188,13 @@ export default function App(){
         </IconButton>
       </Box>
       <List dense>{nav.map(([label,icon],index)=><Box key={label}>
-        {(index===0||index===5)&&<Typography className="mr-nav-section" variant="overline">{navCollapsed?(index===0?'Ops':'Eng'):(index===0?'Operations':'Engineering')}</Typography>}
+        {(index===0||index===6)&&<Typography className="mr-nav-section" variant="overline">{navCollapsed?(index===0?'Ops':'Eng'):(index===0?'Operations':'Engineering')}</Typography>}
         <Tooltip key={label} title={navCollapsed?label:''} placement="right"><ListItemButton aria-label={label} selected={label===activeNav} onClick={()=>{
         if(label==='Settings')setSettingsOpen(true);if(label==='Map')setLocatorOpen(true);
         if(label==='Global Replanning')setGlobalReplanningOpen(true);
-        if(label==='Robot State'){setMissionPanelOpen(true);setAdvancedMissionOpen(true);}
-        if(label==='Planner'){setDiagnosticsOpen(false);setAdvancedMissionOpen(false);document.getElementById('planner-workspace')?.focus();}
+        if(label==='Missions'){dispatchToken.current++;setDispatchCountdown(undefined);routePreparationGuard.current.cancel();setPlacement(undefined);setMissionPanelOpen(true);workspace.show();}
+        if(label==='Robot State'){workspace.close();setMissionPanelOpen(true);setAdvancedMissionOpen(true);}
+        if(label==='Planner'){workspace.close();setDiagnosticsOpen(false);setAdvancedMissionOpen(false);document.getElementById('planner-workspace')?.focus();}
         if(label==='Waypoints')setWaypointsOpen(true);
         const tab={MQTT:7,Order:5,Logs:0,Diagnostics:bottom}[label as 'MQTT'|'Order'|'Logs'|'Diagnostics'];
         if(tab!==undefined){setBottom(tab);setDiagnosticsOpen(true);}
@@ -1151,13 +1238,13 @@ export default function App(){
         <Box className="mr-map-tool-slot" aria-label="Map editing tools">
           <Button size="small" variant="outlined" startIcon={<AddLocationAlt/>} disabled={!planningMapId} onClick={()=>startPlacement()}>Create Waypoint</Button>
         </Box>
-        <Tooltip title={recalculateReason??'Calculate a route preview'}><span>
+        {!workspace.open&&<><Tooltip title={recalculateReason??'Calculate a route preview'}><span>
           <Button variant="outlined" startIcon={<AltRoute/>} disabled={store.planning||Boolean(recalculateReason)}
             onClick={()=>void plan()}>{store.planning?'Planning…':'Recalculate'}</Button>
         </span></Tooltip>
         <Button startIcon={<Refresh/>} onClick={()=>{
           planningCoordinator.invalidate();store.invalidateRoute();
-        }}>Clear path</Button>
+        }}>Clear path</Button></>}
         <Box sx={{flex:1}}/><Typography variant="caption">{store.grid?`${store.grid.metadata.width}×${store.grid.metadata.height} · ${store.grid.metadata.resolution} m/cell`:'No map loaded'}</Typography>
       </Paper>
       {(locator.downloading||mapImporting)&&<Alert severity="info" role="status">
@@ -1166,11 +1253,19 @@ export default function App(){
       {placement&&<Alert severity="info" action={<Button onClick={()=>setPlacement(undefined)}>Cancel</Button>}>
         Select a free position for {placement.item?.displayName??'the new waypoint'}.
       </Alert>}
-      <MapCanvas focusedPoint={focusedPoint} mode={mode} onCell={setCell} liveRobotPose={poseSnapshot?.pose}/>
+      {workspace.pick&&<Alert severity="info" action={<Button onClick={()=>workspace.setPick(false)}>Cancel</Button>}>Select a free cell for the next mission destination.</Alert>}
+      <MapCanvas missionIndex={workspace.open?workspace.index:undefined} missionPreview={workspace.open?workspace.preview?.legs:undefined} focusedPoint={focusedPoint} mode={mode} onCell={setCell} liveRobotPose={poseSnapshot?.pose}/>
     </Box>
     <Box component="aside" aria-label="Mission panel" className="mr-workspace-mission-panel"
       hidden={tablet&&!missionPanelOpen}
       sx={{p:1.5,bgcolor:'rgba(255,255,255,.98)',borderLeft:'1px solid',borderColor:'divider'}}>
+      {workspace.open?<MissionsPanel draft={workspace.draft} mapId={store.grid?.metadata.mapId} points={workspace.points}
+        index={workspace.index} continuing={!!workspace.run} busy={workspace.busy} preview={workspace.preview}
+        message={workspace.message} blockers={missionBlockers()} robot={robotConnectionLabel} pose={!!poseSnapshot}
+        speed={store.orderSettings.missionMaximumSpeedMps} replanning={globalReplanning.runtime.status} onEdit={workspace.edit}
+        onMap={()=>{setPlacement(undefined);workspace.setPick(true);}} onClose={workspace.close}
+        onContinue={workspace.resume} onValidate={()=>void workspace.validate()} onExecute={()=>void executeDestination()}
+        canCancel={store.mqttConnected&&(!activeNavigatorOrderId||activeNavigatorOrderId===store.sentOrder?.orderId)?store.sentOrder?.orderId:undefined} onCancel={id=>void instant('cancelOrder',id)}/>:<>
       <Paper component="section" aria-label="Route preview" className="mr-glass mr-route-ready" sx={{p:1.5,mb:1.5}}>
         <Stack alignItems="flex-start" gap={.5}>
           <Box><Typography variant="overline">Mission control</Typography>
@@ -1484,6 +1579,7 @@ export default function App(){
         <Button size="small" startIcon={<Autorenew/>}
           onClick={()=>setGlobalReplanningOpen(true)}>Open replanning</Button>
       </Paper>
+    </>}
     </Box>
     </Box>
     <Paper className="mr-glass mr-diagnostics-dock" square sx={{

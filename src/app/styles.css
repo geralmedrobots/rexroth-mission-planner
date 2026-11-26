@@ -112,3 +112,8 @@ body:has(.mr-app-shell[data-reduce-motion='true']) *::after {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
 }
+.mr-missions { padding: 4px; }
+.mr-mission-entry { border-top: 1px solid var(--mr-line); padding: 10px 0; overflow-wrap: anywhere; }
+.mr-stop-list { padding-inline-start: 24px; margin: 0; }
+.mr-stop-list li { padding: 4px 0; }
+.mr-stop-list button { min-width: 32px; }

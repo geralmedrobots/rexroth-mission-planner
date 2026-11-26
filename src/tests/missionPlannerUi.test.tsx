@@ -1,6 +1,7 @@
 import { act, cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
+import { betweenStops, newMission, savedStop, useMissionLibrary } from '../features/mission/missionLibrary';
 import { MapCanvas } from '../components/MapCanvas';
 import { createPlanningConfigurationSnapshot } from '../domain/planning/PlanningConfigurationSnapshot';
 import type { OccupancyGrid, PlannerResult, RobotPose, VdaState } from '../domain/types';
@@ -69,6 +70,7 @@ const button=(name:string)=>screen.getByRole('button',{name});
 
 beforeEach(()=>{
   localStorage.clear();
+  useMissionLibrary.setState({templates:[],history:[]});
   useDestinationStore.setState({destinations:[]});
   useAppStore.setState(appDefaults,true);
   useLocatorStore.setState(useLocatorStore.getInitialState(),true);
@@ -84,6 +86,125 @@ afterEach(()=>{
   Reflect.deleteProperty(navigator,'clipboard');
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+});
+
+describe('structured missions',()=>{
+  function loadMission(wardX=2.95) {
+    seedTelemetry();
+    useAppStore.setState({plannerMode:'manual',orderSettings:{...appDefaults.orderSettings,stateStaleTimeoutMs:60000}});
+    const point=useDestinationStore.getState().add({displayName:'Pharmacy',mapId:'fixture',x:2.05,y:2.05,theta:0,
+      enabled:true,icon:'pharmacy',category:'pharmacy'});
+    const template={...newMission('fixture'),name:'Ward delivery',stops:[savedStop(point),{id:'ward',label:'Ward',x:wardX,y:2.05}]};
+    useMissionLibrary.getState().save(template);
+    render(<App/>);fireEvent.click(button('Missions'));fireEvent.click(button('Library'));fireEvent.click(button('Load / edit'));
+    return {point,template};
+  }
+  async function validate() {
+    fireEvent.click(button('Validate mission'));
+    await waitFor(()=>expect(screen.getByText('Preview validated')).toBeVisible());
+  }
+  it('invalidates a prepared mission and its pending authorization on a moved or deleted waypoint',async()=>{
+    const {point}=loadMission();await validate();
+    fireEvent.click(button('Authorize destination 1'));
+    act(()=>useDestinationStore.getState().update(point.id,{x:2.15}));
+    fireEvent.click(button('Send Mission'));
+    expect(mqttService.publish).not.toHaveBeenCalled();
+    await waitFor(()=>expect(button('Authorize destination 1')).toBeDisabled());
+    await validate();
+    act(()=>useDestinationStore.getState().remove(point.id));
+    fireEvent.click(button('Validate mission'));
+    expect(await screen.findByText(/Destination 1 .*missing/)).toBeVisible();
+    expect(button('Authorize destination 1')).toBeDisabled();
+  },15000);
+  it('blocks the whole mission if a later destination is unreachable and identifies its ordinal',async()=>{
+    loadMission(6.95);
+    const wall={metadata:{...grid.metadata,width:100},data:Array.from({length:4000},(_,i)=>i%100===50?100:0)};
+    act(()=>useAppStore.setState({grid:wall}));
+    fireEvent.click(button('Validate mission'));
+    expect(await screen.findByText(/Leg 2 to Ward/)).toBeVisible();
+    expect(button('Authorize destination 1')).toBeDisabled();
+    expect(mqttService.publish).not.toHaveBeenCalled();
+  });
+  it('sends each stop only after independent live validation and confirmation, then records completion',async()=>{
+    loadMission();await validate();fireEvent.click(button('Authorize destination 1'));fireEvent.click(button('Send Mission'));
+    await waitFor(()=>expect(mqttService.publish).toHaveBeenCalledTimes(1));
+    const arrive=()=>{
+      const app=useAppStore.getState(),order=app.sentOrder!,node=order.nodes.at(-1)!;
+      act(()=>useAppStore.setState({mqttReceiveMetadata:{...app.mqttReceiveMetadata,lastStateReceiveTime:Date.now()},
+        state:{...app.state,orderId:order.orderId,lastNodeSequenceId:node.sequenceId,driving:false,nodeStates:[],edgeStates:[],
+          agvPosition:{...start,...node.nodePosition,theta:node.nodePosition.theta??0}}}));
+    };
+    arrive();
+    await waitFor(()=>expect(useMissionLibrary.getState().history[0]?.status).toBe(betweenStops));
+    expect(mqttService.publish).toHaveBeenCalledTimes(1);
+    fireEvent.click(await screen.findByRole('button',{name:'Prepare next destination'}));expect(button('Authorize destination 2')).toBeDisabled();
+    await validate();fireEvent.click(button('Authorize destination 2'));fireEvent.click(button('Send Mission'));
+    await waitFor(()=>expect(mqttService.publish).toHaveBeenCalledTimes(2));
+    arrive();
+    await waitFor(()=>expect(useMissionLibrary.getState().history[0]).toMatchObject({status:'Completed',completed:2,ended:expect.any(Number)}));
+    expect(useMissionLibrary.getState().history).toHaveLength(1);
+  },20000);
+  it('records an operator cancellation only after matching Navigator action evidence',async()=>{
+    loadMission();await validate();fireEvent.click(button('Authorize destination 1'));fireEvent.click(button('Send Mission'));
+    fireEvent.click(await screen.findByRole('button',{name:'Cancel active order'}));
+    fireEvent.click(button('Cancel Mission'));
+    await waitFor(()=>expect(mqttService.publish).toHaveBeenCalledTimes(2));
+    const recorded=useMissionLibrary.getState().history[0]!;
+    expect(recorded.cancelActionId).toBeTruthy();expect(recorded.ended).toBeUndefined();
+    act(()=>{const app=useAppStore.getState();useAppStore.setState({state:{...app.state,orderId:recorded.orderId,
+      actionStates:[{actionId:recorded.cancelActionId,actionStatus:'FINISHED'}]}});});
+    await waitFor(()=>expect(useMissionLibrary.getState().history[0]?.status).toBe('Cancelled'));
+    expect(screen.queryByRole('button',{name:'Prepare next destination'})).toBeNull();
+  },15000);
+  it('does not cancel a different Navigator order that appears while confirmation is open',async()=>{
+    loadMission();await validate();fireEvent.click(button('Authorize destination 1'));fireEvent.click(button('Send Mission'));
+    fireEvent.click(await screen.findByRole('button',{name:'Cancel active order'}));
+    act(()=>{const app=useAppStore.getState();useAppStore.setState({state:{...app.state,orderId:'another-order',driving:true}});});
+    fireEvent.click(button('Cancel Mission'));
+    expect(await screen.findByText('Submitted order changed. Review cancellation again.')).toBeVisible();
+    expect(mqttService.publish).toHaveBeenCalledTimes(1);
+  },15000);
+  it('adds saved destinations by ID and suppresses quick dispatch during mission map picking',()=>{
+    const {point}=loadMission();
+    useOperatorSettingsStore.getState().update({directDispatchMode:true});
+    fireEvent.mouseDown(screen.getByRole('combobox',{name:'Saved waypoint'}));
+    fireEvent.click(screen.getByRole('option',{name:'Pharmacy'}));
+    fireEvent.click(button('Save template'));
+    expect(useMissionLibrary.getState().templates[0]?.stops.at(-1)?.waypointId).toBe(point.id);
+    const original=useAppStore.getState().goal;
+    const rect={x:0,y:0,left:0,top:0,width:400,height:400,right:400,bottom:400,toJSON:()=>({})};
+    vi.spyOn(HTMLCanvasElement.prototype,'getBoundingClientRect').mockReturnValue(rect);
+    fireEvent.click(screen.getByLabelText('Planning map'),{clientX:215,clientY:205});
+    fireEvent.click(button('Add from map'));fireEvent.click(screen.getByLabelText('Planning map'),{clientX:225,clientY:205});
+    expect(screen.getByText(/Map point \(2\.25/)).toBeVisible();
+    expect(useAppStore.getState().goal).toBe(original);expect(mqttService.publish).not.toHaveBeenCalled();
+  });
+  it('keeps an interrupted handoff unresolved after reconnect and never advances automatically',async()=>{
+    loadMission();await validate();fireEvent.click(button('Authorize destination 1'));fireEvent.click(button('Send Mission'));
+    await waitFor(()=>expect(mqttService.publish).toHaveBeenCalledTimes(1));
+    act(()=>useAppStore.setState({mqttConnected:false}));
+    act(()=>useAppStore.setState({mqttConnected:true}));
+    expect(useMissionLibrary.getState().history[0]?.status).toBe('Outcome unknown');
+    expect(screen.queryByRole('button',{name:'Prepare next destination'})).toBeNull();
+    expect(mqttService.publish).toHaveBeenCalledTimes(1);
+  },15000);
+  it('edits, reorders, searches, duplicates and deletes without executing or losing saved originals',async()=>{
+    const {template}=loadMission();
+    fireEvent.click(button('Move destination 2 up'));fireEvent.click(button('Remove destination 2'));
+    fireEvent.change(screen.getByLabelText('Mission name'),{target:{value:'Ward supply'}});
+    fireEvent.change(screen.getByLabelText('Description (optional)'),{target:{value:'Night shift'}});
+    fireEvent.click(button('Save template'));
+    expect(useMissionLibrary.getState().templates[0]).toMatchObject({id:template.id,name:'Ward supply',description:'Night shift',stops:[{id:'ward'}]});
+    fireEvent.click(button('Library'));fireEvent.click(button('Duplicate'));
+    fireEvent.change(screen.getByLabelText('Search missions'),{target:{value:'(copy)'}});
+    fireEvent.click(button('Delete'));fireEvent.click(button('Keep'));
+    expect(useMissionLibrary.getState().templates).toHaveLength(2);
+    fireEvent.click(await screen.findByRole('button',{name:'Delete'}));fireEvent.click(button('Delete template'));
+    expect(useMissionLibrary.getState().templates).toHaveLength(1);
+    await act(async()=>{await useMissionLibrary.persist.rehydrate();});
+    expect(useMissionLibrary.getState().templates[0]?.id).toBe(template.id);
+    expect(mqttService.publish).not.toHaveBeenCalled();
+  },15000);
 });
 
 describe('named waypoints',()=>{

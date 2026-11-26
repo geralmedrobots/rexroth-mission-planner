@@ -4,7 +4,7 @@ import { LayersOutlined, RotateRight } from '@mui/icons-material';
 import { useDestinationStore, type SavedDestination } from '../features/destinations/destinationStore';
 import { normalizeAngle } from '../domain/geometry/angles';
 import { CoordinateTransformer } from '../domain/geometry/CoordinateTransformer';
-import type { GridCell, RobotPose } from '../domain/types';
+import type { GridCell, PathPoint, RobotPose } from '../domain/types';
 import { useLocatorStore } from '../features/locator/stores/locatorStore';
 import { useGlobalReplanningStore } from '../features/replanning/globalReplanningStore';
 import { useRecoveryStore } from '../features/recovery/recoveryStore';
@@ -17,8 +17,8 @@ import {
 } from './mapRobotVisualization';
 
 export type ClickMode='goal'|'start'|'waypoint'|'obstacle'|'erase'|'inspect';
-interface Props { mode:ClickMode; onCell:(cell:GridCell)=>void; liveRobotPose?:RobotPose; focusedPoint?:SavedDestination }
-export const MapCanvas=({mode,onCell,liveRobotPose,focusedPoint}:Props)=>{
+interface Props { mode:ClickMode; onCell:(cell:GridCell)=>void; liveRobotPose?:RobotPose; focusedPoint?:SavedDestination;missionIndex?:number;missionPreview?:readonly {finalPath:PathPoint[]}[] }
+export const MapCanvas=({mode,onCell,liveRobotPose,focusedPoint,missionPreview,missionIndex}:Props)=>{
   const canvas=useRef<HTMLCanvasElement>(null); const container=useRef<HTMLDivElement>(null);
   const lastPoseMapDiagnostic=useRef<string|undefined>(undefined);
   const [mouse,setMouse]=useState<{cell?:GridCell;world?:{x:number;y:number}}>({});
@@ -224,6 +224,7 @@ export const MapCanvas=({mode,onCell,liveRobotPose,focusedPoint}:Props)=>{
     if(replanBlocked.length)drawPath(replanBlocked,'#d32f2f',5);
     if(replanNew.length)drawPath(replanNew,'#1b8f4d',5);
     else drawPath(final,'#c8102e',5);
+    missionPreview?.forEach(leg=>drawPath(leg.finalPath,'#175f86',4));
     if(recoveryPath.length)drawPath(recoveryPath,'#7b1fa2',6);
     for(let i=0;i<final.length-1;i+=1){const a=pixel(final[i]!.x,final[i]!.y);const b=pixel(final[i+1]!.x,final[i+1]!.y);
       if(!a||!b)continue;const angle=Math.atan2(b.y-a.y,b.x-a.x);const x=(a.x+b.x)/2,y=(a.y+b.y)/2;
@@ -276,9 +277,18 @@ export const MapCanvas=({mode,onCell,liveRobotPose,focusedPoint}:Props)=>{
         ctx.restore();
       }
     }
+    missionPreview?.forEach((leg,index)=>{
+      const end=leg.finalPath.at(-1);
+      const point=end&&pixel(end.x,end.y);
+      if(!point)return;
+      ctx.save();ctx.translate(point.x,point.y);ctx.rotate(-rotation);
+      ctx.fillStyle='#175f86';ctx.beginPath();ctx.arc(0,0,10,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='white';ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(String((missionIndex??0)+index+1),0,0);ctx.restore();
+    });
     if(start)drawFootprint(start,'#1565c0');
     ctx.restore();
-  },[grid,destinations,showMarkers,inflated,start,goal,raw,final,footprint,showInflation,showGrid,rotation,view,size,
+  },[grid,missionPreview,missionIndex,destinations,showMarkers,inflated,start,goal,raw,final,footprint,showInflation,showGrid,rotation,view,size,
     locatorImage,locatorRaster,layers,robotState,generatedOrder,replanOriginal,replanBlocked,
     replanNew,temporaryObstacleCells,inflatedTemporaryObstacleCells,
     replanExplored,startProjection,recoveryPath,plannerDiagnostics,optimizedPath,
@@ -362,7 +372,7 @@ export const MapCanvas=({mode,onCell,liveRobotPose,focusedPoint}:Props)=>{
         filter:'contrast(var(--mr-map-contrast, 1))',cursor:'crosshair'}}/>
     </Box>
     <Box role="group" aria-label="Map position and zoom" className="mr-map-footer" sx={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:.5,p:.75}}>
-      <Chip size="small" label={`Mode: ${mode}`} color="primary"/>
+      <Chip size="small" label={missionIndex===undefined?`Mode: ${mode}`:'Mission editor'} color="primary"/>
       <Chip size="small" label={robotVisualization.label}
         color={robotVisualization.status==='visible'?'success':
           robotVisualization.status==='outside-map'?'warning':'default'}/>
