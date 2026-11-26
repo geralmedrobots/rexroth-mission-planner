@@ -1,4 +1,11 @@
-﻿import { readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
+import { Blob as NodeBlob } from 'node:buffer';
+import { IDBFactory, IDBKeyRange } from 'fake-indexeddb';
+import { configuredReferenceBinding, referenceDispatchIssue } from '../features/map/referenceMapBinding';
+import { prepareSourceMapUpdate, confirmSourceMapUpdate } from '../features/map/sourceMapUpdate';
+import { loadStartupReference } from '../features/startup/useStartupConnections';
+import { MqttService } from '../services/MqttService';
+import { ReferenceMapPersistence, referenceMapPersistence } from '../features/map/ReferenceMapPersistence';
 import { mapCorrectionPersistence } from '../features/map/MapCorrectionPersistence';
 import { defaultFootprint, defaultPlannerOptions, defaultOrderSettings } from '../domain/defaults';
 import { planSynchronously } from '../domain/planner/PlannerService';
@@ -46,9 +53,19 @@ const downloaded = (name: string, occupancyValue = 100) => {
 const revokeObjectURL = vi.fn();
 beforeEach(() => {
   vi.stubGlobal('crypto', webcrypto);
-  vi.stubGlobal('URL', class extends URL { static revokeObjectURL = revokeObjectURL; });
+  vi.stubGlobal('indexedDB', new IDBFactory());
+  vi.stubGlobal('IDBKeyRange', IDBKeyRange);
+  vi.stubGlobal('Blob', NodeBlob);
+  vi.stubGlobal('URL', class extends URL {
+    static revokeObjectURL = revokeObjectURL;
+    static createObjectURL = () => 'blob:cached-reference';
+  });
   revokeObjectURL.mockClear();
-  useAppStore.setState({ grid: undefined, inflatedGrid: undefined, sourceMap: undefined, planningMap: undefined });
+  localStorage.clear();
+  useLocatorStore.getState().updateSettings(downloaded('fixture').instance);
+  useAppStore.setState({ grid: undefined, inflatedGrid: undefined, sourceMap: undefined, planningMap: undefined,
+    referenceUpdatePending:false, referenceReviewRequired:false, activeNavigatorMapId:null,
+    lastKnownValidNavigatorMapId:null, state:undefined, sentOrder:undefined, publishingOrder:false });
   useLocatorStore.setState({ loadedMap: undefined, mapInfo: undefined, downloading: false, selectedMapName: '' });
 });
 afterEach(() => {
@@ -88,7 +105,7 @@ describe('map source initialization', () => {
     expect(sourceMap?.originalRaster?.image).toBe(file);
   });
 
-  it('keeps the source snapshot through existing click edits and replaces it on same-name reload', async () => {
+  it('keeps the source snapshot through existing click edits and restores the fixed reference on same-name reload', async () => {
     const activate = vi.spyOn(locatorMapService, 'activateRaster').mockImplementation(() => {});
     vi.spyOn(locatorMapService, 'downloadSource')
       .mockResolvedValueOnce(downloaded('Map-A')).mockResolvedValueOnce(downloaded('Map-A', 0));
@@ -102,10 +119,11 @@ describe('map source initialization', () => {
 
     await loadLocatorSource('Map-A');
     const { sourceMap, planningMap, grid: fresh } = useAppStore.getState();
-    expect(sameSourceMap(original.sourceIdentity, sourceMap!.sourceIdentity)).toBe(false);
+    expect(sameSourceMap(original.sourceIdentity, sourceMap!.sourceIdentity)).toBe(true);
     expect(planningMap?.revision).toBe(0);
     expect(fresh?.data).toEqual(sourceMap?.rawOccupancyGrid.data);
-    expect(fresh?.data).toEqual([0, -1]);
+    expect(fresh?.data).toEqual([100, -1]);
+    expect(locatorMapService.downloadSource).toHaveBeenCalledTimes(1);
     expect(activate).toHaveBeenCalledTimes(2);
   });
 
@@ -116,6 +134,7 @@ describe('map source initialization', () => {
       name === 'Older' ? older.promise : newer.promise);
     const activate = vi.spyOn(locatorMapService, 'activateRaster').mockImplementation(() => {});
     const first = loadLocatorSource('Older');
+    await vi.waitFor(()=>expect(locatorMapService.downloadSource).toHaveBeenCalledTimes(1));
     const second = loadLocatorSource('Newer');
     older.resolve(downloaded('Older'));
     expect(await first).toBeUndefined();
@@ -143,9 +162,9 @@ describe('map source initialization', () => {
     expect(await loadLocatorSource('Map-A', { skipUnchanged: true })).toBeUndefined();
     expect(useAppStore.getState().routeRevision).toBe(revision);
     expect(useAppStore.getState().grid?.data).toEqual([50, -1]);
-    expect(revokeObjectURL).toHaveBeenCalledWith('blob:duplicate');
-    expect((await loadLocatorSource('Map-A', { skipUnchanged: true }))?.data).toEqual([0, -1]);
-    expect(activate).toHaveBeenCalledTimes(2);
+    expect(await loadLocatorSource('Map-A', { skipUnchanged: true })).toBeUndefined();
+    expect(locatorMapService.downloadSource).toHaveBeenCalledTimes(1);
+    expect(activate).toHaveBeenCalledTimes(1);
   });
 
   it('allows a newer import to win over an older load already hashing occupancy', async () => {
@@ -154,8 +173,7 @@ describe('map source initialization', () => {
     vi.spyOn(locatorMapService, 'downloadSource').mockResolvedValue(downloaded('Older'));
     const activate = vi.spyOn(locatorMapService, 'activateRaster').mockImplementation(() => {});
     const first = loadLocatorSource('Older');
-    await Promise.resolve();
-    expect(webcrypto.subtle.digest).toHaveBeenCalledTimes(1);
+    await vi.waitFor(()=>expect(webcrypto.subtle.digest).toHaveBeenCalledTimes(1));
     await loadJsonMap(jsonFile(json([5, 6])));
     digest.resolve(new ArrayBuffer(32));
     expect(await first).toBeUndefined();
@@ -183,6 +201,7 @@ describe('map source initialization', () => {
     const response = deferred<ReturnType<typeof downloaded>>();
     vi.spyOn(locatorMapService, 'downloadSource').mockReturnValue(response.promise);
     const load = loadLocatorSource('Startup', { signal: controller.signal });
+    await vi.waitFor(()=>expect(locatorMapService.downloadSource).toHaveBeenCalledTimes(1));
     controller.abort();
     response.resolve(downloaded('Startup'));
     expect(await load).toBeUndefined();
@@ -289,5 +308,226 @@ describe('saved planning map activation', () => {
     expect(await activation).toBeUndefined();
     expect(await activateSavedPlanningMap(old)).toBeUndefined();
     expect(useAppStore.getState().grid?.data).toEqual([5,6]);
+  });
+});
+
+
+function idleNavigator(mapName: string) {
+  const app = useAppStore.getState();
+  app.set({
+    activeNavigatorMapId:mapName, mqttConnected:true, state:{driving:false},
+    connection:{connectionState:'ONLINE', headerId:0, manufacturer:'test', serialNumber:'1', version:'2.0.0', timestamp:''},
+    mqttReceiveMetadata:{...app.mqttReceiveMetadata, lastStateReceiveTime:Date.now()},
+  });
+}
+
+describe('persistent Locator reference lifecycle', () => {
+  const name = 'Floor A';
+  const backend = () => vi.spyOn(locatorMapService, 'downloadSource').mockImplementation(async n => downloaded(n));
+  async function saveEdits() {
+    vi.stubGlobal('navigator', {locks:{request:(_key:string, run:()=>unknown)=>run()}});
+    const source = useAppStore.getState().sourceMap!;
+    const transform = new CoordinateTransformer(source.sourceIdentity.metadata);
+    const edits = (['erase','force_free','force_occupied'] as const).map((kind,index) => {
+      const {x,y} = transform.gridToWorld(0,index);
+      return {id:kind, kind, createdAt:'2026-11-26T10:00:00Z',
+        area:{kind:'circle' as const, center:{x,y}, radiusM:.001}};
+    });
+    await mapCorrectionPersistence.saveCorrections(source, {sourceIdentity:source.sourceIdentity, corrections:edits});
+    return source;
+  }
+
+  it('rebuilds the PNG, geometry, and all three occupancy edits offline after restart', async () => {
+    const latest = downloaded(name);
+    latest.raster.pixelWidth = latest.occupancy.metadata.width = 3;
+    latest.occupancy.data = [100,-1,0];
+    const download = backend().mockResolvedValueOnce(latest);
+    await loadLocatorSource(name);
+    const original = await saveEdits();
+    const persisted = await new ReferenceMapPersistence().load(configuredReferenceBinding(name));
+    expect(persisted?.info).toEqual(latest.info);
+    expect(persisted?.source.sourceIdentity).toEqual(original.sourceIdentity);
+    expect(persisted?.source.rawOccupancyGrid).toEqual(original.rawOccupancyGrid);
+    useAppStore.setState({sourceMap:undefined, planningMap:undefined, grid:undefined, mqttConnected:false});
+    useLocatorStore.setState({loadedMap:undefined, maps:[], mapInfo:undefined});
+    expect((await loadStartupReference(new AbortController().signal))?.data).toEqual([0,0,100]);
+    expect(useLocatorStore.getState().loadedMap).toMatchObject({...latest.raster, imageUrl:'blob:cached-reference'});
+    const app = useAppStore.getState();
+    expect(app.sourceMap?.rawOccupancyGrid.data).toEqual([100,-1,0]);
+    expect(app.planningMap?.savedRevision).toBe(1);
+    expect(referenceDispatchIssue()).toMatch(/Navigator map binding/);
+    app.set({state:{orderId:'running',paused:true}});
+    await loadLocatorSource(name,{skipUnchanged:true});
+    expect(useAppStore.getState().routeRevision).toBe(app.routeRevision);
+    expect(useAppStore.getState().state?.orderId).toBe('running');
+    expect(download).toHaveBeenCalledTimes(1);
+  });
+
+  it('separates floors and Locator installations and rejects a different endpoint on download', async () => {
+    const download = backend();
+    await loadLocatorSource(name);
+    await loadLocatorSource('Floor B');
+    expect((await loadLocatorSource(name,{referenceOnly:true}))?.metadata.mapId).toBe(name);
+    idleNavigator('Floor B');
+    expect(referenceDispatchIssue()).toMatch(/binding/);
+    idleNavigator(name);
+    useLocatorStore.getState().updateSettings({port:443});
+    expect(referenceDispatchIssue()).toMatch(/installation/);
+    await expect(loadLocatorSource(name,{referenceOnly:true})).rejects.toThrow(/No saved reference/);
+    await expect(loadLocatorSource(name)).rejects.toThrow(/binding/);
+    expect(download).toHaveBeenCalledTimes(3);
+    expect(await referenceMapPersistence.load(configuredReferenceBinding(name))).toBeUndefined();
+  });
+
+  it('keeps the current reference, saved edits and route on confirmation of identical content', async () => {
+    backend();
+    await loadLocatorSource(name);
+    const original = await saveEdits();
+    await activateSavedPlanningMap(original);
+    idleNavigator(name);
+    const before = useAppStore.getState();
+    const candidate = await prepareSourceMapUpdate();
+    expect(candidate).toMatchObject({correctionsCompatible:true,geometryChanges:[]});
+    await confirmSourceMapUpdate(candidate);
+    expect(useAppStore.getState().grid).toBe(before.grid);
+    expect(useAppStore.getState().routeRevision).toBe(before.routeRevision);
+    expect((await mapCorrectionPersistence.listRevisions(original)).length).toBe(2);
+  });
+
+  it('archives the previous reference and its edits even when only the fingerprint changes', async () => {
+    const download = backend();
+    await loadLocatorSource(name);
+    const original = await saveEdits();
+    await activateSavedPlanningMap(original);
+    const revision = useAppStore.getState().routeRevision;
+    const next = downloaded(name);
+    next.info.fingerprint = '7722289214529635124';
+    download.mockResolvedValueOnce(next);
+    idleNavigator(name);
+    const candidate = await prepareSourceMapUpdate();
+    expect(candidate).toMatchObject({correctionsCompatible:false, geometryChanges:[]});
+    expect(useAppStore.getState().grid?.data).toEqual([0,0]);
+    expect(useAppStore.getState().routeRevision).toBe(revision);
+    await confirmSourceMapUpdate(candidate);
+    expect(useAppStore.getState().grid?.data).toEqual([100,-1]);
+    expect(useAppStore.getState().routeRevision).toBe(revision+1);
+    expect(useAppStore.getState().planningMap?.savedRevision).toBe(0);
+    const archive = await new ReferenceMapPersistence().load(configuredReferenceBinding(name), original.sourceIdentity);
+    expect(archive?.source.sourceIdentity).toEqual(original.sourceIdentity);
+    expect((await mapCorrectionPersistence.loadCorrections(archive!.source)).revision).toBe(1);
+    await expect(confirmSourceMapUpdate(candidate)).rejects.toThrow(/superseded/);
+  });
+
+  it('persists detected coordinate discrepancies through reload and requires alignment review', async () => {
+    const download = backend();
+    await loadLocatorSource(name);
+    const next = downloaded(name);
+    next.occupancy.metadata.origin.yaw += .2;
+    next.info.level = 1;
+    download.mockResolvedValue(next);
+    idleNavigator(name);
+    const candidate = await prepareSourceMapUpdate();
+    expect(candidate.geometryChanges).toEqual([
+      {field:'yaw',before:.2,after:.4},{field:'level',before:0,after:1},
+    ]);
+    expect(candidate.requiresAlignmentReview).toBe(true);
+    expect(referenceDispatchIssue()).toMatch(/alignment/);
+    const service = new MqttService(), send = vi.fn();
+    Object.assign(service, {settings:{topics:{order:'test/order'}}, bridge:{readyState:WebSocket.OPEN, send}});
+    await expect(service.publish('test/order','{}')).rejects.toThrow(/alignment/);
+    expect(send).not.toHaveBeenCalled();
+    await expect(confirmSourceMapUpdate(candidate)).rejects.toThrow(/alignment/);
+    useAppStore.setState({referenceReviewRequired:false});
+    await loadLocatorSource(name,{referenceOnly:true});
+    expect(referenceDispatchIssue()).toMatch(/alignment/);
+    await confirmSourceMapUpdate(await prepareSourceMapUpdate(),{coordinateAlignmentVerified:true});
+    expect(referenceDispatchIssue()).toBeUndefined();
+    expect(useAppStore.getState().grid?.metadata.origin.yaw).toBe(next.occupancy.metadata.origin.yaw);
+  });
+
+  it('blocks update confirmation for a different floor, offline robot, pending publication and active mission', async () => {
+    const download = backend();
+    await loadLocatorSource(name);
+    const original = useAppStore.getState().sourceMap;
+    download.mockResolvedValue(downloaded(name,0));
+    const candidate = await prepareSourceMapUpdate();
+    idleNavigator('Floor B');
+    await expect(confirmSourceMapUpdate(candidate)).rejects.toThrow(/binding/);
+    idleNavigator(name);
+    useAppStore.setState({mqttConnected:false});
+    await expect(confirmSourceMapUpdate(candidate)).rejects.toThrow(/Fresh online/);
+    idleNavigator(name);
+    useAppStore.setState({publishingOrder:true});
+    await expect(confirmSourceMapUpdate(candidate)).rejects.toThrow(/mission/);
+    useAppStore.setState({publishingOrder:false, state:{orderId:'in progress', edgeStates:[{}]}});
+    await expect(confirmSourceMapUpdate(candidate)).rejects.toThrow(/mission/);
+    expect(useAppStore.getState().sourceMap).toBe(original);
+    expect((await referenceMapPersistence.load(configuredReferenceBinding(name)))?.source.sourceIdentity)
+      .toEqual(original?.sourceIdentity);
+  });
+
+  it('keeps the old reference if a write fails or a new selection supersedes preparation', async () => {
+    const download = backend();
+    await loadLocatorSource(name);
+    const original = useAppStore.getState().sourceMap;
+    download.mockResolvedValueOnce(downloaded(name,0));
+    idleNavigator(name);
+    const candidate = await prepareSourceMapUpdate();
+    vi.spyOn(referenceMapPersistence,'save').mockRejectedValueOnce(new Error('quota exceeded'));
+    await expect(confirmSourceMapUpdate(candidate)).rejects.toThrow(/quota/);
+    expect(useAppStore.getState().sourceMap).toBe(original);
+    expect((await referenceMapPersistence.load(configuredReferenceBinding(name)))?.source.sourceIdentity)
+      .toEqual(original?.sourceIdentity);
+    const response = deferred<ReturnType<typeof downloaded>>();
+    download.mockReturnValueOnce(response.promise);
+    const waiting = prepareSourceMapUpdate();
+    await vi.waitFor(()=>expect(download).toHaveBeenCalledTimes(3));
+    await loadLocatorSource('Floor B');
+    response.resolve(downloaded(name,0));
+    await expect(waiting).rejects.toThrow(/selection changed/);
+    expect(useAppStore.getState().sourceMap?.sourceIdentity.metadata.mapId).toBe('Floor B');
+  });
+
+  it('aborts the storage transaction if Navigator starts a mission before the update commits', async () => {
+    const download = backend();
+    await loadLocatorSource(name);
+    const original = useAppStore.getState().sourceMap!;
+    idleNavigator(name);
+    download.mockResolvedValueOnce(downloaded(name,0));
+    const candidate = await prepareSourceMapUpdate();
+    const save = referenceMapPersistence.save.bind(referenceMapPersistence);
+    vi.spyOn(referenceMapPersistence, 'save').mockImplementationOnce((binding, record, expected, check) => {
+      useAppStore.setState({state:{orderId:'external order',driving:true}});
+      return save(binding, record, expected, check);
+    });
+    await expect(confirmSourceMapUpdate(candidate)).rejects.toThrow(/mission/);
+    expect(useAppStore.getState().sourceMap).toBe(original);
+    expect((await referenceMapPersistence.load(configuredReferenceBinding(name)))?.source.sourceIdentity)
+      .toEqual(original.sourceIdentity);
+    expect(useAppStore.getState().referenceUpdatePending).toBe(false);
+  });
+
+  it('reports corrupt reference data without overwriting it with a new download', async () => {
+    const download = backend();
+    await loadLocatorSource(name);
+    await new Promise<void>((resolve,reject)=>{
+      const open = indexedDB.open('med-robots-reference-maps');
+      open.onsuccess = () => {
+        const tx = open.result.transaction('active','readwrite');
+        const cursor = tx.objectStore('active').openCursor();
+        cursor.onsuccess = () => {
+          const row = cursor.result!;
+          const record = row.value;
+          record.source.rawOccupancyGrid.data[0] = 0;
+          row.update(record);
+        };
+        tx.oncomplete = () => {open.result.close(); resolve();};
+        tx.onabort = () => reject(tx.error);
+      };
+    });
+    await expect(loadLocatorSource(name)).rejects.toThrow(/integrity/);
+    expect(useLocatorStore.getState().error).toMatch(/integrity/);
+    expect(download).toHaveBeenCalledTimes(1);
+    expect(useAppStore.getState().sourceMap?.rawOccupancyGrid.data).toEqual([100,-1]);
   });
 });

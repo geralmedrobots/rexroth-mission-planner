@@ -3,6 +3,7 @@ import type { MqttSettings } from '../domain/types';
 import { inspectOutgoingOrderEdgeSpeeds } from '../domain/robot/SpeedLimitDiagnostics';
 import { LogService } from './LogService';
 import { outgoingMotionDiagnostics } from '../domain/vda5050/MotionExecutionDiagnostics';
+import { referenceDispatchIssue } from '../features/map/referenceMapBinding';
 
 export type MqttEvent =
   | { type: 'status'; connected: boolean; message: string }
@@ -44,6 +45,8 @@ export class MqttService {
 
   public publish(topic: string, payload: string, qos: 0|1|2 = 1, retain = false): Promise<void> {
     if(topic===this.settings?.topics.order){
+      const issue = referenceDispatchIssue();
+      if (issue) return Promise.reject(new Error(issue));
       for (const diagnostic of outgoingMotionDiagnostics(payload))
         LogService.write('mqtt', 'info', `[order-motion] ${JSON.stringify(diagnostic)}`);
       const edges=inspectOutgoingOrderEdgeSpeeds(payload);

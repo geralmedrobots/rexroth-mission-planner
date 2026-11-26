@@ -31,6 +31,19 @@ const resolveStartupMapId=()=>{
       binding.serialNumber===app.orderSettings.serialNumber?normalizeMapId(binding.locatorMapName):null);
 };
 
+export async function loadStartupReference(signal: AbortSignal) {
+  const locator = useLocatorStore.getState();
+  const resolved = resolveStartupMapId();
+  // A last selection identifies a cached floor for offline inspection only.
+  const mapId = resolved || locator.selectedMapName;
+  if (!mapId) throw new Error('No resolved navigation map or saved selection is available.');
+  const match = locator.maps.find(map => normalizeMapId(map.name) === mapId);
+  return loadLocatorSource(match?.name ?? mapId, {
+    signal, skipUnchanged:true, referenceOnly:!match || !resolved,
+    isSelectionCurrent:() => (resolveStartupMapId() || useLocatorStore.getState().selectedMapName) === mapId,
+  });
+}
+
 export function useStartupConnections(onGridLoaded?:(grid:OccupancyGrid)=>void):void {
   const retryToken=useStartupStore((state)=>state.retryToken);
   const callbackRef=useRef(onGridLoaded);callbackRef.current=onGridLoaded;
@@ -38,7 +51,7 @@ export function useStartupConnections(onGridLoaded?:(grid:OccupancyGrid)=>void):
     const mapCheckpoint=mapLoadCheckpoint();
     const operations:StartupOperation[]=[
       {phase:'LOADING_CONFIGURATION',message:'Loading saved application configuration…',run:async()=>{}},
-      {phase:'CONNECTING_MQTT',message:'Connecting to the robot message broker…',retries:2,run:async()=>{
+      {phase:'CONNECTING_MQTT',message:'Connecting to the robot message broker…',retries:2,optional:true,run:async()=>{
         const app=useAppStore.getState();
         if(!app.mqttSettings.automaticConnection)throw new Error('Automatic MQTT connection is disabled.');
         mqttService.connect(app.mqttSettings);
@@ -72,19 +85,13 @@ export function useStartupConnections(onGridLoaded?:(grid:OccupancyGrid)=>void):
         LogService.write('system','info',`Locator returned ${maps.length} available map(s).`);
       }},
       {phase:'RESOLVING_MAP',message:'Resolving the active navigation map…',optional:true,run:async(signal)=>{
-        await waitFor(()=>!isLatestMapLoad(mapCheckpoint)||Boolean(resolveStartupMapId()),
+        await waitFor(()=>!isLatestMapLoad(mapCheckpoint)||Boolean(resolveStartupMapId())||
+          (!useAppStore.getState().mqttSettings.automaticConnection && Boolean(useLocatorStore.getState().selectedMapName)),
           8_000,signal,'Navigator mapId is unavailable. Confirm a Locator map binding in advanced settings.');
       }},
       {phase:'LOADING_MAP',message:'Loading the matching hospital navigation map…',optional:true,run:async(signal)=>{
         if(!isLatestMapLoad(mapCheckpoint))return;
-        const locator=useLocatorStore.getState();
-        const mapId=resolveStartupMapId();
-        if(!mapId)throw new Error('No resolved navigation map is available.');
-        const match=locator.maps.find((map)=>normalizeMapId(map.name)===mapId);
-        if(!match)throw new Error(`Resolved map "${mapId}" is not available on ROKIT Locator.`);
-        const grid=await loadLocatorSource(match.name,{
-          signal,skipUnchanged:true,isSelectionCurrent:()=>resolveStartupMapId()===mapId,
-        });
+        const grid=await loadStartupReference(signal);
         if(grid){
           callbackRef.current?.(grid);
           LogService.write('planner','info','Map loaded successfully.');

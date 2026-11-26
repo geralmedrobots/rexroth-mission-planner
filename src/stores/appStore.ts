@@ -46,6 +46,7 @@ export interface AppState {
   mapBindingMismatchWarning: string | null;
   navigatorIdentityKey: string;
   sourceMap?: SourceMapSnapshot; planningMap?: PlanningMapSnapshot;
+  referenceReviewRequired?: boolean; referenceUpdatePending?: boolean;
   /** Compatibility alias for the effective occupancy grid. */
   grid?: OccupancyGrid; inflatedGrid?: OccupancyGrid; start?: RobotPose; goal?: RobotPose;
   goalThetaExplicit: boolean;
