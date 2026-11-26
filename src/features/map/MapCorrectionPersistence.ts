@@ -67,6 +67,25 @@ async function storageKey(identity: SourceMapIdentity) {
 }
 
 export class MapCorrectionPersistence {
+  async importRevisions(source: SourceMapSnapshot, revisions: readonly SavedMapRevision[],
+    commitReference: () => Promise<void>): Promise<void> {
+    const key = await storageKey(source.sourceIdentity);
+    if (!navigator.locks) throw new Error('Importing map revisions requires browser Web Locks.');
+    await navigator.locks.request(key, async () => {
+      if (localStorage.getItem(key) !== null) throw new Error('Correction history already exists.');
+      const entries = revisions.slice(1);
+      const text = JSON.stringify({schemaVersion: 1, sourceIdentity: source.sourceIdentity,
+        activeRevision: entries.length, revisions: entries});
+      if (entries.length) localStorage.setItem(key, text);
+      try {
+        await commitReference();
+      } catch (error) {
+        if (entries.length && localStorage.getItem(key) === text) localStorage.removeItem(key);
+        throw error;
+      }
+    });
+  }
+
   private read(source: SourceMapSnapshot, key: string): SavedPlanningMap {
     const sourceIdentity = source.sourceIdentity;
     const text = localStorage.getItem(key);

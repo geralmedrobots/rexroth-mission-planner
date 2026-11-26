@@ -122,11 +122,12 @@ export async function downloadReference(binding: ReferenceMapBinding): Promise<S
 
 /** Prepare all fallible reads before replacing the persisted reference or publishing the grid. */
 export async function activateReference(record: StoredReferenceMap, isCurrent: () => boolean,
-  skipUnchanged: boolean, persist?: () => Promise<void>, explicitUpdate = false): Promise<OccupancyGrid | undefined> {
+  skipUnchanged: boolean, persist?: () => Promise<void>, explicitUpdate = false,
+  preparedPlanning?: PlanningMapSnapshot): Promise<OccupancyGrid | undefined> {
   const {source, info, reviewRequired} = record;
   const active = useAppStore.getState().planningMap;
   const mode = persist || !useLocatorStore.getState().loadedMap ? 'reload' : skipUnchanged ? 'startup' : 'editor';
-  const planning = await planFromSource(source, isCurrent, explicitUpdate ? 'update' : mode);
+  const planning = preparedPlanning ?? await planFromSource(source, isCurrent, explicitUpdate ? 'update' : mode);
   if (!isCurrent()) return;
   if (!planning || planning === active) {
     useAppStore.getState().set({referenceReviewRequired:reviewRequired});
