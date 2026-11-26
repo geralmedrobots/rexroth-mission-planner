@@ -94,3 +94,5 @@ describe('MotionPlan to VDA execution intent', () => {
     expect(buildSpeedCycleDiagnostic(state, {}).commandVelocityX).toBeNull();
   });
 });
+
+vi.mock('../features/pharmacy/deliveryApi',()=>({deliveryRequest:vi.fn().mockResolvedValue({})}));

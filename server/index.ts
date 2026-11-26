@@ -1,8 +1,12 @@
 import cors from 'cors';
+import { registerDelivery } from './deliveryService.js';
 import express from 'express';
 import { existsSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { resolve } from 'node:path';
+import { resolve,join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { createHash } from 'node:crypto';
+import { createServer as createOwnershipLock } from 'node:net';
 import mqtt, { type MqttClient } from 'mqtt';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { registerLocatorProxy } from './locatorProxy.js';
@@ -25,6 +29,9 @@ app.get('/health',(_request,response)=>response.json({ok:true,service:'ROKIT MQT
 registerLocatorProxy(app);
 registerStage5BRecording(app);
 registerCtrlXDataLayerProxy(app);
+const deliveryRouter=express.Router();
+app.use(deliveryRouter);
+let delivery:ReturnType<typeof registerDelivery>;
 
 // In production the bridge also serves the compiled Vite application, so a
 // single published Docker port is enough for the complete web application.
@@ -62,6 +69,9 @@ wss.on('connection',(socket)=>{
         client.on('close',()=>send(socket,{type:'status',connected:false,message:'MQTT disconnected'}));
         client.on('error',(error)=>send(socket,{type:'status',connected:false,message:error.message}));
       } else if(message.type==='publish'&&client?.connected&&message.topic&&message.payload!==undefined){
+        if(delivery.active()&&(message.topic===delivery.orderTopic()||message.topic.endsWith('/order'))){
+          send(socket,{type:'publish',topic:message.topic,success:false,message:'The pharmacy mission owns order dispatch.'});return;
+        }
         client.publish(message.topic,message.payload,{qos:message.qos??1,retain:message.retain??false},(error)=>
           send(socket,{type:'publish',topic:message.topic!,success:!error,message:error?.message??'Publish acknowledged'}));
       }
@@ -71,4 +81,13 @@ wss.on('connection',(socket)=>{
 });
 const port=Number(process.env.ROKIT_BRIDGE_PORT??8787);
 const host=process.env.ROKIT_BRIDGE_HOST??'127.0.0.1';
-server.listen(port,host,()=>console.log(`ROKIT application listening on http://${host}:${port}`));
+// The OS releases this owner endpoint when its process exits. Never run two
+// schedulers against one journal, even if their HTTP ports differ.
+const deliveryDir=resolve(process.env.MISSION_DATA_DIR??'data/pharmacy-delivery');
+const key='medrobots-delivery-'+createHash('sha256').update(process.platform==='win32'?deliveryDir.toLowerCase():deliveryDir).digest('hex').slice(0,32);
+const lockPath=process.platform==='win32'?'\\\\.\\pipe\\'+key:process.platform==='linux'?'\0'+key:join(tmpdir(),key+'.sock');
+const owner=createOwnershipLock(socket=>socket.end());
+owner.listen(lockPath,()=>server.listen(port,host,()=>{
+  delivery=registerDelivery(deliveryRouter,deliveryDir);
+  console.log(`ROKIT application listening on http://${host}:${port}`);
+}));

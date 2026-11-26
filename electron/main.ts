@@ -14,7 +14,7 @@ const createWindow = ():void => {
   if(dev) void window.loadURL(dev); else void window.loadFile(join(directory,'../../dist/index.html'));
 };
 app.whenReady().then(()=>{
-  if(!process.env.VITE_DEV_SERVER_URL) bridge=fork(join(directory,'../server/index.js'),[],{stdio:'inherit'});
+  if(!process.env.VITE_DEV_SERVER_URL) bridge=fork(join(directory,'../server/index.js'),[],{stdio:'inherit',env:{...process.env,MISSION_DATA_DIR:process.env.MISSION_DATA_DIR??join(app.getPath('userData'),'pharmacy-delivery')}});
   ipcMain.handle('config:save',async(_event,data:string)=>{
     const result=await dialog.showSaveDialog({defaultPath:'rokit-planner-settings.json',filters:[{name:'JSON',extensions:['json']}]});
     if(!result.canceled&&result.filePath) await writeFile(result.filePath,data,'utf8');

@@ -117,3 +117,11 @@ body:has(.mr-app-shell[data-reduce-motion='true']) *::after {
 .mr-stop-list { padding-inline-start: 24px; margin: 0; }
 .mr-stop-list li { padding: 4px 0; }
 .mr-stop-list button { min-width: 32px; }
+
+.delivery-timeline { padding-left: 1.5rem; }
+.delivery-timeline li { border-left: 3px solid var(--mr-line); padding: 6px 12px; }
+.delivery-timeline li > div { font-size: .8rem; }
+.delivery-timeline [data-status="Active"] { border-color: #17628b; }
+.delivery-timeline [data-status="Completed"] { border-color: #176747; }
+.delivery-timeline [data-status="Waiting for confirmation"] { border-color: #925a00; background: #fff8eb; }
+.delivery-timeline [data-status="Recovery required"], .delivery-timeline [data-status="Cancelled"] { border-color: var(--mr-red); }

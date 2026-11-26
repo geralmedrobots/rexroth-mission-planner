@@ -17,6 +17,7 @@ import { useStartupStore } from '../features/startup/startupStore';
 import { mqttService } from '../services/MqttService';
 import { useAppStore } from '../stores/appStore';
 
+vi.mock('../features/pharmacy/deliveryApi',()=>({deliveryRequest:vi.fn().mockResolvedValue({archive:[],maps:[],connected:false,localisation:'Unavailable'})}));
 vi.mock('../features/startup/useStartupConnections', () => ({ useStartupConnections: vi.fn() }));
 vi.mock('../features/replanning/useGlobalReplanning', () => ({ useGlobalReplanning: vi.fn() }));
 vi.mock('../hooks/useMqtt', () => ({ useMqtt: vi.fn() }));

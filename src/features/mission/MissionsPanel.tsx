@@ -3,7 +3,9 @@ import {Alert,Button,Dialog,DialogActions,DialogTitle,MenuItem,Stack,TextField,T
 import type {SavedDestination} from '../destinations/destinationStore';
 import {betweenStops,inFlight,missionStorageIssue,newMission,resolveStop,savedStop,useMissionLibrary,type MissionRun,type MissionTemplate} from './missionLibrary';
 import type {MissionPreview} from './missionPreview';
+import {pharmacyTitle} from '../pharmacy/model';
 interface Props {
+  onDelivery:()=>void;
   draft:MissionTemplate;mapId?:string;points:SavedDestination[];index:number;continuing:boolean;busy:boolean;
   preview?:MissionPreview;message:string;blockers:string[];robot:string;pose:boolean;speed:number;replanning:string;
   onEdit:(t:MissionTemplate)=>void;onMap:()=>void;onValidate:()=>void;onExecute:()=>void;onClose:()=>void;
@@ -54,6 +56,7 @@ export function MissionsPanel(p:Props){
     {tab==='Library'&&<>
       <TextField size="small" label="Search missions" value={search} onChange={e=>setSearch(e.target.value)}/>
       <Button disabled={!p.mapId} onClick={()=>load(newMission(p.mapId!))}>New mission</Button>
+      {pharmacyTitle.toLowerCase().includes(search.toLowerCase())&&<Button variant="outlined" onClick={p.onDelivery}>{pharmacyTitle}</Button>}
       {lib.templates.filter(m=>m.mapId===p.mapId&&m.name.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>a.name.localeCompare(b.name)).map(m=>
         <section key={m.id} className="mr-mission-entry"><strong>{m.name}</strong><Typography variant="body2">{m.description}</Typography>
           <Typography variant="caption">{m.stops.length} destinations · {m.mapId}</Typography>

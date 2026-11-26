@@ -32,6 +32,7 @@ import type {
   OccupancyGrid, PathPoint, PlannerOptions, PlannerResult, RobotFootprint, RobotPose,
   ValidationResult, VdaInstantAction, VdaOrder, Waypoint,
 } from './domain/types';
+import { DeliveryConsole } from './features/pharmacy/DeliveryConsole';
 import { MissionsPanel } from './features/mission/MissionsPanel';
 import { useMissionWorkspace } from './features/mission/useMissionWorkspace';
 import { newMission, observeRun, inFlight, useMissionLibrary, type MissionRun } from './features/mission/missionLibrary';
@@ -240,6 +241,7 @@ export default function App(){
   const [draft,setDraft]=useState<WaypointDraft>();
   const [placement,setPlacement]=useState<{mapId:string;item?:SavedDestination}>();
   const [focusedPoint,setFocusedPoint]=useState<SavedDestination>();
+  const [deliveryOpen,setDeliveryOpen]=useState(false);
   const workspace=useMissionWorkspace(getLiveRouteContext);
   const operatorSettings=useOperatorSettingsStore((state)=>state.settings);
   const globalReplanning=useGlobalReplanningStore();
@@ -1153,6 +1155,7 @@ export default function App(){
       ?Math.min(2,Math.max(.5,operatorSettings.mapContrast)):1,
   }}>
     <StartupOverlay/>
+    <DeliveryConsole open={deliveryOpen} onClose={()=>setDeliveryOpen(false)}/>
     <AppBar position="static" elevation={0} sx={{
       background:'#fff',color:'text.primary',
       borderBottom:'1px solid',borderColor:'divider'}}>
@@ -1259,7 +1262,7 @@ export default function App(){
     <Box component="aside" aria-label="Mission panel" className="mr-workspace-mission-panel"
       hidden={tablet&&!missionPanelOpen}
       sx={{p:1.5,bgcolor:'rgba(255,255,255,.98)',borderLeft:'1px solid',borderColor:'divider'}}>
-      {workspace.open?<MissionsPanel draft={workspace.draft} mapId={store.grid?.metadata.mapId} points={workspace.points}
+      {workspace.open?<MissionsPanel onDelivery={()=>setDeliveryOpen(true)} draft={workspace.draft} mapId={store.grid?.metadata.mapId} points={workspace.points}
         index={workspace.index} continuing={!!workspace.run} busy={workspace.busy} preview={workspace.preview}
         message={workspace.message} blockers={missionBlockers()} robot={robotConnectionLabel} pose={!!poseSnapshot}
         speed={store.orderSettings.missionMaximumSpeedMps} replanning={globalReplanning.runtime.status} onEdit={workspace.edit}

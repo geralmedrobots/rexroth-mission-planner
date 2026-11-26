@@ -1,3 +1,5 @@
+import {useAppStore} from '../stores/appStore';
+import {deliveryRequest} from '../features/pharmacy/deliveryApi';
 import mqtt, { type IClientOptions, type MqttClient } from 'mqtt';
 import type { MqttSettings } from '../domain/types';
 import { inspectOutgoingOrderEdgeSpeeds } from '../domain/robot/SpeedLimitDiagnostics';
@@ -42,8 +44,18 @@ export class MqttService {
     this.emit({ type:'status',connected:false,message:'Disconnected' });
   }
 
-  public publish(topic: string, payload: string, qos: 0|1|2 = 1, retain = false): Promise<void> {
+  public async publish(topic: string, payload: string, qos: 0|1|2 = 1, retain = false): Promise<void> {
     if(topic===this.settings?.topics.order){
+      const before=useAppStore.getState(),client=this.mqttClient,bridge=this.bridge;
+      await deliveryRequest('manual-order',{});
+      const after=useAppStore.getState(),received=before.mqttReceiveMetadata.lastStateReceiveTime;
+      if(before.state!==after.state||before.visualization!==after.visualization||before.connection!==after.connection||
+        before.mqttConnected!==after.mqttConnected||before.routeRevision!==after.routeRevision||
+        before.generatedOrder!==after.generatedOrder||before.mqttSettings!==after.mqttSettings||
+        client!==this.mqttClient||bridge!==this.bridge||
+        (received!=null&&Date.now()-received>after.orderSettings.stateStaleTimeoutMs)){
+        throw Error('Robot or route state changed during dispatch arbitration. Validate again.');
+      }
       for (const diagnostic of outgoingMotionDiagnostics(payload))
         LogService.write('mqtt', 'info', `[order-motion] ${JSON.stringify(diagnostic)}`);
       const edges=inspectOutgoingOrderEdgeSpeeds(payload);
